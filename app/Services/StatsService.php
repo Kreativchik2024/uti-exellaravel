@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class StatsService
 {
@@ -17,21 +18,22 @@ class StatsService
             $model = $cfg['model'];
             $hasQty = isset($cfg['fields']['qty']);
 
-            $q = $model::query()->whereDate('created_at', '>=', $from->toDateString());
+            // Определяем, по какому полю фильтровать: record_date (дата события) или created_at (дата импорта)
+            $table = (new $model)->getTable();
+            $dateField = Schema::hasColumn($table, 'record_date') ? 'record_date' : 'created_at';
 
-            // Если передан исполнитель — фильтруем
+            $q = $model::query()->whereDate($dateField, '>=', $from->toDateString());
+
             if ($user && $user->isExecutor()) {
                 $q->where('created_by', $user->id);
             }
 
-            // Считаем либо сумму qty, либо количество строк
             if ($hasQty) {
                 $total = (clone $q)->sum('qty');
             } else {
                 $total = (clone $q)->count();
             }
 
-            // Группировка по авторам
             $byUser = (clone $q)
                 ->select('created_by', $hasQty ? DB::raw('SUM(qty) as c') : DB::raw('COUNT(*) as c'))
                 ->groupBy('created_by')
@@ -76,8 +78,11 @@ class StatsService
 
     public function byPosts(Carbon $from, ?User $user): array
     {
+        $pgpTable = (new \App\Models\PgpRecord)->getTable();
+        $dateField = Schema::hasColumn($pgpTable, 'record_date') ? 'record_date' : 'created_at';
+
         $q = \App\Models\PgpRecord::query()
-            ->whereDate('created_at', '>=', $from->toDateString());
+            ->whereDate($dateField, '>=', $from->toDateString());
 
         if ($user && $user->isExecutor()) {
             $q->where('created_by', $user->id);
