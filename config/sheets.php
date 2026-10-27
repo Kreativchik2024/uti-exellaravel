@@ -256,7 +256,7 @@ return [
                 'notes'    => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
                 'comments' => ['label'=>'Комментарии','type'=>'textarea','rules'=>'nullable|string'],
             ], $faultCode),
-            'list_columns' => ['record_date','serial_number','frame_serial','camera_status','night_camera_status','fault_code'],
+            'list_columns' => ['record_date','serial_number','camera_status','night_camera_status','fault_code'],
         ],
 
         // =====================================================

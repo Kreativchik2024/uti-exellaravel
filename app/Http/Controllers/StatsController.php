@@ -11,17 +11,8 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class StatsController extends Controller
 {
-    /**
-     * Допустимые периоды: 0 = всё время, 1, 7, 30 дней.
-     */
     private const ALLOWED_PERIODS = [0, 1, 7, 30];
 
-    /**
-     * Вычислить дату начала периода.
-     *
-     * @param  int  $period  0 = всё время, иначе количество дней
-     * @return Carbon|null   null = без фильтра по дате (всё время)
-     */
     private function resolveFrom(int $period): ?Carbon
     {
         if ($period === 0) {
@@ -31,11 +22,6 @@ class StatsController extends Controller
         return now()->subDays($period - 1)->startOfDay();
     }
 
-    /**
-     * Определить, чью статистику показывать.
-     *
-     * @return User|null  null = общая статистика (без фильтра по пользователю)
-     */
     private function resolveTargetUser(Request $r): ?User
     {
         $user = auth()->user();
@@ -45,15 +31,14 @@ class StatsController extends Controller
                 return User::find($r->user_id) ?? $user;
             }
 
-            return null; // общая статистика
+            return null;
         }
 
-        // Исполнитель
         if ($r->input('mode') === 'all') {
-            return null; // общая статистика
+            return null;
         }
 
-        return $user; // только своя
+        return $user;
     }
 
     public function index(Request $r, StatsService $s)
@@ -78,6 +63,33 @@ class StatsController extends Controller
         $totals   = $s->totals($perSheet);
         $byPosts  = $s->byPosts($from, $targetUser);
 
+        // === Сводка по исполнителю ===
+        $worker         = trim((string) $r->input('worker', ''));
+        $workerDateFrom = $r->input('worker_date_from');
+        $workerDateTo   = $r->input('worker_date_to');
+
+        $workersList   = $s->listWorkers();
+        $workerSummary = [];
+
+        if ($worker !== '') {
+            if ($workerDateFrom || $workerDateTo) {
+                if ($workerDateFrom && !$workerDateTo) {
+                    // Одна дата — ровно этот день
+                    $wFrom = Carbon::parse($workerDateFrom)->startOfDay();
+                    $wTo   = Carbon::parse($workerDateFrom)->endOfDay();
+                } else {
+                    $wFrom = $workerDateFrom ? Carbon::parse($workerDateFrom)->startOfDay() : null;
+                    $wTo   = $workerDateTo   ? Carbon::parse($workerDateTo)->endOfDay()     : null;
+                }
+            } else {
+                // Даты не указаны — берём общий период
+                $wFrom = $from;
+                $wTo   = null;
+            }
+
+            $workerSummary = $s->workerSummary($worker, $wFrom, $wTo);
+        }
+
         return view('stats.index', compact(
             'period',
             'from',
@@ -85,7 +97,10 @@ class StatsController extends Controller
             'totals',
             'byPosts',
             'usersList',
-            'targetUser'
+            'targetUser',
+            'worker',
+            'workersList',
+            'workerSummary'
         ));
     }
 

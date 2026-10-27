@@ -20,10 +20,8 @@ class RecordController extends Controller
 
         $query = $cfg['model']::query();
 
-        // Если исполнитель — показываем только его записи
-        if (auth()->user()->isExecutor()) {
-            $query->where('created_by', auth()->id());
-        }
+        // Все пользователи видят все записи во всех категориях.
+        // Права на редактирование/удаление ограничены политикой RecordPolicy.
 
         // П О И С К
         $q = trim($request->input('q', ''));

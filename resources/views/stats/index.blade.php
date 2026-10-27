@@ -15,7 +15,6 @@
         <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
             <div class="flex flex-wrap items-end gap-4">
 
-                {{-- Период (ссылки) --}}
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">Период</label>
                     <div class="flex flex-wrap gap-1">
@@ -28,7 +27,6 @@
                     </div>
                 </div>
 
-                {{-- Переключатель для исполнителя (Моя / Общая) --}}
                 @if(auth()->user()->isExecutor())
                     <div>
                         <label class="block text-xs text-gray-500 mb-1">Вид статистики</label>
@@ -45,14 +43,13 @@
                     </div>
                 @endif
 
-                {{-- Селект для админа/мастера --}}
                 @if(auth()->user()->isAdmin() || auth()->user()->isMaster())
                     <form method="GET" action="{{ route('stats.index') }}" class="flex items-end gap-2">
                         <input type="hidden" name="period" value="{{ $period }}">
                         <div>
-                            <label class="block text-xs text-gray-500 mb-1">Сотрудник</label>
+                            <label class="block text-xs text-gray-500 mb-1">Сотрудник (автор)</label>
                             <select name="user_id" onchange="this.form.submit()" class="border rounded px-3 py-1 text-sm bg-white min-w-[200px]">
-                                <option value="">Общая статистика</option>
+                                <option value="">Все авторы</option>
                                 @foreach($usersList as $u)
                                     <option value="{{ $u->id }}" @selected(request('user_id') == $u->id)>{{ $u->name }}</option>
                                 @endforeach
@@ -100,19 +97,101 @@
             </div>
         </div>
 
-        {{-- ИСПОЛНИТЕЛИ (показываем только если это не "моя" статистика) --}}
-        @if(! empty($totals['perUser']) && (!auth()->user()->isExecutor() || request('mode') === 'all'))
-            <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-                <h3 class="font-semibold text-lg mb-3 text-gray-800">Всего по исполнителям</h3>
-                <div class="flex flex-wrap gap-2">
-                    @foreach($totals['perUser'] as $name => $count)
-                        <span class="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1 rounded-full text-sm font-medium">
-                            {{ $name }}: <strong>{{ $count }}</strong>
-                        </span>
-                    @endforeach
+        {{-- СВОДКА ПО ИСПОЛНИТЕЛЮ --}}
+        <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+            <h3 class="font-semibold text-lg mb-3 text-gray-800">Сводка по исполнителю</h3>
+
+            <form method="GET" action="{{ route('stats.index') }}" class="flex flex-wrap items-end gap-3">
+                <input type="hidden" name="period" value="{{ $period }}">
+                @if(request('user_id'))
+                    <input type="hidden" name="user_id" value="{{ request('user_id') }}">
+                @endif
+                @if(request('mode'))
+                    <input type="hidden" name="mode" value="{{ request('mode') }}">
+                @endif
+
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Исполнитель</label>
+                    <select name="worker" class="border rounded px-3 py-1 text-sm bg-white min-w-[220px]">
+                        <option value="">— выберите —</option>
+                        @foreach($workersList as $w)
+                            <option value="{{ $w }}" @selected($worker === $w)>{{ $w }}</option>
+                        @endforeach
+                    </select>
                 </div>
-            </div>
-        @endif
+
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Дата с</label>
+                    <input type="date" name="worker_date_from" value="{{ request('worker_date_from') }}"
+                           class="border rounded px-3 py-1 text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Дата по</label>
+                    <input type="date" name="worker_date_to" value="{{ request('worker_date_to') }}"
+                           class="border rounded px-3 py-1 text-sm">
+                </div>
+
+                <div class="flex gap-2">
+                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
+                    @if($worker || request('worker_date_from') || request('worker_date_to'))
+                        <a href="{{ route('stats.index', array_filter([
+                                'period' => $period,
+                                'user_id' => request('user_id'),
+                                'mode' => request('mode'),
+                            ])) }}"
+                           class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-1 text-sm rounded">Сброс</a>
+                    @endif
+                </div>
+            </form>
+
+            <p class="text-xs text-gray-400 mt-2">
+                Только «Дата с» — поиск за этот день. Обе даты — период. Ничего не указано — берётся общий период сверху.
+            </p>
+
+            @if($worker !== '')
+                <div class="mt-4">
+                    <p class="text-sm text-gray-600 mb-2">
+                        <strong>{{ $worker }}</strong>
+                        <span class="text-gray-400">
+                            @if(request('worker_date_from') && request('worker_date_to'))
+                                · {{ \Carbon\Carbon::parse(request('worker_date_from'))->format('d.m.Y') }} — {{ \Carbon\Carbon::parse(request('worker_date_to'))->format('d.m.Y') }}
+                            @elseif(request('worker_date_from'))
+                                · {{ \Carbon\Carbon::parse(request('worker_date_from'))->format('d.m.Y') }}
+                            @elseif(request('worker_date_to'))
+                                · до {{ \Carbon\Carbon::parse(request('worker_date_to'))->format('d.m.Y') }}
+                            @endif
+                        </span>
+                    </p>
+
+                    @if(empty($workerSummary))
+                        <p class="text-gray-500 text-sm">Ничего не найдено за выбранный период.</p>
+                    @else
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-gray-50 text-gray-600">
+                                    <tr>
+                                        <th class="p-3 text-left font-semibold rounded-tl">Категория</th>
+                                        <th class="p-3 text-right font-semibold rounded-tr">Сделано</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    @foreach($workerSummary as $slug => $data)
+                                        <tr class="hover:bg-gray-50 transition">
+                                            <td class="p-3 text-gray-800">{{ $data['title'] }}</td>
+                                            <td class="p-3 text-right">
+                                                <span class="text-blue-700 font-bold">{{ $data['total'] }}</span>
+                                                <span class="text-xs text-gray-400 ml-1">{{ $data['unit'] }}</span>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            @endif
+        </div>
 
         {{-- Детализация по постам (ПГП) --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
@@ -126,7 +205,7 @@
                             <tr>
                                 <th class="p-3 text-left font-semibold rounded-tl">Пост</th>
                                 <th class="p-3 text-left font-semibold">Всего бортов</th>
-                                <th class="p-3 text-left font-semibold rounded-tr">Исполнители (кол-во записей)</th>
+                                <th class="p-3 text-left font-semibold rounded-tr">Сдано</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -134,15 +213,7 @@
                                 <tr class="hover:bg-gray-50 transition">
                                     <td class="p-3 font-semibold text-gray-800">{{ $post }}</td>
                                     <td class="p-3 text-blue-700 font-bold">{{ $data['total'] }}</td>
-                                    <td class="p-3">
-                                        <div class="flex flex-wrap gap-1">
-                                            @foreach($data['users'] as $worker => $count)
-                                                <span class="inline-block bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs">
-                                                    {{ $worker }}: {{ $count }}
-                                                </span>
-                                            @endforeach
-                                        </div>
-                                    </td>
+                                    <td class="p-3 text-green-700 font-bold">{{ $data['delivered'] }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
