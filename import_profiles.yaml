@@ -1,0 +1,49 @@
+# ============================================================
+# Профили импорта CSV → таблицы
+# ============================================================
+
+cross3_records:
+  csv_columns:
+    0:  record_date
+    1:  serial_number
+    2:  worker1_raw
+    3:  pc_version
+    4:  ahrs
+    5:  compass_version
+    6:  camera_mount
+    7:  bch
+    8:  wings_check
+    9:  parachute_check
+    10: asc_check
+    11: calibration
+    12: notes
+    13: defect
+    14: path
+    15: unused
+    16: primechanie
+
+  table_columns:
+    record_date:     record_date
+    serial_number:   serial_number
+    worker1_raw:     worker1
+    pc_version:      pc_version
+    ahrs:            ahrs
+    compass_version: compass_version
+    camera_mount:    camera_mount
+    bch:             bch
+    wings_check:     wings_check
+    parachute_check: parachute_check
+    asc_check:       asc_check
+    calibration:     calibration
+    notes:           notes
+    defect:          defect
+    path:            worker3
+    primechanie:     worker2
+
+  date_column: record_date
+  date_formats: ["%d.%m.%Y", "%d.%m.%y"]
+  fallback_worker1_from: primechanie
+  ignore_columns: [unused]
+  auto_fill:
+    created_at: now
+    updated_at: now
