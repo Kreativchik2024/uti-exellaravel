@@ -243,7 +243,7 @@ return [
             'fields' => array_merge([
                 'record_date'         => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
                 'serial_number'       => ['label'=>'S/N кронштейна','type'=>'text','rules'=>'nullable|string|max:120'],
-                'frame_serial'        => ['label'=>'№ моторамы','type'=>'text','rules'=>'nullable|string|max:120'],
+                //'frame_serial'        => ['label'=>'№ моторамы','type'=>'text','rules'=>'nullable|string|max:120'],
                 'camera_status'       => ['label'=>'Камера','type'=>'select','rules'=>'nullable',
                                             'options'=>['Работает','Не работает','Требует ремонта']],
                 'night_camera_status' => ['label'=>'Ночная камера','type'=>'select','rules'=>'nullable',
