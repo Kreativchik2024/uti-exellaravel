@@ -275,5 +275,25 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
+        // =====================================================
+        // Датчик скорости
+        // =====================================================
+        'speed_sensor' => [
+            'title'  => 'Датчик скорости',
+            'model'  => \App\Models\SpeedSensorRecord::class,
+            'policy' => \App\Policies\RecordPolicy::class,
+            'fields' => array_merge([
+                'record_date'   => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
+                'serial_number' => ['label'=>'Серийный номер','type'=>'text','rules'=>'required|string|max:120'],
+                'is_working'    => ['label'=>'Рабочий','type'=>'select','rules'=>'required',
+                                    'options'=>['Да','Нет']],
+                'runs_count'    => ['label'=>'Кол-во прогонов','type'=>'number','rules'=>'required|integer|min:1',
+                                    'default'=>3],
+            ], $workers, [
+                'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
+            ], $faultCode),
+            'list_columns' => ['record_date','serial_number','is_working','runs_count','fault_code'],
+        ],
+
     ],
 ];

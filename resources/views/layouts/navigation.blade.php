@@ -36,9 +36,10 @@
                                 'software_install' => 'Установка ПО',
                                 'motor_regulator' => 'Регулятор мотора',
                                 'camera_bracket' => 'Кронштейн с камерой',
+                                'speed_sensor' => 'Датчик скорости',
                                 'router_firmware' => 'Прошивка роутеров',
                             ] as $slug => $label)
-                                <x-dropdown-link :href="route('records.index', $slug)" :class="request()->route('sheet') === $slug ? 'font-semibold text-indigo-600' : ''">
+                                <x-dropdown-link :href="route('records.index', $slug)" :class="request()->route('sheet') === $slug && $slug !== 'speed_sensor' ? 'font-semibold text-indigo-600' : ''">
                                     {{ __($label) }}
                                 </x-dropdown-link>
                             @endforeach
@@ -140,9 +141,10 @@
                         'software_install' => 'Установка ПО',
                         'motor_regulator' => 'Регулятор мотора',
                         'camera_bracket' => 'Кронштейн с камерой',
+                        'speed_sensor' => 'Датчик скорости',
                         'router_firmware' => 'Прошивка роутеров',
                     ] as $slug => $label)
-                        <x-responsive-nav-link :href="route('records.index', $slug)" :active="request()->route('sheet') === $slug">
+                        <x-responsive-nav-link :href="route('records.index', $slug)" :active="request()->route('sheet') === $slug && $slug !== 'speed_sensor'">
                             {{ __($label) }}
                         </x-responsive-nav-link>
                     @endforeach

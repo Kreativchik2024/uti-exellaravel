@@ -13,6 +13,7 @@ use App\Models\PgpRecord;
 use App\Models\ResearchRecord;
 use App\Models\SophonCheckRecord;
 use App\Models\TechnologistRecord;
+use App\Models\SpeedSensorRecord;          // ← добавлено
 use App\Observers\FirmwareVersionObserver;
 use App\Policies\FirmwarePolicy;
 use App\Policies\NewsPolicy;
@@ -51,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(MotorRegulatorRecord::class,  RecordPolicy::class);
         Gate::policy(CameraBracketRecord::class,   RecordPolicy::class);
         Gate::policy(RouterFirmwareRecord::class,  RecordPolicy::class);
+        Gate::policy(SpeedSensorRecord::class,     RecordPolicy::class);   // ← теперь корректно
 
         // Observer прошивок
         FirmwareVersion::observe(FirmwareVersionObserver::class);
