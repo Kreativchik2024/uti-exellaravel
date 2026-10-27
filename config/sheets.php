@@ -8,6 +8,10 @@ $workers = [
     'worker5' => ['label'=>'Исполнитель 5','type'=>'text','rules'=>'nullable|string|max:120'],
 ];
 
+$faultCode = [
+    'fault_code' => ['label'=>'Код неисправности','type'=>'text','rules'=>'nullable|string|max:100'],
+];
+
 return [
     'map' => [
 
@@ -31,8 +35,8 @@ return [
                                        'options'=>['Сдан','Не сдан','В работе','Исправен','Неисправен','В ремонт']],
                 'defect_reason'   => ['label'=>'Причина','type'=>'textarea','rules'=>'nullable|string'],
                 'actions_taken'   => ['label'=>'Действия','type'=>'textarea','rules'=>'nullable|string'],
-            ]),
-            'list_columns' => ['record_date','post_number','board_number','status'],
+            ], $faultCode),
+            'list_columns' => ['record_date','post_number','board_number','status','fault_code'],
         ],
 
         // =====================================================
@@ -48,8 +52,8 @@ return [
                 'ip_address'    => ['label'=>'IP','type'=>'text','rules'=>'nullable|string|max:64'],
             ], $workers, [
                 'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
-            ]),
-            'list_columns' => ['record_date','serial_number','ip_address'],
+            ], $faultCode),
+            'list_columns' => ['record_date','serial_number','ip_address','fault_code'],
         ],
 
         // =====================================================
@@ -64,8 +68,8 @@ return [
                 'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
             ], $workers, [
                 'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
-            ]),
-            'list_columns' => ['record_date','qty'],
+            ], $faultCode),
+            'list_columns' => ['record_date','qty','fault_code'],
         ],
 
         // =====================================================
@@ -84,8 +88,8 @@ return [
             ], $workers, [
                 'notes'  => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
                 'defect' => ['label'=>'Дефект','type'=>'textarea','rules'=>'nullable|string'],
-            ]),
-            'list_columns' => ['record_date','serial_number','pc_version'],
+            ], $faultCode),
+            'list_columns' => ['record_date','serial_number','pc_version','fault_code'],
         ],
 
         // =====================================================
@@ -102,8 +106,8 @@ return [
                                   'options'=>['Роутер','Софон','Регулятор мотора','Прочее']],
             ], $workers, [
                 'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
-            ]),
-            'list_columns' => ['record_date','qty','device_type'],
+            ], $faultCode),
+            'list_columns' => ['record_date','qty','device_type','fault_code'],
         ],
 
         // =====================================================
@@ -126,8 +130,8 @@ return [
                 'analysis_actions'=> ['label'=>'Действия для анализа','type'=>'textarea','rules'=>'nullable|string'],
                 'found_defect'    => ['label'=>'Дефект при анализе','type'=>'textarea','rules'=>'nullable|string'],
                 'result'          => ['label'=>'Результат','type'=>'textarea','rules'=>'nullable|string'],
-            ]),
-            'list_columns' => ['record_date','fuselage_no','reported_defect','found_defect','result'],
+            ], $faultCode),
+            'list_columns' => ['record_date','fuselage_no','reported_defect','found_defect','result','fault_code'],
         ],
 
         // =====================================================
@@ -156,8 +160,8 @@ return [
                 'actual_return_at'  => ['label'=>'Фактическая дата возврата','type'=>'date','rules'=>'nullable|date'],
             ], $workers, [
                 'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
-            ]),
-            'list_columns' => ['record_date','act_number','node_name','serial_number','repair_status'],
+            ], $faultCode),
+            'list_columns' => ['record_date','act_number','node_name','serial_number','repair_status','fault_code'],
         ],
 
         // =====================================================
@@ -172,8 +176,8 @@ return [
                 'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
             ], $workers, [
                 'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
-            ]),
-            'list_columns' => ['record_date','qty'],
+            ], $faultCode),
+            'list_columns' => ['record_date','qty','fault_code'],
         ],
 
         // =====================================================
@@ -193,8 +197,8 @@ return [
                 'stand_test'      => ['label'=>'Тест на стенде','type'=>'text','rules'=>'nullable|string|max:120'],
                 'notes'           => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
                 'status'          => ['label'=>'Статус','type'=>'text','rules'=>'nullable|string|max:80'],
-            ]),
-            'list_columns' => ['record_date','reported_defect','found_defect','status'],
+            ], $faultCode),
+            'list_columns' => ['record_date','reported_defect','found_defect','status','fault_code'],
         ],
 
         // =====================================================
@@ -209,8 +213,8 @@ return [
                 'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
             ], $workers, [
                 'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
-            ]),
-            'list_columns' => ['record_date','qty'],
+            ], $faultCode),
+            'list_columns' => ['record_date','qty','fault_code'],
         ],
 
         // =====================================================
@@ -225,8 +229,8 @@ return [
                 'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
             ], $workers, [
                 'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
-            ]),
-            'list_columns' => ['record_date','qty'],
+            ], $faultCode),
+            'list_columns' => ['record_date','qty','fault_code'],
         ],
 
         // =====================================================
@@ -251,8 +255,8 @@ return [
             ], $workers, [
                 'notes'    => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
                 'comments' => ['label'=>'Комментарии','type'=>'textarea','rules'=>'nullable|string'],
-            ]),
-            'list_columns' => ['record_date','serial_number','frame_serial','camera_status','night_camera_status'],
+            ], $faultCode),
+            'list_columns' => ['record_date','serial_number','frame_serial','camera_status','night_camera_status','fault_code'],
         ],
 
         // =====================================================
@@ -267,8 +271,8 @@ return [
                 'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
             ], $workers, [
                 'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
-            ]),
-            'list_columns' => ['record_date','qty'],
+            ], $faultCode),
+            'list_columns' => ['record_date','qty','fault_code'],
         ],
 
     ],

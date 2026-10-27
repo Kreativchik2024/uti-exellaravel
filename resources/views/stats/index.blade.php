@@ -14,12 +14,12 @@
         {{-- Блок фильтров --}}
         <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
             <div class="flex flex-wrap items-end gap-4">
-                
+
                 {{-- Период (ссылки) --}}
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">Период</label>
-                    <div class="flex gap-1">
-                        @foreach([1 => '1 день', 7 => '7 дней', 30 => '30 дней'] as $p => $label)
+                    <div class="flex flex-wrap gap-1">
+                        @foreach([1 => '1 день', 7 => '7 дней', 30 => '30 дней', 0 => 'Всё время'] as $p => $label)
                             <a href="{{ route('stats.index', ['period' => $p, 'user_id' => request('user_id'), 'mode' => request('mode')]) }}"
                                class="px-3 py-1 text-sm rounded border transition {{ $period === $p ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' }}">
                                 {{ $label }}
@@ -29,7 +29,6 @@
                 </div>
 
                 {{-- Переключатель для исполнителя (Моя / Общая) --}}
-                         {{-- Переключатель для исполнителя (Моя / Общая) --}}
                 @if(auth()->user()->isExecutor())
                     <div>
                         <label class="block text-xs text-gray-500 mb-1">Вид статистики</label>
@@ -61,12 +60,16 @@
                         </div>
                     </form>
                 @endif
-                
+
             </div>
         </div>
 
         <div class="text-sm text-gray-600">
-            Период: с <strong>{{ $from->format('d.m.Y') }}</strong> по <strong>{{ now()->format('d.m.Y') }}</strong>
+            @if($period === 0)
+                Период: <strong>всё время</strong>
+            @else
+                Период: с <strong>{{ $from->format('d.m.Y') }}</strong> по <strong>{{ now()->format('d.m.Y') }}</strong>
+            @endif
             @if($targetUser && $targetUser->isExecutor())
                 <span class="ml-2 text-amber-700">(показаны записи: {{ $targetUser->name }})</span>
             @elseif(request('mode') === 'all' || !$targetUser)
@@ -77,7 +80,7 @@
         {{-- СВОДКА ПО ВКЛАДКАМ --}}
         <div>
             <h3 class="font-semibold text-lg mb-4 text-gray-800">Сводка по вкладкам</h3>
-            
+
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
                 @foreach($perSheet as $slug => $data)
                     <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition border border-gray-200 p-6 flex flex-col items-center justify-center text-center">

@@ -14,6 +14,7 @@ class PgpRecord extends Model
         'board_number','ip_address','fuselage_number',
         'status','defect_reason','actions_taken',
         'created_by','updated_by',
+        'fault_code',
     ];
 
     protected function casts(): array

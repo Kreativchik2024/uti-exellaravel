@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 
 class StatsService
 {
-    public function forPeriod(Carbon $from, ?User $user): array
+    public function forPeriod(?Carbon $from, ?User $user): array
     {
         $map = config('sheets.map', []);
         $result = [];
@@ -22,7 +22,12 @@ class StatsService
             $table = (new $model)->getTable();
             $dateField = Schema::hasColumn($table, 'record_date') ? 'record_date' : 'created_at';
 
-            $q = $model::query()->whereDate($dateField, '>=', $from->toDateString());
+            $q = $model::query();
+
+            // Фильтр по дате применяем только если задан период (не «всё время»)
+            if ($from !== null) {
+                $q->whereDate($dateField, '>=', $from->toDateString());
+            }
 
             if ($user && $user->isExecutor()) {
                 $q->where('created_by', $user->id);
@@ -76,13 +81,17 @@ class StatsService
         return ['total' => $total, 'perUser' => $perUser];
     }
 
-    public function byPosts(Carbon $from, ?User $user): array
+    public function byPosts(?Carbon $from, ?User $user): array
     {
         $pgpTable = (new \App\Models\PgpRecord)->getTable();
         $dateField = Schema::hasColumn($pgpTable, 'record_date') ? 'record_date' : 'created_at';
 
-        $q = \App\Models\PgpRecord::query()
-            ->whereDate($dateField, '>=', $from->toDateString());
+        $q = \App\Models\PgpRecord::query();
+
+        // Фильтр по дате применяем только если задан период (не «всё время»)
+        if ($from !== null) {
+            $q->whereDate($dateField, '>=', $from->toDateString());
+        }
 
         if ($user && $user->isExecutor()) {
             $q->where('created_by', $user->id);

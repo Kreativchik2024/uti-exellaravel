@@ -10,7 +10,7 @@ class TechnologistRecord extends Model
         'from_section','to_section','sent_to_repair_at','repair_status',
         'planned_ready_at','responsible','actual_return_at','notes',
         'worker1','worker2','worker3','worker4','worker5',
-        'created_by','updated_by',
+        'created_by','updated_by','fault_code',
     ];
     protected function casts(): array {
         return [
