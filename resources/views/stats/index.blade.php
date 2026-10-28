@@ -101,7 +101,7 @@
             </div>
         </div>
 
-        {{-- ============ ЗОНА 2: детализация по постам (бывшая зона 3) ============ --}}
+        {{-- ============ ЗОНА 2: детализация по постам ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">
@@ -145,7 +145,7 @@
             </div>
         </div>
 
-        {{-- ============ ЗОНА 3: сводка по исполнителю (бывшая зона 2) ============ --}}
+        {{-- ============ ЗОНА 3: сводка по исполнителю ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">3. Сводка по исполнителю</h3>
@@ -258,6 +258,84 @@
             </div>
         </div>
 
+        {{-- ============ ЗОНА 6: рейтинг кодов неисправностей ============ --}}
+        <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-semibold text-lg text-gray-800">6. Рейтинг кодов неисправностей</h3>
+                <button x-show="!loaded6" @click="loadZone6()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
+                    Показать
+                </button>
+            </div>
+            <div x-show="loading6" class="text-gray-500 text-sm">Загрузка…</div>
+            <div x-show="loaded6" x-cloak>
+                {{-- Фильтр по времени + категория --}}
+                <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
+                    <label class="text-sm text-gray-600">
+                        С:
+                        <input type="date" x-model="dateFrom6" @change="loadZone6(true)"
+                               class="border rounded px-2 py-1 ml-1">
+                    </label>
+                    <label class="text-sm text-gray-600">
+                        По:
+                        <input type="date" x-model="dateTo6" @change="loadZone6(true)"
+                               class="border rounded px-2 py-1 ml-1">
+                    </label>
+                    <button @click="resetDates6()"
+                            class="text-sm text-gray-500 hover:text-gray-800 underline">
+                        Сбросить даты
+                    </button>
+                    <div class="flex-1 min-w-[240px]">
+                        <label class="block text-xs text-gray-500 mb-1">Категория</label>
+                        <select x-model="selectedCategory6" @change="loadZone6(true)"
+                                class="border rounded px-3 py-2 text-sm bg-white w-full">
+                            <option value="">— Все категории —</option>
+                            @foreach(config('sheets.map', []) as $slug => $cfg)
+                                @if(isset($cfg['fields']['fault_code']))
+                                    <option value="{{ $slug }}">{{ $cfg['title'] ?? $slug }}</option>
+                                @endif
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                {{-- Сводка итогов --}}
+                <div class="mb-4 flex flex-wrap gap-4 items-baseline text-sm">
+                    <span class="text-gray-600">Всего кодов: <strong class="text-lg text-gray-800" x-text="zone6Rows.length"></strong></span>
+                    <span class="text-gray-600">Суммарно вхождений: <strong class="text-lg text-blue-700" x-text="zone6Total()"></strong></span>
+                </div>
+
+                {{-- Таблица --}}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left w-12">#</th>
+                                <th class="p-3 text-left">Код неисправности</th>
+                                <th class="p-3 text-left">Категория</th>
+                                <th class="p-3 text-right">Кол-во</th>
+                                <th class="p-3 text-left">Первое появление</th>
+                                <th class="p-3 text-left">Последнее появление</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(row, idx) in zone6Rows" :key="row.code + '|' + row.sheet">
+                                <tr class="border-t hover:bg-gray-50">
+                                    <td class="p-3 text-gray-400" x-text="idx + 1"></td>
+                                    <td class="p-3 font-mono font-semibold text-gray-900" x-text="row.code"></td>
+                                    <td class="p-3 text-gray-600" x-text="row.sheet_title"></td>
+                                    <td class="p-3 text-right font-bold text-red-700" x-text="row.count"></td>
+                                    <td class="p-3 text-gray-500" x-text="formatDate(row.first_date)"></td>
+                                    <td class="p-3 text-gray-500" x-text="formatDate(row.last_date)"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <div x-show="zone6Rows.length === 0" class="p-3 text-gray-500 text-sm">Нет данных за период</div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     @push('scripts')
@@ -268,10 +346,10 @@
                     initialFrom: opts.initialFrom || '',
                     initialTo:   opts.initialTo   || '',
 
-                    // Зона 2 (по внутренней логике — это посты)
+                    // Зона 2 (по внутренней логике — посты)
                     loaded3: false, loading3: false, zone3: [],
 
-                    // Зона 3 (по внутренней логике — это исполнители)
+                    // Зона 3 (по внутренней логике — исполнители)
                     loaded2: false, loading2: false,
                     zone2Rows: [], zone2Total: 0,
                     selectedExecutor: '', zone2ChartObj: null,
@@ -289,7 +367,29 @@
                     dateTo5: '',
                     zone5ChartObj: null,
 
-                    // ============ ЗОНА: ИСПОЛНИТЕЛИ ============
+                    // Зона 6
+                    loaded6: false, loading6: false,
+                    zone6Rows: [], selectedCategory6: '',
+                    dateFrom6: opts.initialFrom || '',
+                    dateTo6: '',
+
+                    // ============ ЗОНА 2 (посты) ============
+                    async loadZone3() {
+                        this.loading3 = true;
+                        try {
+                            const params = new URLSearchParams({ sheet: 'pgp' });
+                            if (this.initialFrom) params.set('from', this.initialFrom);
+                            if (this.initialTo)   params.set('to',   this.initialTo);
+
+                            const res = await fetch('{{ route("stats.zone3") }}?' + params.toString());
+                            if (!res.ok) throw new Error('HTTP ' + res.status);
+                            this.zone3 = await res.json();
+                            this.loaded3 = true;
+                        } catch (e) { console.error('[zone3]', e); }
+                        this.loading3 = false;
+                    },
+
+                    // ============ ЗОНА 3 (исполнители) ============
                     async loadZone2(force = false) {
                         if (!force) this.loaded2 = true;
                         this.loading2 = true;
@@ -379,22 +479,6 @@
                             console.error('[zone2Chart]', e);
                             this.chartError = 'Ошибка графика: ' + e.message;
                         }
-                    },
-
-                    // ============ ЗОНА: ПОСТЫ ============
-                    async loadZone3() {
-                        this.loading3 = true;
-                        try {
-                            const params = new URLSearchParams({ sheet: 'pgp' });
-                            if (this.initialFrom) params.set('from', this.initialFrom);
-                            if (this.initialTo)   params.set('to',   this.initialTo);
-
-                            const res = await fetch('{{ route("stats.zone3") }}?' + params.toString());
-                            if (!res.ok) throw new Error('HTTP ' + res.status);
-                            this.zone3 = await res.json();
-                            this.loaded3 = true;
-                        } catch (e) { console.error('[zone3]', e); }
-                        this.loading3 = false;
                     },
 
                     // ============ ЗОНА 4 ============
@@ -561,6 +645,41 @@
                         } catch (e) {
                             console.error('[zone5Chart]', e);
                         }
+                    },
+
+                    // ============ ЗОНА 6 ============
+                    async loadZone6(force = false) {
+                        if (!force) this.loaded6 = true;
+                        this.loading6 = true;
+                        try {
+                            const params = new URLSearchParams();
+                            if (this.dateFrom6) params.set('from', this.dateFrom6);
+                            if (this.dateTo6)   params.set('to',   this.dateTo6);
+                            if (this.selectedCategory6) params.set('sheet', this.selectedCategory6);
+
+                            const res = await fetch('{{ route("stats.zone6") }}?' + params.toString());
+                            if (!res.ok) throw new Error('zone6 HTTP ' + res.status);
+                            this.zone6Rows = await res.json();
+                            this.loaded6 = true;
+                        } catch (e) { console.error('[zone6]', e); }
+                        this.loading6 = false;
+                    },
+
+                    resetDates6() {
+                        this.dateFrom6 = '';
+                        this.dateTo6 = '';
+                        this.loadZone6(true);
+                    },
+
+                    zone6Total() {
+                        return this.zone6Rows.reduce((s, r) => s + Number(r.count), 0);
+                    },
+
+                    formatDate(d) {
+                        if (!d) return '—';
+                        const [y, m, day] = String(d).split('-');
+                        if (!y || !m || !day) return d;
+                        return day + '.' + m + '.' + y;
                     },
                 };
             }

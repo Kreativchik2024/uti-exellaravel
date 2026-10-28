@@ -68,15 +68,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/records/{sheet}/{id}',   [RecordController::class, 'destroy'])->name('records.destroy');
 });
 
-// =====================================================
-// Статистика
-// =====================================================
 Route::middleware('auth')->group(function () {
-    // Основная страница и экспорт (уже были)
     Route::get('/stats',        [StatsController::class, 'index'])->name('stats.index');
     Route::get('/stats/export', [StatsController::class, 'export'])->name('stats.export');
 
-    // Зоны статистики (ленивая подгрузка)
     Route::get('/stats/zone1',       [StatsController::class, 'zone1'])->name('stats.zone1');
     Route::get('/stats/zone2',       [StatsController::class, 'zone2'])->name('stats.zone2');
     Route::get('/stats/zone2-chart', [StatsController::class, 'zone2Chart'])->name('stats.zone2Chart');
@@ -84,6 +79,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/stats/zone4',       [StatsController::class, 'zone4'])->name('stats.zone4');
     Route::get('/stats/zone5',       [StatsController::class, 'zone5'])->name('stats.zone5');
     Route::get('/stats/zone5-chart', [StatsController::class, 'zone5Chart'])->name('stats.zone5Chart');
+    Route::get('/stats/zone6',       [StatsController::class, 'zone6'])->name('stats.zone6');
 });
 
 Route::get('/media/{path}', [MediaController::class, 'show'])

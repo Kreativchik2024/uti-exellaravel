@@ -299,10 +299,6 @@ class StatsController extends Controller
         return response()->json(['labels' => $labels, 'values' => $values]);
     }
 
-    /**
-     * Зона 3: детализация по постам с фильтром по времени
-     * (привязан к общему периоду сверху — тому же, что и зона 1).
-     */
     public function zone3(Request $r)
     {
         $sheet = $r->input('sheet', 'pgp');
@@ -389,10 +385,6 @@ class StatsController extends Controller
         ]);
     }
 
-    /**
-     * Зона 5: брак по категориям.
-     * Возвращает для каждой категории: total, defects, fixed, percent, fixed_percent.
-     */
     public function zone5(Request $r)
     {
         $from = $r->input('from');
@@ -531,10 +523,6 @@ class StatsController extends Controller
         return response()->json($data);
     }
 
-    /**
-     * Зона 5 (график по дням для одной категории):
-     * возвращает defects (брак) и fixed («Исправили на посту») по дням.
-     */
     public function zone5Chart(Request $r)
     {
         $sheet = $r->input('sheet', 'pgp');
@@ -687,5 +675,82 @@ class StatsController extends Controller
             'defects' => $defectsSeries,
             'fixed'   => $fixedSeries,
         ]);
+    }
+
+    /**
+     * Зона 6: рейтинг кодов неисправностей.
+     * Собирает fault_code по всем вкладкам (где это поле есть),
+     * группирует по (код + вкладка), считает количество и даты первого/последнего появления.
+     * Сортировка по количеству (убывание).
+     *
+     * Параметры: from, to (даты), sheet (опционально — фильтр по категории).
+     */
+    public function zone6(Request $r)
+    {
+        $from     = $r->input('from');
+        $to       = $r->input('to');
+        $category = $r->input('sheet');
+
+        $cacheKey = "stats.zone6.{$from}_{$to}_{$category}";
+
+        $data = Cache::remember($cacheKey, 120, function () use ($from, $to, $category) {
+            $rows = [];
+
+            $sheets = config('sheets.map', []);
+            if ($category && isset($sheets[$category])) {
+                $sheets = [$category => $sheets[$category]];
+            }
+
+            foreach ($sheets as $slug => $cfg) {
+                if (!isset($cfg['model']) || !isset($cfg['fields']['fault_code'])) {
+                    continue;
+                }
+
+                $model = $cfg['model'];
+                $table = (new $model)->getTable();
+
+                $where = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
+                $bindings = [];
+
+                if ($from) {
+                    $where .= " AND DATE(record_date) >= ?";
+                    $bindings[] = $from;
+                }
+                if ($to) {
+                    $where .= " AND DATE(record_date) <= ?";
+                    $bindings[] = $to;
+                }
+
+                $sql = "
+                    SELECT
+                        `fault_code` AS code,
+                        COUNT(*) AS cnt,
+                        MIN(record_date) AS first_date,
+                        MAX(record_date) AS last_date
+                    FROM `$table`
+                    WHERE {$where}
+                    GROUP BY `fault_code`
+                ";
+
+                $res = DB::select($sql, $bindings);
+
+                foreach ($res as $row) {
+                    $rows[] = [
+                        'code'         => $row->code,
+                        'sheet'        => $slug,
+                        'sheet_title'  => $cfg['title'] ?? $slug,
+                        'count'        => (int) $row->cnt,
+                        'first_date'   => substr((string) $row->first_date, 0, 10),
+                        'last_date'    => substr((string) $row->last_date, 0, 10),
+                    ];
+                }
+            }
+
+            usort($rows, fn($a, $b) => $b['count'] <=> $a['count']);
+
+            return $rows;
+        });
+
+        return response()->json($data);
     }
 }
