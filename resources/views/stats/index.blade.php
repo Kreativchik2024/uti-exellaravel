@@ -13,7 +13,8 @@
 
     <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6"
          x-data="statsZones({
-             initialFrom: '{{ $from ? $from->format('Y-m-d') : '' }}'
+             initialFrom: '{{ $from ? $from->format('Y-m-d') : '' }}',
+             initialTo: '{{ now()->format('Y-m-d') }}'
          })">
 
         {{-- ============ ФИЛЬТРЫ ============ --}}
@@ -100,10 +101,54 @@
             </div>
         </div>
 
-        {{-- ============ ЗОНА 2: сводка по исполнителю ============ --}}
+        {{-- ============ ЗОНА 2: детализация по постам (бывшая зона 3) ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
-                <h3 class="font-semibold text-lg text-gray-800">2. Сводка по исполнителю</h3>
+                <h3 class="font-semibold text-lg text-gray-800">
+                    2. Детализация по постам
+                    <span class="text-sm font-normal text-gray-400">
+                        @if($period === 0)
+                            (всё время)
+                        @else
+                            (с {{ $from->format('d.m.Y') }})
+                        @endif
+                    </span>
+                </h3>
+                <button x-show="!loaded3" @click="loadZone3()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
+                    Показать
+                </button>
+            </div>
+            <div x-show="loading3" class="text-gray-500 text-sm">Загрузка…</div>
+            <div x-show="loaded3" x-cloak>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">#</th>
+                                <th class="p-3 text-left">Пост</th>
+                                <th class="p-3 text-right">Сделано бортов</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(row, idx) in zone3" :key="row.post_number">
+                                <tr class="border-t hover:bg-gray-50">
+                                    <td class="p-3 text-gray-400" x-text="idx + 1"></td>
+                                    <td class="p-3 font-medium" x-text="'Пост ' + row.post_number"></td>
+                                    <td class="p-3 text-right font-bold text-blue-700" x-text="row.cnt"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <div x-show="zone3.length === 0" class="p-3 text-gray-500 text-sm">Нет данных за период</div>
+                </div>
+            </div>
+        </div>
+
+        {{-- ============ ЗОНА 3: сводка по исполнителю (бывшая зона 2) ============ --}}
+        <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-semibold text-lg text-gray-800">3. Сводка по исполнителю</h3>
                 <button x-show="!loaded2" @click="loadZone2()"
                         class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
                     Показать
@@ -147,41 +192,6 @@
             </div>
         </div>
 
-        {{-- ============ ЗОНА 3: детализация по постам ============ --}}
-        <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="font-semibold text-lg text-gray-800">3. Детализация по постам</h3>
-                <button x-show="!loaded3" @click="loadZone3()"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
-                    Показать
-                </button>
-            </div>
-            <div x-show="loading3" class="text-gray-500 text-sm">Загрузка…</div>
-            <div x-show="loaded3" x-cloak>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 text-gray-600">
-                            <tr>
-                                <th class="p-3 text-left">#</th>
-                                <th class="p-3 text-left">Пост</th>
-                                <th class="p-3 text-right">Сделано бортов</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="(row, idx) in zone3" :key="row.post_number">
-                                <tr class="border-t hover:bg-gray-50">
-                                    <td class="p-3 text-gray-400" x-text="idx + 1"></td>
-                                    <td class="p-3 font-medium" x-text="'Пост ' + row.post_number"></td>
-                                    <td class="p-3 text-right font-bold text-blue-700" x-text="row.cnt"></td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                    <div x-show="zone3.length === 0" class="p-3 text-gray-500 text-sm">Нет данных</div>
-                </div>
-            </div>
-        </div>
-
         {{-- ============ ЗОНА 4: график по постам ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
@@ -217,7 +227,6 @@
             </div>
             <div x-show="loading5" class="text-gray-500 text-sm">Загрузка…</div>
             <div x-show="loaded5" x-cloak>
-                {{-- Фильтр по времени + выпадающее меню категории --}}
                 <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
                     <label class="text-sm text-gray-600">
                         С:
@@ -256,16 +265,19 @@
         <script>
             function statsZones(opts = {}) {
                 return {
-                    // Зона 2
+                    initialFrom: opts.initialFrom || '',
+                    initialTo:   opts.initialTo   || '',
+
+                    // Зона 2 (по внутренней логике — это посты)
+                    loaded3: false, loading3: false, zone3: [],
+
+                    // Зона 3 (по внутренней логике — это исполнители)
                     loaded2: false, loading2: false,
                     zone2Rows: [], zone2Total: 0,
                     selectedExecutor: '', zone2ChartObj: null,
                     dateFrom2: opts.initialFrom || '',
                     dateTo2: '',
                     chartError: '',
-
-                    // Зона 3
-                    loaded3: false, loading3: false, zone3: [],
 
                     // Зона 4
                     loaded4: false, dateFrom: '', dateTo: '', zone4ChartObj: null,
@@ -277,7 +289,7 @@
                     dateTo5: '',
                     zone5ChartObj: null,
 
-                    // ============ ЗОНА 2 ============
+                    // ============ ЗОНА: ИСПОЛНИТЕЛИ ============
                     async loadZone2(force = false) {
                         if (!force) this.loaded2 = true;
                         this.loading2 = true;
@@ -369,11 +381,15 @@
                         }
                     },
 
-                    // ============ ЗОНА 3 ============
+                    // ============ ЗОНА: ПОСТЫ ============
                     async loadZone3() {
                         this.loading3 = true;
                         try {
-                            const res = await fetch('{{ route("stats.zone3") }}?sheet=pgp');
+                            const params = new URLSearchParams({ sheet: 'pgp' });
+                            if (this.initialFrom) params.set('from', this.initialFrom);
+                            if (this.initialTo)   params.set('to',   this.initialTo);
+
+                            const res = await fetch('{{ route("stats.zone3") }}?' + params.toString());
                             if (!res.ok) throw new Error('HTTP ' + res.status);
                             this.zone3 = await res.json();
                             this.loaded3 = true;
@@ -452,7 +468,6 @@
                         if (this.zone5ChartObj) this.zone5ChartObj.destroy();
 
                         if (!this.selectedCategory) {
-                            // «Все категории» — два dataset: % брака (красный) и % исправили (зелёный)
                             this.zone5ChartObj = new Chart(ctx, {
                                 type: 'bar',
                                 data: {
@@ -503,7 +518,6 @@
                             return;
                         }
 
-                        // Конкретная категория — два dataset по дням: брак (красный) и исправили (зелёный)
                         try {
                             const params = new URLSearchParams({ sheet: this.selectedCategory });
                             if (this.dateFrom5) params.set('from', this.dateFrom5);
