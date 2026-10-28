@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Employee;
 use App\Services\StatsService;
 use Illuminate\Http\Request;
 
@@ -13,7 +14,14 @@ class WorkstationController extends Controller
         $selected = session('workstation_workers', []);
         $intended = $r->query('intended', route('dashboard'));
 
-        return view('workstation.select', compact('workers', 'selected', 'intended'));
+        // Активные сотрудники из справочника для datalist-подсказок
+        $employeesList = Employee::query()
+            ->active()
+            ->orderBy('short_name')
+            ->pluck('short_name')
+            ->all();
+
+        return view('workstation.select', compact('workers', 'selected', 'intended', 'employeesList'));
     }
 
     public function store(Request $r)

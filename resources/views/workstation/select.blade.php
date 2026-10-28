@@ -5,8 +5,18 @@
 
     <div class="py-8 max-w-3xl mx-auto sm:px-6 lg:px-8">
         <div class="bg-white rounded-lg shadow p-6">
+
+            {{-- Общий datalist для всех 5 полей --}}
+            <datalist id="employees-list">
+                @foreach(($employeesList ?? []) as $emp)
+                    <option value="{{ $emp }}"></option>
+                @endforeach
+            </datalist>
+
             <p class="text-sm text-gray-600 mb-6">
                 Впишите до 5 исполнителей, которые сейчас работают за этим рабочим местом.
+                Начните печатать фамилию — браузер предложит сотрудников из справочника
+                (или впишите вручную, если сотрудника ещё нет в списке).
                 Эти данные будут автоматически подставляться в формы учёта.
                 Изменить выбор можно в любой момент через меню «Исполнители».
             </p>
@@ -23,7 +33,9 @@
                         <input type="text"
                                name="workers[]"
                                value="{{ old('workers.' . $i, $selected[$i] ?? '') }}"
-                               placeholder="Фамилия и инициалы"
+                               list="employees-list"
+                               autocomplete="off"
+                               placeholder="Фамилия И.О. (начните печатать для подсказки)"
                                class="border rounded px-3 py-2 w-full bg-white">
                     </div>
                 @endfor
