@@ -1,4 +1,9 @@
 <nav x-data="{ open: false }" class="bg-white border-b border-gray-100">
+    @php
+        $currentWorkers = session('workstation_workers', []);
+        $workersCount   = count($currentWorkers);
+    @endphp
+
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex">
@@ -45,6 +50,10 @@
                             @endforeach
                         </x-slot>
                     </x-dropdown>
+
+                    <x-nav-link :href="route('workstation.show')" :active="request()->routeIs('workstation.*')">
+                        {{ __('Исполнители') }}@if($workersCount > 0) ({{ $workersCount }})@endif
+                    </x-nav-link>
 
                     <x-nav-link :href="route('firmware.index')" :active="request()->routeIs('firmware.*')">
                         {{ __('Прошивки') }}
@@ -150,6 +159,10 @@
                     @endforeach
                 </div>
             </div>
+
+            <x-responsive-nav-link :href="route('workstation.show')" :active="request()->routeIs('workstation.*')">
+                {{ __('Исполнители') }}@if($workersCount > 0) ({{ $workersCount }})@endif
+            </x-responsive-nav-link>
 
             <x-responsive-nav-link :href="route('firmware.index')" :active="request()->routeIs('firmware.*')">
                 {{ __('Прошивки') }}

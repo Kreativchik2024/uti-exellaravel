@@ -14,19 +14,30 @@ class RecordController extends Controller
         return $cfg;
     }
 
+    /**
+     * Значения по умолчанию для полей worker1..5 из сессии.
+     */
+    private function workerDefaults(): array
+    {
+        $workers = session('workstation_workers', []);
+
+        return [
+            'worker1' => $workers[0] ?? '',
+            'worker2' => $workers[1] ?? '',
+            'worker3' => $workers[2] ?? '',
+            'worker4' => $workers[3] ?? '',
+            'worker5' => $workers[4] ?? '',
+        ];
+    }
+
     public function index(Request $request, string $sheet)
     {
         $cfg = $this->cfg($sheet);
 
         $query = $cfg['model']::query();
 
-        // Все пользователи видят все записи во всех категориях.
-        // Права на редактирование/удаление ограничены политикой RecordPolicy.
-
-        // П О И С К
         $q = trim($request->input('q', ''));
         if ($q !== '') {
-            // Собираем текстовые поля из конфига
             $searchableFields = [];
             foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
                 if (in_array($fieldCfg['type'], ['text', 'textarea', 'string'])) {
@@ -43,9 +54,6 @@ class RecordController extends Controller
             }
         }
 
-        // Хронология: сортируем по дате записи (record_date),
-        // при равных датах — по id (свежие введения выше).
-        // Fallback на id, если у модели вдруг нет поля record_date.
         $hasRecordDate = array_key_exists('record_date', $cfg['fields']);
 
         if ($hasRecordDate) {
@@ -63,13 +71,24 @@ class RecordController extends Controller
     {
         $cfg = $this->cfg($sheet);
         Gate::authorize('create', $cfg['model']);
-        return view('records.create', compact('sheet','cfg'));
+
+        $defaults = $this->workerDefaults();
+
+        return view('records.create', compact('sheet','cfg','defaults'));
     }
 
     public function store(Request $r, string $sheet)
     {
         $cfg = $this->cfg($sheet);
         Gate::authorize('create', $cfg['model']);
+
+        // Автозаполнение исполнителей, если поле вообще не пришло в запросе
+        $defaults = $this->workerDefaults();
+        foreach ($defaults as $field => $value) {
+            if (!$r->exists($field) && $value !== '') {
+                $r->merge([$field => $value]);
+            }
+        }
 
         $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
         $data  = $r->validate($rules);

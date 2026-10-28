@@ -6,6 +6,8 @@
 @php
     $workerFields = ['worker1','worker2','worker3','worker4','worker5'];
     $hasWorkers   = collect($workerFields)->contains(fn($f) => isset($cfg['fields'][$f]));
+    // Значения из сессии "workstation_workers", переданные RecordController::create
+    $workerDefaults = $defaults ?? [];
 @endphp
 
 @if($hasWorkers)
@@ -16,7 +18,8 @@
                 @if(isset($cfg['fields'][$name]))
                     @php
                         $f     = $cfg['fields'][$name];
-                        $value = old($name, $record->$name ?? null);
+                        // Приоритет: old() → значение записи (edit) → значение из сессии (create)
+                        $value = old($name, $record->$name ?? ($workerDefaults[$name] ?? null));
                         $isReq = !empty($f['required_mark']);
                     @endphp
                     <div>
