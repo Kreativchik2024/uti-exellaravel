@@ -66,7 +66,7 @@
                     @if(auth()->user()->isAdmin())
                         <x-dropdown align="left" width="48">
                             <x-slot name="trigger">
-                                <button class="inline-flex items-center px-3 py-2 text-sm font-medium leading-4 rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('users.*') || request()->routeIs('firmware.categories.*') ? 'text-gray-900' : '' }}">
+                                <button class="inline-flex items-center px-3 py-2 text-sm font-medium leading-4 rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('users.*') || request()->routeIs('firmware.categories.*') || request()->routeIs('employees.*') ? 'text-gray-900' : '' }}">
                                     <span>{{ __('Админ') }}</span>
                                     <svg class="ms-1 fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -76,6 +76,9 @@
                             <x-slot name="content">
                                 <x-dropdown-link :href="route('users.index')" :class="request()->routeIs('users.*') ? 'font-semibold text-indigo-600' : ''">
                                     {{ __('Пользователи') }}
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('employees.index')" :class="request()->routeIs('employees.*') ? 'font-semibold text-indigo-600' : ''">
+                                    {{ __('Сотрудники') }}
                                 </x-dropdown-link>
                                 <x-dropdown-link :href="route('firmware.categories.index')" :class="request()->routeIs('firmware.categories.*') ? 'font-semibold text-indigo-600' : ''">
                                     {{ __('Категории прошивок') }}
@@ -183,6 +186,9 @@
                     <div x-show="expanded" x-collapse class="ps-4">
                         <x-responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
                             {{ __('Пользователи') }}
+                        </x-responsive-nav-link>
+                        <x-responsive-nav-link :href="route('employees.index')" :active="request()->routeIs('employees.*')">
+                            {{ __('Сотрудники') }}
                         </x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('firmware.categories.index')" :active="request()->routeIs('firmware.categories.*')">
                             {{ __('Категории прошивок') }}

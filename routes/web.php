@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\FirmwareCategoryController;
 use App\Http\Controllers\FirmwareController;
 use App\Http\Controllers\MediaController;
@@ -20,7 +21,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/workstation/clear',  [WorkstationController::class, 'clear'])->name('workstation.clear');
 });
 
-// Дашборд требует выбранных исполнителей
 Route::get('/', [DashboardController::class, 'index'])
     ->middleware(['auth', 'workers'])
     ->name('dashboard');
@@ -38,6 +38,20 @@ Route::middleware(['auth', 'workers', 'role:admin'])->group(function () {
     Route::patch('/users/{user}/deactivate', [UserController::class, 'deactivate'])->name('users.deactivate');
     Route::patch('/users/{user}/password',   [UserController::class, 'resetPassword'])->name('users.password');
     Route::delete('/users/{user}',           [UserController::class, 'destroy'])->name('users.destroy');
+
+    // Сотрудники: импорт/экспорт/шаблон — ПЕРЕД {employee}
+    Route::get('/employees/export',   [EmployeeController::class, 'export'])->name('employees.export');
+    Route::get('/employees/template', [EmployeeController::class, 'template'])->name('employees.template');
+    Route::get('/employees/import',   [EmployeeController::class, 'importForm'])->name('employees.importForm');
+    Route::post('/employees/import',  [EmployeeController::class, 'import'])->name('employees.import');
+
+    // CRUD сотрудников
+    Route::get('/employees',                 [EmployeeController::class, 'index'])->name('employees.index');
+    Route::get('/employees/create',          [EmployeeController::class, 'create'])->name('employees.create');
+    Route::post('/employees',                [EmployeeController::class, 'store'])->name('employees.store');
+    Route::get('/employees/{employee}/edit', [EmployeeController::class, 'edit'])->name('employees.edit');
+    Route::put('/employees/{employee}',      [EmployeeController::class, 'update'])->name('employees.update');
+    Route::delete('/employees/{employee}',   [EmployeeController::class, 'destroy'])->name('employees.destroy');
 });
 
 Route::get('/news', [NewsController::class, 'index'])->name('news.index');
