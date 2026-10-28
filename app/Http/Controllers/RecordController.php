@@ -43,7 +43,18 @@ class RecordController extends Controller
             }
         }
 
-        $records = $query->latest('id')->paginate(50)->withQueryString();
+        // Хронология: сортируем по дате записи (record_date),
+        // при равных датах — по id (свежие введения выше).
+        // Fallback на id, если у модели вдруг нет поля record_date.
+        $hasRecordDate = array_key_exists('record_date', $cfg['fields']);
+
+        if ($hasRecordDate) {
+            $query->orderByDesc('record_date')->orderByDesc('id');
+        } else {
+            $query->orderByDesc('id');
+        }
+
+        $records = $query->paginate(50)->withQueryString();
 
         return view('records.index', compact('sheet','cfg','records', 'q'));
     }

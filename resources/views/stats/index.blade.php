@@ -22,7 +22,7 @@
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">Период</label>
                     <div class="flex flex-wrap gap-1">
-                        @foreach([1 => '1 день', 7 => '7 дней', 30 => '30 дней', 0 => 'Всё время'] as $p => $label)
+                        @foreach([1 => '1 день', 3 => '3 дня', 7 => '7 дней', 30 => '30 дней', 0 => 'Всё время'] as $p => $label)
                             <a href="{{ route('stats.index', ['period' => $p, 'user_id' => request('user_id'), 'mode' => request('mode')]) }}"
                                class="px-3 py-1 text-sm rounded border transition {{ $period === $p ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' }}">
                                 {{ $label }}
@@ -78,7 +78,7 @@
             @endif
         </div>
 
-        {{-- ============ ЗОНА 1 ============ --}}
+        {{-- ============ ЗОНА 1: сводка по вкладкам ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <h3 class="font-semibold text-lg mb-4 text-gray-800">1. Сводка по вкладкам</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
@@ -100,7 +100,7 @@
             </div>
         </div>
 
-        {{-- ============ ЗОНА 2 ============ --}}
+        {{-- ============ ЗОНА 2: сводка по исполнителю ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">2. Сводка по исполнителю</h3>
@@ -147,7 +147,7 @@
             </div>
         </div>
 
-        {{-- ============ ЗОНА 3 ============ --}}
+        {{-- ============ ЗОНА 3: детализация по постам ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">3. Детализация по постам</h3>
@@ -182,7 +182,7 @@
             </div>
         </div>
 
-        {{-- ============ ЗОНА 4 ============ --}}
+        {{-- ============ ЗОНА 4: график по постам ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">4. График по постам</h3>
@@ -245,7 +245,7 @@
                     </div>
                 </div>
 
-                <div class="relative h-80"><canvas id="zone5Chart"></canvas></div>
+                <div class="relative h-96"><canvas id="zone5Chart"></canvas></div>
             </div>
         </div>
 
@@ -452,24 +452,27 @@
                         if (this.zone5ChartObj) this.zone5ChartObj.destroy();
 
                         if (!this.selectedCategory) {
-                            // «Все категории» — столбчатый график % брака
+                            // «Все категории» — два dataset: % брака (красный) и % исправили (зелёный)
                             this.zone5ChartObj = new Chart(ctx, {
                                 type: 'bar',
                                 data: {
                                     labels: this.zone5Rows.map(r => r.title),
-                                    datasets: [{
-                                        label: '% брака',
-                                        data: this.zone5Rows.map(r => r.percent),
-                                        backgroundColor: this.zone5Rows.map(r =>
-                                            r.percent > 20 ? 'rgba(239,68,68,0.75)' :
-                                            (r.percent > 5 ? 'rgba(245,158,11,0.75)' : 'rgba(16,185,129,0.75)')
-                                        ),
-                                        borderColor: this.zone5Rows.map(r =>
-                                            r.percent > 20 ? '#dc2626' :
-                                            (r.percent > 5 ? '#d97706' : '#059669')
-                                        ),
-                                        borderWidth: 1,
-                                    }]
+                                    datasets: [
+                                        {
+                                            label: '% брака',
+                                            data: this.zone5Rows.map(r => r.percent),
+                                            backgroundColor: 'rgba(239,68,68,0.75)',
+                                            borderColor: '#dc2626',
+                                            borderWidth: 1,
+                                        },
+                                        {
+                                            label: '% исправили на посту',
+                                            data: this.zone5Rows.map(r => r.fixed_percent || 0),
+                                            backgroundColor: 'rgba(16,185,129,0.75)',
+                                            borderColor: '#059669',
+                                            borderWidth: 1,
+                                        },
+                                    ]
                                 },
                                 options: {
                                     indexAxis: 'y',
@@ -478,17 +481,19 @@
                                     scales: {
                                         x: {
                                             beginAtZero: true,
-                                            max: Math.max(5, Math.ceil(Math.max(...this.zone5Rows.map(r => r.percent), 0))),
                                             ticks: { callback: v => v + '%' }
                                         }
                                     },
                                     plugins: {
-                                        legend: { display: false },
+                                        legend: { position: 'bottom' },
                                         tooltip: {
                                             callbacks: {
                                                 label: (item) => {
                                                     const r = this.zone5Rows[item.dataIndex];
-                                                    return r.defects + ' из ' + r.total + ' (' + r.percent + '%)';
+                                                    if (item.datasetIndex === 0) {
+                                                        return 'Брак: ' + r.defects + ' из ' + r.total + ' (' + r.percent + '%)';
+                                                    }
+                                                    return 'Исправили: ' + r.fixed + ' из ' + r.total + ' (' + (r.fixed_percent || 0) + '%)';
                                                 }
                                             }
                                         }
@@ -498,7 +503,7 @@
                             return;
                         }
 
-                        // Конкретная категория — линейный график брака по дням
+                        // Конкретная категория — два dataset по дням: брак (красный) и исправили (зелёный)
                         try {
                             const params = new URLSearchParams({ sheet: this.selectedCategory });
                             if (this.dateFrom5) params.set('from', this.dateFrom5);
@@ -512,13 +517,22 @@
                                 type: 'bar',
                                 data: {
                                     labels: data.labels,
-                                    datasets: [{
-                                        label: 'Брак, шт',
-                                        data: data.values,
-                                        backgroundColor: 'rgba(239,68,68,0.7)',
-                                        borderColor: 'rgba(239,68,68,1)',
-                                        borderWidth: 1,
-                                    }]
+                                    datasets: [
+                                        {
+                                            label: 'Брак',
+                                            data: data.defects || [],
+                                            backgroundColor: 'rgba(239,68,68,0.75)',
+                                            borderColor: '#dc2626',
+                                            borderWidth: 1,
+                                        },
+                                        {
+                                            label: 'Исправили на посту',
+                                            data: data.fixed || [],
+                                            backgroundColor: 'rgba(16,185,129,0.75)',
+                                            borderColor: '#059669',
+                                            borderWidth: 1,
+                                        },
+                                    ]
                                 },
                                 options: {
                                     responsive: true,
@@ -527,7 +541,7 @@
                                         x: { ticks: { autoSkip: true, maxRotation: 60 } },
                                         y: { beginAtZero: true, ticks: { stepSize: 1 } }
                                     },
-                                    plugins: { legend: { display: false } },
+                                    plugins: { legend: { position: 'bottom' } },
                                 }
                             });
                         } catch (e) {

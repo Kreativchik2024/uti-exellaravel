@@ -13,7 +13,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class StatsController extends Controller
 {
-    private const ALLOWED_PERIODS = [0, 1, 7, 30];
+    private const ALLOWED_PERIODS = [0, 1, 3, 7, 30];
 
     private const DEFECT_VALUES = [
         'Не сдан', 'Неисправен', 'В ремонт',
@@ -375,7 +375,12 @@ class StatsController extends Controller
     }
 
     /**
-     * Зона 5: брак по категориям (сводка с фильтром по времени).
+     * Зона 5: брак по категориям.
+     * Возвращает для каждой категории: total, defects (брак), fixed («Исправили на посту»),
+     * percent (% брака), fixed_percent (% исправленных).
+     *
+     * Брак: status != 'Сдан' + (fault_code или defect_reason) / плохой status.
+     * «Исправили на посту»: status = 'Сдан' + (fault_code или defect_reason).
      */
     public function zone5(Request $r)
     {
@@ -407,14 +412,32 @@ class StatsController extends Controller
                 $table = (new $model)->getTable();
 
                 $hasRecordDate = isset($cfg['fields']['record_date']);
+                $hasStatus     = isset($cfg['fields']['status']);
 
-                $conditions = [];
-                $bindings   = [];
+                $defectConditions = [];
+                $defectBindings   = [];
+                $fixedConditions  = [];
+                $fixedBindings    = [];
 
+                // 1) fault_code
                 if (isset($cfg['fields']['fault_code'])) {
-                    $conditions[] = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
+                    if ($hasStatus) {
+                        // Брак: не «Сдан»
+                        $defectConditions[] = "(
+                            `fault_code` IS NOT NULL AND `fault_code` != ''
+                            AND (`status` IS NULL OR `status` != 'Сдан')
+                        )";
+                        // Исправили: «Сдан»
+                        $fixedConditions[] = "(
+                            `fault_code` IS NOT NULL AND `fault_code` != ''
+                            AND `status` = 'Сдан'
+                        )";
+                    } else {
+                        $defectConditions[] = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
+                    }
                 }
 
+                // 2) select-поля с «плохими» значениями (всегда брак)
                 foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
                     if (($fieldCfg['type'] ?? '') !== 'select' || empty($fieldCfg['options'])) {
                         continue;
@@ -424,12 +447,13 @@ class StatsController extends Controller
                         continue;
                     }
                     $placeholders = implode(',', array_fill(0, count($matched), '?'));
-                    $conditions[] = "`$fieldName` IN ($placeholders)";
+                    $defectConditions[] = "`$fieldName` IN ($placeholders)";
                     foreach ($matched as $v) {
-                        $bindings[] = $v;
+                        $defectBindings[] = $v;
                     }
                 }
 
+                // 3) textarea с defect/дефект/брак
                 foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
                     if (($fieldCfg['type'] ?? '') !== 'textarea') {
                         continue;
@@ -437,9 +461,21 @@ class StatsController extends Controller
                     if (!preg_match('/(defect|дефект|брак)/iu', $fieldName)) {
                         continue;
                     }
-                    $conditions[] = "(`$fieldName` IS NOT NULL AND `$fieldName` != '')";
+                    if ($hasStatus) {
+                        $defectConditions[] = "(
+                            `$fieldName` IS NOT NULL AND `$fieldName` != ''
+                            AND (`status` IS NULL OR `status` != 'Сдан')
+                        )";
+                        $fixedConditions[] = "(
+                            `$fieldName` IS NOT NULL AND `$fieldName` != ''
+                            AND `status` = 'Сдан'
+                        )";
+                    } else {
+                        $defectConditions[] = "(`$fieldName` IS NOT NULL AND `$fieldName` != '')";
+                    }
                 }
 
+                // total
                 if ($hasRecordDate) {
                     $totalSql = "SELECT COUNT(*) AS c FROM `$table` WHERE 1=1 {$dateSql}";
                     $total = (int) (DB::select($totalSql, $dateBindings)[0]->c ?? 0);
@@ -447,24 +483,40 @@ class StatsController extends Controller
                     $total = $model::count();
                 }
 
+                // defects
                 $defects = 0;
-                if (!empty($conditions) && $total > 0) {
-                    $defectWhere = '(' . implode(' OR ', $conditions) . ')';
-                    $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$defectWhere}";
-                    $allBindings = $bindings;
+                if (!empty($defectConditions) && $total > 0) {
+                    $where = '(' . implode(' OR ', $defectConditions) . ')';
+                    $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$where}";
+                    $bindings = $defectBindings;
                     if ($hasRecordDate) {
                         $sql .= " {$dateSql}";
-                        $allBindings = array_merge($bindings, $dateBindings);
+                        $bindings = array_merge($defectBindings, $dateBindings);
                     }
-                    $defects = (int) (DB::select($sql, $allBindings)[0]->c ?? 0);
+                    $defects = (int) (DB::select($sql, $bindings)[0]->c ?? 0);
+                }
+
+                // fixed
+                $fixed = 0;
+                if (!empty($fixedConditions) && $total > 0) {
+                    $where = '(' . implode(' OR ', $fixedConditions) . ')';
+                    $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$where}";
+                    $bindings = $fixedBindings;
+                    if ($hasRecordDate) {
+                        $sql .= " {$dateSql}";
+                        $bindings = array_merge($fixedBindings, $dateBindings);
+                    }
+                    $fixed = (int) (DB::select($sql, $bindings)[0]->c ?? 0);
                 }
 
                 $summary[] = [
-                    'slug'    => $slug,
-                    'title'   => $cfg['title'] ?? $slug,
-                    'total'   => $total,
-                    'defects' => $defects,
-                    'percent' => $total > 0 ? round($defects / $total * 100, 1) : 0,
+                    'slug'          => $slug,
+                    'title'         => $cfg['title'] ?? $slug,
+                    'total'         => $total,
+                    'defects'       => $defects,
+                    'fixed'         => $fixed,
+                    'percent'       => $total > 0 ? round($defects / $total * 100, 1) : 0,
+                    'fixed_percent' => $total > 0 ? round($fixed / $total * 100, 1) : 0,
                 ];
             }
 
@@ -477,7 +529,8 @@ class StatsController extends Controller
     }
 
     /**
-     * Зона 5 (график по дням для одной категории): количество бракованных записей по дням.
+     * Зона 5 (график по дням для одной категории):
+     * возвращает defects (брак) и fixed («Исправили на посту») по дням.
      */
     public function zone5Chart(Request $r)
     {
@@ -502,12 +555,26 @@ class StatsController extends Controller
             $dateBindings[] = $to;
         }
 
-        // Собираем условия брака (те же, что в zone5)
-        $conditions = [];
-        $bindings   = [];
+        $hasStatus = isset($cfg['fields']['status']);
+
+        $defectConditions = [];
+        $defectBindings   = [];
+        $fixedConditions  = [];
+        $fixedBindings    = [];
 
         if (isset($cfg['fields']['fault_code'])) {
-            $conditions[] = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
+            if ($hasStatus) {
+                $defectConditions[] = "(
+                    `fault_code` IS NOT NULL AND `fault_code` != ''
+                    AND (`status` IS NULL OR `status` != 'Сдан')
+                )";
+                $fixedConditions[] = "(
+                    `fault_code` IS NOT NULL AND `fault_code` != ''
+                    AND `status` = 'Сдан'
+                )";
+            } else {
+                $defectConditions[] = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
+            }
         }
 
         foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
@@ -519,9 +586,9 @@ class StatsController extends Controller
                 continue;
             }
             $placeholders = implode(',', array_fill(0, count($matched), '?'));
-            $conditions[] = "`$fieldName` IN ($placeholders)";
+            $defectConditions[] = "`$fieldName` IN ($placeholders)";
             foreach ($matched as $v) {
-                $bindings[] = $v;
+                $defectBindings[] = $v;
             }
         }
 
@@ -532,29 +599,57 @@ class StatsController extends Controller
             if (!preg_match('/(defect|дефект|брак)/iu', $fieldName)) {
                 continue;
             }
-            $conditions[] = "(`$fieldName` IS NOT NULL AND `$fieldName` != '')";
+            if ($hasStatus) {
+                $defectConditions[] = "(
+                    `$fieldName` IS NOT NULL AND `$fieldName` != ''
+                    AND (`status` IS NULL OR `status` != 'Сдан')
+                )";
+                $fixedConditions[] = "(
+                    `$fieldName` IS NOT NULL AND `$fieldName` != ''
+                    AND `status` = 'Сдан'
+                )";
+            } else {
+                $defectConditions[] = "(`$fieldName` IS NOT NULL AND `$fieldName` != '')";
+            }
         }
 
-        if (empty($conditions)) {
-            return response()->json(['labels' => [], 'values' => []]);
+        if (empty($defectConditions)) {
+            return response()->json(['labels' => [], 'defects' => [], 'fixed' => []]);
         }
 
-        $defectWhere = '(' . implode(' OR ', $conditions) . ')';
-
-        $sql = "
+        // Считаем defects по дням
+        $defectWhere = '(' . implode(' OR ', $defectConditions) . ')';
+        $sqlDefects = "
             SELECT DATE(record_date) AS d, COUNT(*) AS c
             FROM `$table`
             WHERE {$defectWhere} {$dateSql}
             GROUP BY DATE(record_date)
             ORDER BY d
         ";
-        $allBindings = array_merge($bindings, $dateBindings);
-        $rows = DB::select($sql, $allBindings);
+        $defectRows = DB::select($sqlDefects, array_merge($defectBindings, $dateBindings));
 
-        $counts = [];
-        foreach ($rows as $row) {
+        // Считаем fixed по дням
+        $fixedCounts = [];
+        if (!empty($fixedConditions)) {
+            $fixedWhere = '(' . implode(' OR ', $fixedConditions) . ')';
+            $sqlFixed = "
+                SELECT DATE(record_date) AS d, COUNT(*) AS c
+                FROM `$table`
+                WHERE {$fixedWhere} {$dateSql}
+                GROUP BY DATE(record_date)
+                ORDER BY d
+            ";
+            $fixedRows = DB::select($sqlFixed, array_merge($fixedBindings, $dateBindings));
+            foreach ($fixedRows as $row) {
+                $key = substr((string) $row->d, 0, 10);
+                $fixedCounts[$key] = (int) $row->c;
+            }
+        }
+
+        $defectCounts = [];
+        foreach ($defectRows as $row) {
             $key = substr((string) $row->d, 0, 10);
-            $counts[$key] = (int) $row->c;
+            $defectCounts[$key] = (int) $row->c;
         }
 
         // Диапазон
@@ -562,8 +657,9 @@ class StatsController extends Controller
         $rangeTo   = $to   ? Carbon::parse($to)->endOfDay()     : now()->endOfDay();
 
         if (!$rangeFrom) {
-            if (!empty($counts)) {
-                $minDate   = collect(array_keys($counts))->min();
+            $allKeys = array_unique(array_merge(array_keys($defectCounts), array_keys($fixedCounts)));
+            if (!empty($allKeys)) {
+                $minDate   = collect($allKeys)->min();
                 $rangeFrom = Carbon::parse($minDate)->startOfDay();
             } else {
                 $rangeFrom = $rangeTo->copy()->subDays(29)->startOfDay();
@@ -575,15 +671,21 @@ class StatsController extends Controller
         }
 
         $labels = [];
-        $values = [];
+        $defectsSeries = [];
+        $fixedSeries = [];
         $cursor = $rangeFrom->copy();
         while ($cursor->lte($rangeTo)) {
-            $day      = $cursor->format('Y-m-d');
-            $labels[] = $day;
-            $values[] = $counts[$day] ?? 0;
+            $day = $cursor->format('Y-m-d');
+            $labels[]        = $day;
+            $defectsSeries[] = $defectCounts[$day] ?? 0;
+            $fixedSeries[]   = $fixedCounts[$day] ?? 0;
             $cursor->addDay();
         }
 
-        return response()->json(['labels' => $labels, 'values' => $values]);
+        return response()->json([
+            'labels'  => $labels,
+            'defects' => $defectsSeries,
+            'fixed'   => $fixedSeries,
+        ]);
     }
 }
