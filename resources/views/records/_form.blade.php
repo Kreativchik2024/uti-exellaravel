@@ -4,13 +4,20 @@
 @endif
 
 @php
-    $workerFields = ['worker1','worker2','worker3','worker4','worker5'];
-    $hasWorkers   = collect($workerFields)->contains(fn($f) => isset($cfg['fields'][$f]));
-    // Значения из сессии "workstation_workers", переданные RecordController::create
+    $workerFields   = ['worker1','worker2','worker3','worker4','worker5'];
+    $hasWorkers     = collect($workerFields)->contains(fn($f) => isset($cfg['fields'][$f]));
     $workerDefaults = $defaults ?? [];
+    $employeesList  = $employeesList ?? [];
 @endphp
 
 @if($hasWorkers)
+    {{-- Один общий datalist для всех 5 полей исполнителей --}}
+    <datalist id="employees-list">
+        @foreach($employeesList as $emp)
+            <option value="{{ $emp }}"></option>
+        @endforeach
+    </datalist>
+
     <div class="border rounded p-3 bg-gray-50">
         <div class="text-sm font-semibold text-gray-700 mb-2">Исполнители (до 5, первый обязателен)</div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
@@ -18,7 +25,6 @@
                 @if(isset($cfg['fields'][$name]))
                     @php
                         $f     = $cfg['fields'][$name];
-                        // Приоритет: old() → значение записи (edit) → значение из сессии (create)
                         $value = old($name, $record->$name ?? ($workerDefaults[$name] ?? null));
                         $isReq = !empty($f['required_mark']);
                     @endphp
@@ -26,7 +32,12 @@
                         <label class="block text-xs text-gray-600 mb-1">
                             {{ $f['label'] }}@if($isReq)<span class="text-red-600">*</span>@endif
                         </label>
-                        <input type="text" name="{{ $name }}" value="{{ $value }}"
+                        <input type="text"
+                               name="{{ $name }}"
+                               value="{{ $value }}"
+                               list="employees-list"
+                               autocomplete="off"
+                               placeholder="Фамилия И.О."
                                @if($isReq) required @endif
                                class="w-full border rounded px-2 py-1 text-sm">
                     </div>

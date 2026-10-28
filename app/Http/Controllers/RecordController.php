@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
@@ -28,6 +29,20 @@ class RecordController extends Controller
             'worker4' => $workers[3] ?? '',
             'worker5' => $workers[4] ?? '',
         ];
+    }
+
+    /**
+     * Список активных сотрудников для подсказок в полях worker1..5.
+     *
+     * @return string[]
+     */
+    private function employeesList(): array
+    {
+        return Employee::query()
+            ->active()
+            ->orderBy('short_name')
+            ->pluck('short_name')
+            ->all();
     }
 
     public function index(Request $request, string $sheet)
@@ -72,9 +87,10 @@ class RecordController extends Controller
         $cfg = $this->cfg($sheet);
         Gate::authorize('create', $cfg['model']);
 
-        $defaults = $this->workerDefaults();
+        $defaults      = $this->workerDefaults();
+        $employeesList = $this->employeesList();
 
-        return view('records.create', compact('sheet','cfg','defaults'));
+        return view('records.create', compact('sheet','cfg','defaults','employeesList'));
     }
 
     public function store(Request $r, string $sheet)
@@ -104,7 +120,10 @@ class RecordController extends Controller
         $cfg    = $this->cfg($sheet);
         $record = $cfg['model']::findOrFail($id);
         Gate::authorize('update', $record);
-        return view('records.edit', compact('sheet','cfg','record'));
+
+        $employeesList = $this->employeesList();
+
+        return view('records.edit', compact('sheet','cfg','record','employeesList'));
     }
 
     public function update(Request $r, string $sheet, int $id)
