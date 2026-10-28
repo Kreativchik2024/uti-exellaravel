@@ -1,4 +1,6 @@
 <x-app-layout>
+    <style>[x-cloak]{display:none!important}</style>
+
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800">Статистика</h2>
@@ -9,12 +11,14 @@
         </div>
     </x-slot>
 
-    <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+    <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6"
+         x-data="statsZones({
+             initialFrom: '{{ $from ? $from->format('Y-m-d') : '' }}'
+         })">
 
-        {{-- Блок фильтров --}}
+        {{-- ============ ФИЛЬТРЫ (общие для зоны 1) ============ --}}
         <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
             <div class="flex flex-wrap items-end gap-4">
-
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">Период</label>
                     <div class="flex flex-wrap gap-1">
@@ -30,13 +34,13 @@
                 @if(auth()->user()->isExecutor())
                     <div>
                         <label class="block text-xs text-gray-500 mb-1">Вид статистики</label>
-                        <div style="display: flex; gap: 4px;">
+                        <div class="flex gap-1">
                             <a href="{{ route('stats.index', ['period' => $period, 'mode' => 'my']) }}"
-                               style="display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 32px; font-size: 14px; border-radius: 4px; border: 1px solid {{ request('mode') !== 'all' ? '#4f46e5' : '#d1d5db' }}; background-color: {{ request('mode') !== 'all' ? '#4f46e5' : '#ffffff' }}; color: {{ request('mode') !== 'all' ? '#ffffff' : '#374151' }}; text-decoration: none; font-weight: 500; box-sizing: border-box;">
+                               class="px-3 py-1 text-sm rounded border {{ request('mode') !== 'all' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300' }}">
                                 Моя
                             </a>
                             <a href="{{ route('stats.index', ['period' => $period, 'mode' => 'all']) }}"
-                               style="display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 32px; font-size: 14px; border-radius: 4px; border: 1px solid {{ request('mode') === 'all' ? '#4f46e5' : '#d1d5db' }}; background-color: {{ request('mode') === 'all' ? '#4f46e5' : '#ffffff' }}; color: {{ request('mode') === 'all' ? '#ffffff' : '#374151' }}; text-decoration: none; font-weight: 500; box-sizing: border-box;">
+                               class="px-3 py-1 text-sm rounded border {{ request('mode') === 'all' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300' }}">
                                 Общая
                             </a>
                         </div>
@@ -48,7 +52,8 @@
                         <input type="hidden" name="period" value="{{ $period }}">
                         <div>
                             <label class="block text-xs text-gray-500 mb-1">Сотрудник (автор)</label>
-                            <select name="user_id" onchange="this.form.submit()" class="border rounded px-3 py-1 text-sm bg-white min-w-[200px]">
+                            <select name="user_id" onchange="this.form.submit()"
+                                    class="border rounded px-3 py-1 text-sm bg-white min-w-[200px]">
                                 <option value="">Все авторы</option>
                                 @foreach($usersList as $u)
                                     <option value="{{ $u->id }}" @selected(request('user_id') == $u->id)>{{ $u->name }}</option>
@@ -57,7 +62,6 @@
                         </div>
                     </form>
                 @endif
-
             </div>
         </div>
 
@@ -68,16 +72,15 @@
                 Период: с <strong>{{ $from->format('d.m.Y') }}</strong> по <strong>{{ now()->format('d.m.Y') }}</strong>
             @endif
             @if($targetUser && $targetUser->isExecutor())
-                <span class="ml-2 text-amber-700">(показаны записи: {{ $targetUser->name }})</span>
+                <span class="ml-2 text-amber-700">(записи: {{ $targetUser->name }})</span>
             @elseif(request('mode') === 'all' || !$targetUser)
-                <span class="ml-2 text-amber-700">(общая статистика по всем)</span>
+                <span class="ml-2 text-amber-700">(общая статистика)</span>
             @endif
         </div>
 
-        {{-- СВОДКА ПО ВКЛАДКАМ --}}
-        <div>
-            <h3 class="font-semibold text-lg mb-4 text-gray-800">Сводка по вкладкам</h3>
-
+        {{-- ============ ЗОНА 1: сводка по вкладкам ============ --}}
+        <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+            <h3 class="font-semibold text-lg mb-4 text-gray-800">1. Сводка по вкладкам</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
                 @foreach($perSheet as $slug => $data)
                     <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition border border-gray-200 p-6 flex flex-col items-center justify-center text-center">
@@ -97,171 +100,253 @@
             </div>
         </div>
 
-        {{-- СВОДКА ПО ИСПОЛНИТЕЛЮ --}}
+        {{-- ============ ЗОНА 2: сводка по исполнителю с фильтром по времени ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-            <h3 class="font-semibold text-lg mb-3 text-gray-800">Сводка по исполнителю</h3>
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-semibold text-lg text-gray-800">2. Сводка по исполнителю</h3>
+                <button x-show="!loaded2" @click="loadZone2()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
+                    Показать
+                </button>
+            </div>
 
-            <form method="GET" action="{{ route('stats.index') }}" class="flex flex-wrap items-end gap-3">
-                <input type="hidden" name="period" value="{{ $period }}">
-                @if(request('user_id'))
-                    <input type="hidden" name="user_id" value="{{ request('user_id') }}">
-                @endif
-                @if(request('mode'))
-                    <input type="hidden" name="mode" value="{{ request('mode') }}">
-                @endif
+            <div x-show="loading2" class="text-gray-500 text-sm">Загрузка…</div>
 
-                <div>
+            <div x-show="loaded2" x-cloak>
+                <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
+                    <label class="text-sm text-gray-600">
+                        С:
+                        <input type="date" x-model="dateFrom2" @change="loadZone2(true)"
+                               class="border rounded px-2 py-1 ml-1">
+                    </label>
+                    <label class="text-sm text-gray-600">
+                        По:
+                        <input type="date" x-model="dateTo2" @change="loadZone2(true)"
+                               class="border rounded px-2 py-1 ml-1">
+                    </label>
+                    <button @click="resetDates()"
+                            class="text-sm text-gray-500 hover:text-gray-800 underline">
+                        Сбросить даты
+                    </button>
+                </div>
+
+                <div class="mb-4">
                     <label class="block text-xs text-gray-500 mb-1">Исполнитель</label>
-                    <select name="worker" class="border rounded px-3 py-1 text-sm bg-white min-w-[220px]">
-                        <option value="">— выберите —</option>
-                        @foreach($workersList as $w)
-                            <option value="{{ $w }}" @selected($worker === $w)>{{ $w }}</option>
-                        @endforeach
+                    <select x-model="selectedExecutor" @change="onExecutorChange()"
+                            class="border rounded px-3 py-2 text-sm bg-white w-full md:w-1/2">
+                        <option value="">— Все исполнители —</option>
+                        <template x-for="row in zone2Rows" :key="row.name">
+                            <option :value="row.name" x-text="row.name + ' (' + row.cnt + ')'"></option>
+                        </template>
                     </select>
                 </div>
 
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Дата с</label>
-                    <input type="date" name="worker_date_from" value="{{ request('worker_date_from') }}"
-                           class="border rounded px-3 py-1 text-sm">
+                <div class="mb-4 flex items-baseline gap-2">
+                    <span class="text-sm text-gray-600">Найдено записей:</span>
+                    <span class="text-3xl font-extrabold text-blue-700" x-text="currentSummary()"></span>
                 </div>
 
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Дата по</label>
-                    <input type="date" name="worker_date_to" value="{{ request('worker_date_to') }}"
-                           class="border rounded px-3 py-1 text-sm">
-                </div>
-
-                <div class="flex gap-2">
-                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
-                    @if($worker || request('worker_date_from') || request('worker_date_to'))
-                        <a href="{{ route('stats.index', array_filter([
-                                'period' => $period,
-                                'user_id' => request('user_id'),
-                                'mode' => request('mode'),
-                            ])) }}"
-                           class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-1 text-sm rounded">Сброс</a>
-                    @endif
-                </div>
-            </form>
-
-            <p class="text-xs text-gray-400 mt-2">
-                Только «Дата с» — поиск за этот день. Обе даты — период. Ничего не указано — берётся общий период сверху.
-            </p>
-
-            @if($worker !== '')
-                <div class="mt-4">
-                    <p class="text-sm text-gray-600 mb-2">
-                        <strong>{{ $worker }}</strong>
-                        <span class="text-gray-400">
-                            @if(request('worker_date_from') && request('worker_date_to'))
-                                · {{ \Carbon\Carbon::parse(request('worker_date_from'))->format('d.m.Y') }} — {{ \Carbon\Carbon::parse(request('worker_date_to'))->format('d.m.Y') }}
-                            @elseif(request('worker_date_from'))
-                                · {{ \Carbon\Carbon::parse(request('worker_date_from'))->format('d.m.Y') }}
-                            @elseif(request('worker_date_to'))
-                                · до {{ \Carbon\Carbon::parse(request('worker_date_to'))->format('d.m.Y') }}
-                            @endif
-                        </span>
-                    </p>
-
-                    @if(empty($workerSummary))
-                        <p class="text-gray-500 text-sm">Ничего не найдено за выбранный период.</p>
-                    @else
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full text-sm">
-                                <thead class="bg-gray-50 text-gray-600">
-                                    <tr>
-                                        <th class="p-3 text-left font-semibold rounded-tl">Категория</th>
-                                        <th class="p-3 text-right font-semibold rounded-tr">Сделано</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100">
-                                    @foreach($workerSummary as $slug => $data)
-                                        <tr class="hover:bg-gray-50 transition">
-                                            <td class="p-3 text-gray-800">{{ $data['title'] }}</td>
-                                            <td class="p-3 text-right">
-                                                <span class="text-blue-700 font-bold">{{ $data['total'] }}</span>
-                                                <span class="text-xs text-gray-400 ml-1">{{ $data['unit'] }}</span>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-                </div>
-            @endif
+                <div class="relative h-72"><canvas id="zone2Chart"></canvas></div>
+            </div>
         </div>
 
-        {{-- Детализация по постам (ПГП) --}}
+        {{-- ============ ЗОНА 3: детализация по постам ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-            <h3 class="font-semibold text-lg mb-3 text-gray-800">ПГП: Детализация по постам</h3>
-            @if(empty($byPosts))
-                <p class="text-gray-500 text-sm">Нет данных за период.</p>
-            @else
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-semibold text-lg text-gray-800">3. Детализация по постам</h3>
+                <button x-show="!loaded3" @click="loadZone3()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
+                    Показать
+                </button>
+            </div>
+            <div x-show="loading3" class="text-gray-500 text-sm">Загрузка…</div>
+            <div x-show="loaded3" x-cloak>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead class="bg-gray-50 text-gray-600">
                             <tr>
-                                <th class="p-3 text-left font-semibold rounded-tl">Пост</th>
-                                <th class="p-3 text-left font-semibold">Всего бортов</th>
-                                <th class="p-3 text-left font-semibold rounded-tr">Сдано</th>
+                                <th class="p-3 text-left">#</th>
+                                <th class="p-3 text-left">Пост</th>
+                                <th class="p-3 text-right">Сделано бортов</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            @foreach($byPosts as $post => $data)
-                                <tr class="hover:bg-gray-50 transition">
-                                    <td class="p-3 font-semibold text-gray-800">{{ $post }}</td>
-                                    <td class="p-3 text-blue-700 font-bold">{{ $data['total'] }}</td>
-                                    <td class="p-3 text-green-700 font-bold">{{ $data['delivered'] }}</td>
+                        <tbody>
+                            <template x-for="(row, idx) in zone3" :key="row.post_number">
+                                <tr class="border-t hover:bg-gray-50">
+                                    <td class="p-3 text-gray-400" x-text="idx + 1"></td>
+                                    <td class="p-3 font-medium" x-text="'Пост ' + row.post_number"></td>
+                                    <td class="p-3 text-right font-bold text-blue-700" x-text="row.cnt"></td>
                                 </tr>
-                            @endforeach
+                            </template>
                         </tbody>
                     </table>
+                    <div x-show="zone3.length === 0" class="p-3 text-gray-500 text-sm">Нет данных</div>
                 </div>
-            @endif
+            </div>
         </div>
 
-        {{-- График --}}
+        {{-- ============ ЗОНА 4: график по постам ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-            <h3 class="font-semibold text-lg mb-4 text-gray-800">График по вкладкам</h3>
-            <div class="relative h-64 w-full">
-                <canvas id="statsChart"></canvas>
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-semibold text-lg text-gray-800">4. График по постам</h3>
+                <button x-show="!loaded4" @click="loadZone4()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
+                    Открыть график
+                </button>
+            </div>
+            <div x-show="loaded4" x-cloak>
+                <div class="flex flex-wrap gap-3 mb-3 items-end">
+                    <label class="text-sm text-gray-600">
+                        С: <input type="date" x-model="dateFrom" @change="loadZone4()"
+                                  class="border rounded px-2 py-1 ml-1">
+                    </label>
+                    <label class="text-sm text-gray-600">
+                        По: <input type="date" x-model="dateTo" @change="loadZone4()"
+                                   class="border rounded px-2 py-1 ml-1">
+                    </label>
+                </div>
+                <div class="relative h-80"><canvas id="zone4Chart"></canvas></div>
             </div>
         </div>
 
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const ctx = document.getElementById('statsChart').getContext('2d');
-            const labels = @json(collect($perSheet)->pluck('title'));
-            const data = @json(collect($perSheet)->pluck('total'));
+    @push('scripts')
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            function statsZones(opts = {}) {
+                return {
+                    // Зона 2
+                    loaded2: false, loading2: false,
+                    zone2Rows: [], zone2Total: 0,
+                    selectedExecutor: '', zone2ChartObj: null,
+                    dateFrom2: opts.initialFrom || '',
+                    dateTo2: '',
 
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Количество',
-                        data: data,
-                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                        borderColor: 'rgba(59, 130, 246, 1)',
-                        borderWidth: 1,
-                        borderRadius: 4,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f3f4f6' } },
-                        x: { grid: { display: false } }
+                    // Зона 3
+                    loaded3: false, loading3: false, zone3: [],
+
+                    // Зона 4
+                    loaded4: false, dateFrom: '', dateTo: '', zone4ChartObj: null,
+
+                    async loadZone2(force = false) {
+                        if (!force) this.loaded2 = true;
+
+                        this.loading2 = true;
+                        try {
+                            const params = new URLSearchParams({ sheet: 'pgp' });
+                            if (this.dateFrom2) params.set('from', this.dateFrom2);
+                            if (this.dateTo2)   params.set('to',   this.dateTo2);
+
+                            const res = await fetch('{{ route("stats.zone2") }}?' + params.toString());
+                            const data = await res.json();
+
+                            this.zone2Rows  = data.rows || [];
+                            this.zone2Total = data.total || 0;
+
+                            if (this.selectedExecutor &&
+                                !this.zone2Rows.some(r => r.name === this.selectedExecutor)) {
+                                this.selectedExecutor = '';
+                            }
+
+                            this.loaded2 = true;
+                            this.$nextTick(() => this.loadZone2Chart());
+                        } catch (e) { console.error(e); }
+                        this.loading2 = false;
                     },
-                    plugins: { legend: { display: false } }
-                }
-            });
-        });
-    </script>
-</x-app-layout>
+
+                    resetDates() {
+                        this.dateFrom2 = '';
+                        this.dateTo2 = '';
+                        this.loadZone2(true);
+                    },
+
+                    onExecutorChange() {
+                        this.loadZone2Chart();
+                    },
+
+                    currentSummary() {
+                        if (!this.selectedExecutor) {
+                            return this.zone2Total;
+                        }
+                        const found = this.zone2Rows.find(r => r.name === this.selectedExecutor);
+                        return found ? Number(found.cnt) : 0;
+                    },
+
+                    async loadZone2Chart() {
+                        const params = new URLSearchParams({ sheet: 'pgp' });
+                        if (this.selectedExecutor) params.set('executor', this.selectedExecutor);
+                        if (this.dateFrom2) params.set('from', this.dateFrom2);
+                        if (this.dateTo2)   params.set('to',   this.dateTo2);
+
+                        const res = await fetch('{{ route("stats.zone2Chart") }}?' + params.toString());
+                        const data = await res.json();
+
+                        const ctx = document.getElementById('zone2Chart');
+                        if (this.zone2ChartObj) this.zone2ChartObj.destroy();
+                        this.zone2ChartObj = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: data.labels,
+                                datasets: [{
+                                    label: this.selectedExecutor || 'Все исполнители',
+                                    data: data.values,
+                                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                                    borderColor: 'rgba(59, 130, 246, 1)',
+                                    borderWidth: 1,
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    x: {
+                                        ticks: {
+                                            autoSkip: true,
+                                            maxRotation: 60,
+                                            minRotation: 0,
+                                        }
+                                    },
+                                    y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                                },
+                                plugins: { legend: { display: false } },
+                            }
+                        });
+                    },
+
+                    async loadZone3() {
+                        this.loading3 = true;
+                        try {
+                            const res = await fetch('{{ route("stats.zone3") }}?sheet=pgp');
+                            this.zone3 = await res.json();
+                            this.loaded3 = true;
+                        } catch (e) { console.error(e); }
+                        this.loading3 = false;
+                    },
+
+                    async loadZone4() {
+                        this.loaded4 = true;
+                        const params = new URLSearchParams({ sheet: 'pgp' });
+                        if (this.dateFrom) params.set('from', this.dateFrom);
+                        if (this.dateTo)   params.set('to',   this.dateTo);
+
+                        const res = await fetch('{{ route("stats.zone4") }}?' + params.toString());
+                        const data = await res.json();
+
+                        const ctx = document.getElementById('zone4Chart');
+                        if (this.zone4ChartObj) this.zone4ChartObj.destroy();
+                        this.zone4ChartObj = new Chart(ctx, {
+                            type: 'line',
+                            data: { labels: data.labels, datasets: data.datasets },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                interaction: { mode: 'index', intersect: false },
+                            }
+                        });
+                    },
+                };
+            }
+        </script>
+    @endpush
+</x-app-layout>теперь

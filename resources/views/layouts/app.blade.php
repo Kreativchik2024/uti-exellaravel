@@ -32,5 +32,8 @@
                 {{ $slot }}
             </main>
         </div>
+
+        {{-- Стек для скриптов страниц (Chart.js, Alpine-логика зон статистики) --}}
+        @stack('scripts')
     </body>
 </html>
