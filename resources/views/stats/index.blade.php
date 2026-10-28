@@ -81,23 +81,37 @@
 
         {{-- ============ ЗОНА 1: сводка по вкладкам ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-            <h3 class="font-semibold text-lg mb-4 text-gray-800">1. Сводка по вкладкам</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
-                @foreach($perSheet as $slug => $data)
-                    <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition border border-gray-200 p-6 flex flex-col items-center justify-center text-center">
-                        <div class="text-sm font-medium text-gray-500 mb-3 truncate w-full" title="{{ $data['title'] }}">
-                            {{ $data['title'] }}
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-semibold text-lg text-gray-800">1. Сводка по вкладкам</h3>
+                <div class="flex gap-2">
+                    <button x-show="!expanded1" @click="toggleZone1()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
+                        Показать
+                    </button>
+                    <button x-show="expanded1" @click="toggleZone1()"
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">
+                        Скрыть
+                    </button>
+                </div>
+            </div>
+            <div x-show="expanded1" x-cloak>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+                    @foreach($perSheet as $slug => $data)
+                        <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition border border-gray-200 p-6 flex flex-col items-center justify-center text-center">
+                            <div class="text-sm font-medium text-gray-500 mb-3 truncate w-full" title="{{ $data['title'] }}">
+                                {{ $data['title'] }}
+                            </div>
+                            <div class="flex flex-col items-center justify-center">
+                                <span class="text-5xl font-extrabold {{ $data['total'] > 0 ? 'text-blue-600' : 'text-gray-300' }} leading-none mb-1">
+                                    {{ $data['total'] }}
+                                </span>
+                                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                    {{ $data['unit'] === 'записей' ? 'штук' : $data['unit'] }}
+                                </span>
+                            </div>
                         </div>
-                        <div class="flex flex-col items-center justify-center">
-                            <span class="text-5xl font-extrabold {{ $data['total'] > 0 ? 'text-blue-600' : 'text-gray-300' }} leading-none mb-1">
-                                {{ $data['total'] }}
-                            </span>
-                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                {{ $data['unit'] === 'записей' ? 'штук' : $data['unit'] }}
-                            </span>
-                        </div>
-                    </div>
-                @endforeach
+                    @endforeach
+                </div>
             </div>
         </div>
 
@@ -114,33 +128,41 @@
                         @endif
                     </span>
                 </h3>
-                <button x-show="!loaded3" @click="loadZone3()"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
-                    Показать
-                </button>
+                <div class="flex gap-2">
+                    <button x-show="!expanded3" @click="toggleZone3()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
+                        Показать
+                    </button>
+                    <button x-show="expanded3" @click="toggleZone3()"
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">
+                        Скрыть
+                    </button>
+                </div>
             </div>
-            <div x-show="loading3" class="text-gray-500 text-sm">Загрузка…</div>
-            <div x-show="loaded3" x-cloak>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 text-gray-600">
-                            <tr>
-                                <th class="p-3 text-left">#</th>
-                                <th class="p-3 text-left">Пост</th>
-                                <th class="p-3 text-right">Сделано бортов</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="(row, idx) in zone3" :key="row.post_number">
-                                <tr class="border-t hover:bg-gray-50">
-                                    <td class="p-3 text-gray-400" x-text="idx + 1"></td>
-                                    <td class="p-3 font-medium" x-text="'Пост ' + row.post_number"></td>
-                                    <td class="p-3 text-right font-bold text-blue-700" x-text="row.cnt"></td>
+            <div x-show="expanded3" x-cloak>
+                <div x-show="loading3" class="text-gray-500 text-sm">Загрузка…</div>
+                <div x-show="loaded3 && !loading3">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50 text-gray-600">
+                                <tr>
+                                    <th class="p-3 text-left">#</th>
+                                    <th class="p-3 text-left">Пост</th>
+                                    <th class="p-3 text-right">Сделано бортов</th>
                                 </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                    <div x-show="zone3.length === 0" class="p-3 text-gray-500 text-sm">Нет данных за период</div>
+                            </thead>
+                            <tbody>
+                                <template x-for="(row, idx) in zone3" :key="row.post_number">
+                                    <tr class="border-t hover:bg-gray-50">
+                                        <td class="p-3 text-gray-400" x-text="idx + 1"></td>
+                                        <td class="p-3 font-medium" x-text="'Пост ' + row.post_number"></td>
+                                        <td class="p-3 text-right font-bold text-blue-700" x-text="row.cnt"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                        <div x-show="zone3.length === 0" class="p-3 text-gray-500 text-sm">Нет данных за период</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -149,46 +171,54 @@
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">3. Сводка по исполнителю</h3>
-                <button x-show="!loaded2" @click="loadZone2()"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
-                    Показать
-                </button>
-            </div>
-            <div x-show="loading2" class="text-gray-500 text-sm">Загрузка…</div>
-            <div x-show="loaded2" x-cloak>
-                <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
-                    <label class="text-sm text-gray-600">
-                        С: <input type="date" x-model="dateFrom2" @change="loadZone2(true)"
-                                  class="border rounded px-2 py-1 ml-1">
-                    </label>
-                    <label class="text-sm text-gray-600">
-                        По: <input type="date" x-model="dateTo2" @change="loadZone2(true)"
-                                   class="border rounded px-2 py-1 ml-1">
-                    </label>
-                    <button @click="resetDates()"
-                            class="text-sm text-gray-500 hover:text-gray-800 underline">
-                        Сбросить даты
+                <div class="flex gap-2">
+                    <button x-show="!expanded2" @click="toggleZone2()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
+                        Показать
+                    </button>
+                    <button x-show="expanded2" @click="toggleZone2()"
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">
+                        Скрыть
                     </button>
                 </div>
+            </div>
+            <div x-show="expanded2" x-cloak>
+                <div x-show="loading2" class="text-gray-500 text-sm">Загрузка…</div>
+                <div x-show="loaded2 && !loading2">
+                    <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
+                        <label class="text-sm text-gray-600">
+                            С: <input type="date" x-model="dateFrom2" @change="loadZone2(true)"
+                                      class="border rounded px-2 py-1 ml-1">
+                        </label>
+                        <label class="text-sm text-gray-600">
+                            По: <input type="date" x-model="dateTo2" @change="loadZone2(true)"
+                                       class="border rounded px-2 py-1 ml-1">
+                        </label>
+                        <button @click="resetDates()"
+                                class="text-sm text-gray-500 hover:text-gray-800 underline">
+                            Сбросить даты
+                        </button>
+                    </div>
 
-                <div class="mb-4">
-                    <label class="block text-xs text-gray-500 mb-1">Исполнитель</label>
-                    <select x-model="selectedExecutor" @change="onExecutorChange()"
-                            class="border rounded px-3 py-2 text-sm bg-white w-full md:w-1/2">
-                        <option value="">— Все исполнители —</option>
-                        <template x-for="row in zone2Rows" :key="row.name">
-                            <option :value="row.name" x-text="row.name + ' (' + row.cnt + ')'"></option>
-                        </template>
-                    </select>
+                    <div class="mb-4">
+                        <label class="block text-xs text-gray-500 mb-1">Исполнитель</label>
+                        <select x-model="selectedExecutor" @change="onExecutorChange()"
+                                class="border rounded px-3 py-2 text-sm bg-white w-full md:w-1/2">
+                            <option value="">— Все исполнители —</option>
+                            <template x-for="row in zone2Rows" :key="row.name">
+                                <option :value="row.name" x-text="row.name + ' (' + row.cnt + ')'"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="mb-4 flex items-baseline gap-2">
+                        <span class="text-sm text-gray-600">Найдено записей:</span>
+                        <span class="text-3xl font-extrabold text-blue-700" x-text="currentSummary()"></span>
+                    </div>
+
+                    <div class="relative h-72"><canvas id="zone2Chart"></canvas></div>
+                    <div x-show="chartError" x-text="chartError" class="mt-2 text-sm text-red-600"></div>
                 </div>
-
-                <div class="mb-4 flex items-baseline gap-2">
-                    <span class="text-sm text-gray-600">Найдено записей:</span>
-                    <span class="text-3xl font-extrabold text-blue-700" x-text="currentSummary()"></span>
-                </div>
-
-                <div class="relative h-72"><canvas id="zone2Chart"></canvas></div>
-                <div x-show="chartError" x-text="chartError" class="mt-2 text-sm text-red-600"></div>
             </div>
         </div>
 
@@ -196,12 +226,18 @@
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">4. График по постам</h3>
-                <button x-show="!loaded4" @click="loadZone4()"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
-                    Открыть график
-                </button>
+                <div class="flex gap-2">
+                    <button x-show="!expanded4" @click="toggleZone4()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
+                        Открыть график
+                    </button>
+                    <button x-show="expanded4" @click="toggleZone4()"
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">
+                        Скрыть
+                    </button>
+                </div>
             </div>
-            <div x-show="loaded4" x-cloak>
+            <div x-show="expanded4" x-cloak>
                 <div class="flex flex-wrap gap-3 mb-3 items-end">
                     <label class="text-sm text-gray-600">
                         С: <input type="date" x-model="dateFrom" @change="loadZone4()"
@@ -220,41 +256,49 @@
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">5. Брак по категориям</h3>
-                <button x-show="!loaded5" @click="loadZone5()"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
-                    Показать
-                </button>
-            </div>
-            <div x-show="loading5" class="text-gray-500 text-sm">Загрузка…</div>
-            <div x-show="loaded5" x-cloak>
-                <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
-                    <label class="text-sm text-gray-600">
-                        С:
-                        <input type="date" x-model="dateFrom5" @change="onZone5FiltersChange()"
-                               class="border rounded px-2 py-1 ml-1">
-                    </label>
-                    <label class="text-sm text-gray-600">
-                        По:
-                        <input type="date" x-model="dateTo5" @change="onZone5FiltersChange()"
-                               class="border rounded px-2 py-1 ml-1">
-                    </label>
-                    <button @click="resetDates5()"
-                            class="text-sm text-gray-500 hover:text-gray-800 underline">
-                        Сбросить даты
+                <div class="flex gap-2">
+                    <button x-show="!expanded5" @click="toggleZone5()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
+                        Показать
                     </button>
-                    <div class="flex-1 min-w-[240px]">
-                        <label class="block text-xs text-gray-500 mb-1">Категория</label>
-                        <select x-model="selectedCategory" @change="onCategoryChange()"
-                                class="border rounded px-3 py-2 text-sm bg-white w-full">
-                            <option value="">— Все категории —</option>
-                            <template x-for="row in zone5Rows" :key="row.slug">
-                                <option :value="row.slug" x-text="row.title + ' (' + row.percent + '%)'"></option>
-                            </template>
-                        </select>
-                    </div>
+                    <button x-show="expanded5" @click="toggleZone5()"
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">
+                        Скрыть
+                    </button>
                 </div>
+            </div>
+            <div x-show="expanded5" x-cloak>
+                <div x-show="loading5" class="text-gray-500 text-sm">Загрузка…</div>
+                <div x-show="loaded5 && !loading5">
+                    <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
+                        <label class="text-sm text-gray-600">
+                            С:
+                            <input type="date" x-model="dateFrom5" @change="onZone5FiltersChange()"
+                                   class="border rounded px-2 py-1 ml-1">
+                        </label>
+                        <label class="text-sm text-gray-600">
+                            По:
+                            <input type="date" x-model="dateTo5" @change="onZone5FiltersChange()"
+                                   class="border rounded px-2 py-1 ml-1">
+                        </label>
+                        <button @click="resetDates5()"
+                                class="text-sm text-gray-500 hover:text-gray-800 underline">
+                            Сбросить даты
+                        </button>
+                        <div class="flex-1 min-w-[240px]">
+                            <label class="block text-xs text-gray-500 mb-1">Категория</label>
+                            <select x-model="selectedCategory" @change="onCategoryChange()"
+                                    class="border rounded px-3 py-2 text-sm bg-white w-full">
+                                <option value="">— Все категории —</option>
+                                <template x-for="row in zone5Rows" :key="row.slug">
+                                    <option :value="row.slug" x-text="row.title + ' (' + row.percent + '%)'"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
 
-                <div class="relative h-96"><canvas id="zone5Chart"></canvas></div>
+                    <div class="relative h-96"><canvas id="zone5Chart"></canvas></div>
+                </div>
             </div>
         </div>
 
@@ -262,76 +306,81 @@
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">6. Рейтинг кодов неисправностей</h3>
-                <button x-show="!loaded6" @click="loadZone6()"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
-                    Показать
-                </button>
-            </div>
-            <div x-show="loading6" class="text-gray-500 text-sm">Загрузка…</div>
-            <div x-show="loaded6" x-cloak>
-                {{-- Фильтр по времени + категория --}}
-                <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
-                    <label class="text-sm text-gray-600">
-                        С:
-                        <input type="date" x-model="dateFrom6" @change="loadZone6(true)"
-                               class="border rounded px-2 py-1 ml-1">
-                    </label>
-                    <label class="text-sm text-gray-600">
-                        По:
-                        <input type="date" x-model="dateTo6" @change="loadZone6(true)"
-                               class="border rounded px-2 py-1 ml-1">
-                    </label>
-                    <button @click="resetDates6()"
-                            class="text-sm text-gray-500 hover:text-gray-800 underline">
-                        Сбросить даты
+                <div class="flex gap-2">
+                    <button x-show="!expanded6" @click="toggleZone6()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
+                        Показать
                     </button>
-                    <div class="flex-1 min-w-[240px]">
-                        <label class="block text-xs text-gray-500 mb-1">Категория</label>
-                        <select x-model="selectedCategory6" @change="loadZone6(true)"
-                                class="border rounded px-3 py-2 text-sm bg-white w-full">
-                            <option value="">— Все категории —</option>
-                            @foreach(config('sheets.map', []) as $slug => $cfg)
-                                @if(isset($cfg['fields']['fault_code']))
-                                    <option value="{{ $slug }}">{{ $cfg['title'] ?? $slug }}</option>
-                                @endif
-                            @endforeach
-                        </select>
+                    <button x-show="expanded6" @click="toggleZone6()"
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">
+                        Скрыть
+                    </button>
+                </div>
+            </div>
+            <div x-show="expanded6" x-cloak>
+                <div x-show="loading6" class="text-gray-500 text-sm">Загрузка…</div>
+                <div x-show="loaded6 && !loading6">
+                    <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
+                        <label class="text-sm text-gray-600">
+                            С:
+                            <input type="date" x-model="dateFrom6" @change="loadZone6(true)"
+                                   class="border rounded px-2 py-1 ml-1">
+                        </label>
+                        <label class="text-sm text-gray-600">
+                            По:
+                            <input type="date" x-model="dateTo6" @change="loadZone6(true)"
+                                   class="border rounded px-2 py-1 ml-1">
+                        </label>
+                        <button @click="resetDates6()"
+                                class="text-sm text-gray-500 hover:text-gray-800 underline">
+                            Сбросить даты
+                        </button>
+                        <div class="flex-1 min-w-[240px]">
+                            <label class="block text-xs text-gray-500 mb-1">Категория</label>
+                            <select x-model="selectedCategory6" @change="loadZone6(true)"
+                                    class="border rounded px-3 py-2 text-sm bg-white w-full">
+                                <option value="">— Все категории —</option>
+                                @foreach(config('sheets.map', []) as $slug => $cfg)
+                                    @if(isset($cfg['fields']['fault_code']))
+                                        <option value="{{ $slug }}">{{ $cfg['title'] ?? $slug }}</option>
+                                    @endif
+                                @endforeach
+                            </select>
+                        </div>
                     </div>
-                </div>
 
-                {{-- Сводка итогов --}}
-                <div class="mb-4 flex flex-wrap gap-4 items-baseline text-sm">
-                    <span class="text-gray-600">Всего кодов: <strong class="text-lg text-gray-800" x-text="zone6Rows.length"></strong></span>
-                    <span class="text-gray-600">Суммарно вхождений: <strong class="text-lg text-blue-700" x-text="zone6Total()"></strong></span>
-                </div>
+                    <div class="mb-4 flex flex-wrap gap-4 items-baseline text-sm">
+                        <span class="text-gray-600">Всего кодов: <strong class="text-lg text-gray-800" x-text="zone6Rows.length"></strong></span>
+                        <span class="text-gray-600">Суммарно вхождений: <strong class="text-lg text-blue-700" x-text="zone6Total()"></strong></span>
+                    </div>
 
-                {{-- Таблица --}}
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 text-gray-600">
-                            <tr>
-                                <th class="p-3 text-left w-12">#</th>
-                                <th class="p-3 text-left">Код неисправности</th>
-                                <th class="p-3 text-left">Категория</th>
-                                <th class="p-3 text-right">Кол-во</th>
-                                <th class="p-3 text-left">Первое появление</th>
-                                <th class="p-3 text-left">Последнее появление</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="(row, idx) in zone6Rows" :key="row.code + '|' + row.sheet">
-                                <tr class="border-t hover:bg-gray-50">
-                                    <td class="p-3 text-gray-400" x-text="idx + 1"></td>
-                                    <td class="p-3 font-mono font-semibold text-gray-900" x-text="row.code"></td>
-                                    <td class="p-3 text-gray-600" x-text="row.sheet_title"></td>
-                                    <td class="p-3 text-right font-bold text-red-700" x-text="row.count"></td>
-                                    <td class="p-3 text-gray-500" x-text="formatDate(row.first_date)"></td>
-                                    <td class="p-3 text-gray-500" x-text="formatDate(row.last_date)"></td>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50 text-gray-600">
+                                <tr>
+                                    <th class="p-3 text-left w-12">#</th>
+                                    <th class="p-3 text-left">Код неисправности</th>
+                                    <th class="p-3 text-left">Категория</th>
+                                    <th class="p-3 text-right">Кол-во</th>
+                                    <th class="p-3 text-left">Первое появление</th>
+                                    <th class="p-3 text-left">Последнее появление</th>
                                 </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                    <div x-show="zone6Rows.length === 0" class="p-3 text-gray-500 text-sm">Нет данных за период</div>
+                            </thead>
+                            <tbody>
+                                <template x-for="(row, idx) in zone6Rows" :key="row.code + '|' + row.sheet">
+                                    <tr class="border-t hover:bg-gray-50">
+                                        <td class="p-3 text-gray-400" x-text="idx + 1"></td>
+                                        <td class="p-3 font-mono font-semibold text-gray-900" x-text="row.code"></td>
+                                        <td class="p-3 text-gray-600" x-text="row.sheet_title"></td>
+                                        <td class="p-3 text-right font-bold text-red-700" x-text="row.count"></td>
+                                        <td class="p-3 text-gray-500" x-text="formatDate(row.first_date)"></td>
+                                        <td class="p-3 text-gray-500" x-text="formatDate(row.last_date)"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                        <div x-show="zone6Rows.length === 0" class="p-3 text-gray-500 text-sm">Нет данных за период</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -346,10 +395,18 @@
                     initialFrom: opts.initialFrom || '',
                     initialTo:   opts.initialTo   || '',
 
-                    // Зона 2 (по внутренней логике — посты)
+                    // Флаги раскрытия зон
+                    expanded1: true,   // сводка по вкладкам — видна по умолчанию
+                    expanded2: false,  // сводка по исполнителю
+                    expanded3: false,  // детализация по постам
+                    expanded4: false,  // график по постам
+                    expanded5: false,  // брак по категориям
+                    expanded6: false,  // рейтинг кодов
+
+                    // Зона 2 (посты)
                     loaded3: false, loading3: false, zone3: [],
 
-                    // Зона 3 (по внутренней логике — исполнители)
+                    // Зона 3 (исполнители)
                     loaded2: false, loading2: false,
                     zone2Rows: [], zone2Total: 0,
                     selectedExecutor: '', zone2ChartObj: null,
@@ -372,6 +429,46 @@
                     zone6Rows: [], selectedCategory6: '',
                     dateFrom6: opts.initialFrom || '',
                     dateTo6: '',
+
+                    // ============ TOGGLE ============
+                    toggleZone1() {
+                        this.expanded1 = !this.expanded1;
+                    },
+
+                    toggleZone2() {
+                        this.expanded2 = !this.expanded2;
+                        if (this.expanded2 && !this.loaded2 && !this.loading2) {
+                            this.loadZone2();
+                        }
+                    },
+
+                    toggleZone3() {
+                        this.expanded3 = !this.expanded3;
+                        if (this.expanded3 && !this.loaded3 && !this.loading3) {
+                            this.loadZone3();
+                        }
+                    },
+
+                    toggleZone4() {
+                        this.expanded4 = !this.expanded4;
+                        if (this.expanded4 && !this.loaded4) {
+                            this.loadZone4();
+                        }
+                    },
+
+                    toggleZone5() {
+                        this.expanded5 = !this.expanded5;
+                        if (this.expanded5 && !this.loaded5 && !this.loading5) {
+                            this.loadZone5();
+                        }
+                    },
+
+                    toggleZone6() {
+                        this.expanded6 = !this.expanded6;
+                        if (this.expanded6 && !this.loaded6 && !this.loading6) {
+                            this.loadZone6();
+                        }
+                    },
 
                     // ============ ЗОНА 2 (посты) ============
                     async loadZone3() {
@@ -679,7 +776,7 @@
                         if (!d) return '—';
                         const [y, m, day] = String(d).split('-');
                         if (!y || !m || !day) return d;
-                        return day + '.' + m + '.' + y;
+                        return day + '.' + m + '.' + day + '.' + y;
                     },
                 };
             }
