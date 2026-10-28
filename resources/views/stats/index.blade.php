@@ -16,7 +16,7 @@
              initialFrom: '{{ $from ? $from->format('Y-m-d') : '' }}'
          })">
 
-        {{-- ============ ФИЛЬТРЫ (общие для зоны 1) ============ --}}
+        {{-- ============ ФИЛЬТРЫ ============ --}}
         <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
             <div class="flex flex-wrap items-end gap-4">
                 <div>
@@ -78,7 +78,7 @@
             @endif
         </div>
 
-        {{-- ============ ЗОНА 1: сводка по вкладкам ============ --}}
+        {{-- ============ ЗОНА 1 ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <h3 class="font-semibold text-lg mb-4 text-gray-800">1. Сводка по вкладкам</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
@@ -100,7 +100,7 @@
             </div>
         </div>
 
-        {{-- ============ ЗОНА 2: сводка по исполнителю с фильтром по времени ============ --}}
+        {{-- ============ ЗОНА 2 ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">2. Сводка по исполнителю</h3>
@@ -109,20 +109,16 @@
                     Показать
                 </button>
             </div>
-
             <div x-show="loading2" class="text-gray-500 text-sm">Загрузка…</div>
-
             <div x-show="loaded2" x-cloak>
                 <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
                     <label class="text-sm text-gray-600">
-                        С:
-                        <input type="date" x-model="dateFrom2" @change="loadZone2(true)"
-                               class="border rounded px-2 py-1 ml-1">
+                        С: <input type="date" x-model="dateFrom2" @change="loadZone2(true)"
+                                  class="border rounded px-2 py-1 ml-1">
                     </label>
                     <label class="text-sm text-gray-600">
-                        По:
-                        <input type="date" x-model="dateTo2" @change="loadZone2(true)"
-                               class="border rounded px-2 py-1 ml-1">
+                        По: <input type="date" x-model="dateTo2" @change="loadZone2(true)"
+                                   class="border rounded px-2 py-1 ml-1">
                     </label>
                     <button @click="resetDates()"
                             class="text-sm text-gray-500 hover:text-gray-800 underline">
@@ -147,10 +143,11 @@
                 </div>
 
                 <div class="relative h-72"><canvas id="zone2Chart"></canvas></div>
+                <div x-show="chartError" x-text="chartError" class="mt-2 text-sm text-red-600"></div>
             </div>
         </div>
 
-        {{-- ============ ЗОНА 3: детализация по постам ============ --}}
+        {{-- ============ ЗОНА 3 ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">3. Детализация по постам</h3>
@@ -185,7 +182,7 @@
             </div>
         </div>
 
-        {{-- ============ ЗОНА 4: график по постам ============ --}}
+        {{-- ============ ЗОНА 4 ============ --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">4. График по постам</h3>
@@ -209,10 +206,53 @@
             </div>
         </div>
 
+        {{-- ============ ЗОНА 5: брак по категориям ============ --}}
+        <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-semibold text-lg text-gray-800">5. Брак по категориям</h3>
+                <button x-show="!loaded5" @click="loadZone5()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">
+                    Показать
+                </button>
+            </div>
+            <div x-show="loading5" class="text-gray-500 text-sm">Загрузка…</div>
+            <div x-show="loaded5" x-cloak>
+                {{-- Фильтр по времени + выпадающее меню категории --}}
+                <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
+                    <label class="text-sm text-gray-600">
+                        С:
+                        <input type="date" x-model="dateFrom5" @change="onZone5FiltersChange()"
+                               class="border rounded px-2 py-1 ml-1">
+                    </label>
+                    <label class="text-sm text-gray-600">
+                        По:
+                        <input type="date" x-model="dateTo5" @change="onZone5FiltersChange()"
+                               class="border rounded px-2 py-1 ml-1">
+                    </label>
+                    <button @click="resetDates5()"
+                            class="text-sm text-gray-500 hover:text-gray-800 underline">
+                        Сбросить даты
+                    </button>
+                    <div class="flex-1 min-w-[240px]">
+                        <label class="block text-xs text-gray-500 mb-1">Категория</label>
+                        <select x-model="selectedCategory" @change="onCategoryChange()"
+                                class="border rounded px-3 py-2 text-sm bg-white w-full">
+                            <option value="">— Все категории —</option>
+                            <template x-for="row in zone5Rows" :key="row.slug">
+                                <option :value="row.slug" x-text="row.title + ' (' + row.percent + '%)'"></option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="relative h-80"><canvas id="zone5Chart"></canvas></div>
+            </div>
+        </div>
+
     </div>
 
     @push('scripts')
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
         <script>
             function statsZones(opts = {}) {
                 return {
@@ -222,6 +262,7 @@
                     selectedExecutor: '', zone2ChartObj: null,
                     dateFrom2: opts.initialFrom || '',
                     dateTo2: '',
+                    chartError: '',
 
                     // Зона 3
                     loaded3: false, loading3: false, zone3: [],
@@ -229,9 +270,16 @@
                     // Зона 4
                     loaded4: false, dateFrom: '', dateTo: '', zone4ChartObj: null,
 
+                    // Зона 5
+                    loaded5: false, loading5: false,
+                    zone5Rows: [], selectedCategory: '',
+                    dateFrom5: opts.initialFrom || '',
+                    dateTo5: '',
+                    zone5ChartObj: null,
+
+                    // ============ ЗОНА 2 ============
                     async loadZone2(force = false) {
                         if (!force) this.loaded2 = true;
-
                         this.loading2 = true;
                         try {
                             const params = new URLSearchParams({ sheet: 'pgp' });
@@ -239,6 +287,7 @@
                             if (this.dateTo2)   params.set('to',   this.dateTo2);
 
                             const res = await fetch('{{ route("stats.zone2") }}?' + params.toString());
+                            if (!res.ok) throw new Error('zone2 HTTP ' + res.status);
                             const data = await res.json();
 
                             this.zone2Rows  = data.rows || [];
@@ -251,7 +300,10 @@
 
                             this.loaded2 = true;
                             this.$nextTick(() => this.loadZone2Chart());
-                        } catch (e) { console.error(e); }
+                        } catch (e) {
+                            console.error('[zone2]', e);
+                            this.chartError = 'Ошибка загрузки данных: ' + e.message;
+                        }
                         this.loading2 = false;
                     },
 
@@ -266,87 +318,224 @@
                     },
 
                     currentSummary() {
-                        if (!this.selectedExecutor) {
-                            return this.zone2Total;
-                        }
+                        if (!this.selectedExecutor) return this.zone2Total;
                         const found = this.zone2Rows.find(r => r.name === this.selectedExecutor);
                         return found ? Number(found.cnt) : 0;
                     },
 
                     async loadZone2Chart() {
-                        const params = new URLSearchParams({ sheet: 'pgp' });
-                        if (this.selectedExecutor) params.set('executor', this.selectedExecutor);
-                        if (this.dateFrom2) params.set('from', this.dateFrom2);
-                        if (this.dateTo2)   params.set('to',   this.dateTo2);
+                        if (typeof Chart === 'undefined') {
+                            this.chartError = 'Chart.js не загрузился.';
+                            return;
+                        }
+                        this.chartError = '';
+                        try {
+                            const params = new URLSearchParams({ sheet: 'pgp' });
+                            if (this.selectedExecutor) params.set('executor', this.selectedExecutor);
+                            if (this.dateFrom2) params.set('from', this.dateFrom2);
+                            if (this.dateTo2)   params.set('to',   this.dateTo2);
 
-                        const res = await fetch('{{ route("stats.zone2Chart") }}?' + params.toString());
-                        const data = await res.json();
+                            const res = await fetch('{{ route("stats.zone2Chart") }}?' + params.toString());
+                            if (!res.ok) throw new Error('zone2Chart HTTP ' + res.status);
+                            const data = await res.json();
 
-                        const ctx = document.getElementById('zone2Chart');
-                        if (this.zone2ChartObj) this.zone2ChartObj.destroy();
-                        this.zone2ChartObj = new Chart(ctx, {
-                            type: 'bar',
-                            data: {
-                                labels: data.labels,
-                                datasets: [{
-                                    label: this.selectedExecutor || 'Все исполнители',
-                                    data: data.values,
-                                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                                    borderColor: 'rgba(59, 130, 246, 1)',
-                                    borderWidth: 1,
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                scales: {
-                                    x: {
-                                        ticks: {
-                                            autoSkip: true,
-                                            maxRotation: 60,
-                                            minRotation: 0,
-                                        }
-                                    },
-                                    y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                            const ctx = document.getElementById('zone2Chart');
+                            if (this.zone2ChartObj) this.zone2ChartObj.destroy();
+                            this.zone2ChartObj = new Chart(ctx, {
+                                type: 'bar',
+                                data: {
+                                    labels: data.labels,
+                                    datasets: [{
+                                        label: this.selectedExecutor || 'Все исполнители',
+                                        data: data.values,
+                                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                                        borderColor: 'rgba(59, 130, 246, 1)',
+                                        borderWidth: 1,
+                                    }]
                                 },
-                                plugins: { legend: { display: false } },
-                            }
-                        });
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        x: { ticks: { autoSkip: true, maxRotation: 60 } },
+                                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                                    },
+                                    plugins: { legend: { display: false } },
+                                }
+                            });
+                        } catch (e) {
+                            console.error('[zone2Chart]', e);
+                            this.chartError = 'Ошибка графика: ' + e.message;
+                        }
                     },
 
+                    // ============ ЗОНА 3 ============
                     async loadZone3() {
                         this.loading3 = true;
                         try {
                             const res = await fetch('{{ route("stats.zone3") }}?sheet=pgp');
+                            if (!res.ok) throw new Error('HTTP ' + res.status);
                             this.zone3 = await res.json();
                             this.loaded3 = true;
-                        } catch (e) { console.error(e); }
+                        } catch (e) { console.error('[zone3]', e); }
                         this.loading3 = false;
                     },
 
+                    // ============ ЗОНА 4 ============
                     async loadZone4() {
                         this.loaded4 = true;
-                        const params = new URLSearchParams({ sheet: 'pgp' });
-                        if (this.dateFrom) params.set('from', this.dateFrom);
-                        if (this.dateTo)   params.set('to',   this.dateTo);
+                        if (typeof Chart === 'undefined') return;
+                        try {
+                            const params = new URLSearchParams({ sheet: 'pgp' });
+                            if (this.dateFrom) params.set('from', this.dateFrom);
+                            if (this.dateTo)   params.set('to',   this.dateTo);
 
-                        const res = await fetch('{{ route("stats.zone4") }}?' + params.toString());
-                        const data = await res.json();
+                            const res = await fetch('{{ route("stats.zone4") }}?' + params.toString());
+                            if (!res.ok) throw new Error('HTTP ' + res.status);
+                            const data = await res.json();
 
-                        const ctx = document.getElementById('zone4Chart');
-                        if (this.zone4ChartObj) this.zone4ChartObj.destroy();
-                        this.zone4ChartObj = new Chart(ctx, {
-                            type: 'line',
-                            data: { labels: data.labels, datasets: data.datasets },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                interaction: { mode: 'index', intersect: false },
+                            const ctx = document.getElementById('zone4Chart');
+                            if (this.zone4ChartObj) this.zone4ChartObj.destroy();
+                            this.zone4ChartObj = new Chart(ctx, {
+                                type: 'line',
+                                data: { labels: data.labels, datasets: data.datasets },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    interaction: { mode: 'index', intersect: false },
+                                }
+                            });
+                        } catch (e) { console.error('[zone4]', e); }
+                    },
+
+                    // ============ ЗОНА 5 ============
+                    async loadZone5() {
+                        this.loading5 = true;
+                        try {
+                            const params = new URLSearchParams();
+                            if (this.dateFrom5) params.set('from', this.dateFrom5);
+                            if (this.dateTo5)   params.set('to',   this.dateTo5);
+
+                            const res = await fetch('{{ route("stats.zone5") }}?' + params.toString());
+                            if (!res.ok) throw new Error('zone5 HTTP ' + res.status);
+                            this.zone5Rows = await res.json();
+
+                            if (this.selectedCategory &&
+                                !this.zone5Rows.some(r => r.slug === this.selectedCategory)) {
+                                this.selectedCategory = '';
                             }
-                        });
+
+                            this.loaded5 = true;
+                            this.$nextTick(() => this.renderZone5Chart());
+                        } catch (e) { console.error('[zone5]', e); }
+                        this.loading5 = false;
+                    },
+
+                    onZone5FiltersChange() {
+                        this.loadZone5();
+                    },
+
+                    onCategoryChange() {
+                        this.renderZone5Chart();
+                    },
+
+                    resetDates5() {
+                        this.dateFrom5 = '';
+                        this.dateTo5 = '';
+                        this.loadZone5();
+                    },
+
+                    async renderZone5Chart() {
+                        if (typeof Chart === 'undefined') return;
+                        const ctx = document.getElementById('zone5Chart');
+                        if (!ctx) return;
+                        if (this.zone5ChartObj) this.zone5ChartObj.destroy();
+
+                        if (!this.selectedCategory) {
+                            // «Все категории» — столбчатый график % брака
+                            this.zone5ChartObj = new Chart(ctx, {
+                                type: 'bar',
+                                data: {
+                                    labels: this.zone5Rows.map(r => r.title),
+                                    datasets: [{
+                                        label: '% брака',
+                                        data: this.zone5Rows.map(r => r.percent),
+                                        backgroundColor: this.zone5Rows.map(r =>
+                                            r.percent > 20 ? 'rgba(239,68,68,0.75)' :
+                                            (r.percent > 5 ? 'rgba(245,158,11,0.75)' : 'rgba(16,185,129,0.75)')
+                                        ),
+                                        borderColor: this.zone5Rows.map(r =>
+                                            r.percent > 20 ? '#dc2626' :
+                                            (r.percent > 5 ? '#d97706' : '#059669')
+                                        ),
+                                        borderWidth: 1,
+                                    }]
+                                },
+                                options: {
+                                    indexAxis: 'y',
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        x: {
+                                            beginAtZero: true,
+                                            max: Math.max(5, Math.ceil(Math.max(...this.zone5Rows.map(r => r.percent), 0))),
+                                            ticks: { callback: v => v + '%' }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: { display: false },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: (item) => {
+                                                    const r = this.zone5Rows[item.dataIndex];
+                                                    return r.defects + ' из ' + r.total + ' (' + r.percent + '%)';
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                            return;
+                        }
+
+                        // Конкретная категория — линейный график брака по дням
+                        try {
+                            const params = new URLSearchParams({ sheet: this.selectedCategory });
+                            if (this.dateFrom5) params.set('from', this.dateFrom5);
+                            if (this.dateTo5)   params.set('to',   this.dateTo5);
+
+                            const res = await fetch('{{ route("stats.zone5Chart") }}?' + params.toString());
+                            if (!res.ok) throw new Error('zone5Chart HTTP ' + res.status);
+                            const data = await res.json();
+
+                            this.zone5ChartObj = new Chart(ctx, {
+                                type: 'bar',
+                                data: {
+                                    labels: data.labels,
+                                    datasets: [{
+                                        label: 'Брак, шт',
+                                        data: data.values,
+                                        backgroundColor: 'rgba(239,68,68,0.7)',
+                                        borderColor: 'rgba(239,68,68,1)',
+                                        borderWidth: 1,
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        x: { ticks: { autoSkip: true, maxRotation: 60 } },
+                                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                                    },
+                                    plugins: { legend: { display: false } },
+                                }
+                            });
+                        } catch (e) {
+                            console.error('[zone5Chart]', e);
+                        }
                     },
                 };
             }
         </script>
     @endpush
-</x-app-layout>теперь
+</x-app-layout>

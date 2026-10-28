@@ -82,6 +82,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/stats/zone2-chart', [StatsController::class, 'zone2Chart'])->name('stats.zone2Chart');
     Route::get('/stats/zone3',       [StatsController::class, 'zone3'])->name('stats.zone3');
     Route::get('/stats/zone4',       [StatsController::class, 'zone4'])->name('stats.zone4');
+    Route::get('/stats/zone5',       [StatsController::class, 'zone5'])->name('stats.zone5');
+    Route::get('/stats/zone5-chart', [StatsController::class, 'zone5Chart'])->name('stats.zone5Chart');
 });
 
 Route::get('/media/{path}', [MediaController::class, 'show'])

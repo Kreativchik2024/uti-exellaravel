@@ -15,6 +15,11 @@ class StatsController extends Controller
 {
     private const ALLOWED_PERIODS = [0, 1, 7, 30];
 
+    private const DEFECT_VALUES = [
+        'Не сдан', 'Неисправен', 'В ремонт',
+        'Не работает', 'Требует ремонта', 'Требует замены',
+    ];
+
     private function resolveFrom(int $period): ?Carbon
     {
         if ($period === 0) {
@@ -65,7 +70,6 @@ class StatsController extends Controller
         $totals   = $s->totals($perSheet);
         $byPosts  = $s->byPosts($from, $targetUser);
 
-        // === Сводка по исполнителю ===
         $worker         = trim((string) $r->input('worker', ''));
         $workerDateFrom = $r->input('worker_date_from');
         $workerDateTo   = $r->input('worker_date_to');
@@ -124,10 +128,6 @@ class StatsController extends Controller
         return Excel::download(new StatsExport($period, $from, $perSheet, $totals), $filename);
     }
 
-    // =========================================================
-    // Зоны статистики (ленивая подгрузка)
-    // =========================================================
-
     public function zone1()
     {
         $data = Cache::remember('stats.zone1', 300, function () {
@@ -155,10 +155,6 @@ class StatsController extends Controller
         return response()->json($data);
     }
 
-    /**
-     * Зона 2: сводка по исполнителям с фильтром по времени.
-     * Возвращает { rows: [...], total: N }, где total — кол-во уникальных записей.
-     */
     public function zone2(Request $r)
     {
         $sheet = $r->input('sheet', 'pgp');
@@ -218,10 +214,6 @@ class StatsController extends Controller
         return response()->json($result);
     }
 
-    /**
-     * Зона 2 (график): количество записей по дням с шагом 1 день.
-     * Пропущенные дни заполняются нулями. Ключи дат приводятся к 'Y-m-d'.
-     */
     public function zone2Chart(Request $r)
     {
         $sheet    = $r->input('sheet', 'pgp');
@@ -249,9 +241,8 @@ class StatsController extends Controller
         if ($executor) {
             $sql = "
                 SELECT DATE(record_date) AS record_date, COUNT(*) AS cnt FROM `$table`
-                WHERE (
-                    worker1 = ? OR worker2 = ? OR worker3 = ? OR worker4 = ? OR worker5 = ?
-                ) {$whereSql}
+                WHERE (worker1 = ? OR worker2 = ? OR worker3 = ? OR worker4 = ? OR worker5 = ?)
+                {$whereSql}
                 GROUP BY DATE(record_date)
                 ORDER BY record_date
             ";
@@ -273,14 +264,12 @@ class StatsController extends Controller
             $rows = DB::select($sql, $bindings);
         }
 
-        // Ключи всегда "Y-m-d" (без времени)
         $counts = [];
         foreach ($rows as $row) {
             $key = substr((string) $row->record_date, 0, 10);
             $counts[$key] = (int) $row->cnt;
         }
 
-        // Диапазон
         $rangeFrom = $from ? Carbon::parse($from)->startOfDay() : null;
         $rangeTo   = $to   ? Carbon::parse($to)->endOfDay()     : now()->endOfDay();
 
@@ -297,7 +286,6 @@ class StatsController extends Controller
             $rangeTo = $rangeFrom->copy()->endOfDay();
         }
 
-        // Непрерывный ряд по дням
         $labels = [];
         $values = [];
         $cursor = $rangeFrom->copy();
@@ -308,15 +296,9 @@ class StatsController extends Controller
             $cursor->addDay();
         }
 
-        return response()->json([
-            'labels' => $labels,
-            'values' => $values,
-        ]);
+        return response()->json(['labels' => $labels, 'values' => $values]);
     }
 
-    /**
-     * Зона 3: детализация по постам (сортировка по убыванию сделанных бортов).
-     */
     public function zone3(Request $r)
     {
         $sheet = $r->input('sheet', 'pgp');
@@ -335,10 +317,6 @@ class StatsController extends Controller
         return response()->json($rows);
     }
 
-    /**
-     * Зона 4: график по постам с выбором временного интервала.
-     * Даты в labels — 'Y-m-d'.
-     */
     public function zone4(Request $r)
     {
         $sheet = $r->input('sheet', 'pgp');
@@ -394,5 +372,218 @@ class StatsController extends Controller
             'labels'   => $dates,
             'datasets' => $datasets,
         ]);
+    }
+
+    /**
+     * Зона 5: брак по категориям (сводка с фильтром по времени).
+     */
+    public function zone5(Request $r)
+    {
+        $from = $r->input('from');
+        $to   = $r->input('to');
+
+        $cacheKey = "stats.zone5.{$from}_{$to}";
+
+        $data = Cache::remember($cacheKey, 120, function () use ($from, $to) {
+            $summary = [];
+
+            $dateSql = '';
+            $dateBindings = [];
+            if ($from) {
+                $dateSql .= " AND DATE(record_date) >= ?";
+                $dateBindings[] = $from;
+            }
+            if ($to) {
+                $dateSql .= " AND DATE(record_date) <= ?";
+                $dateBindings[] = $to;
+            }
+
+            foreach (config('sheets.map', []) as $slug => $cfg) {
+                if (!isset($cfg['model']) || !class_exists($cfg['model'])) {
+                    continue;
+                }
+
+                $model = $cfg['model'];
+                $table = (new $model)->getTable();
+
+                $hasRecordDate = isset($cfg['fields']['record_date']);
+
+                $conditions = [];
+                $bindings   = [];
+
+                if (isset($cfg['fields']['fault_code'])) {
+                    $conditions[] = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
+                }
+
+                foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
+                    if (($fieldCfg['type'] ?? '') !== 'select' || empty($fieldCfg['options'])) {
+                        continue;
+                    }
+                    $matched = array_values(array_intersect($fieldCfg['options'], self::DEFECT_VALUES));
+                    if (empty($matched)) {
+                        continue;
+                    }
+                    $placeholders = implode(',', array_fill(0, count($matched), '?'));
+                    $conditions[] = "`$fieldName` IN ($placeholders)";
+                    foreach ($matched as $v) {
+                        $bindings[] = $v;
+                    }
+                }
+
+                foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
+                    if (($fieldCfg['type'] ?? '') !== 'textarea') {
+                        continue;
+                    }
+                    if (!preg_match('/(defect|дефект|брак)/iu', $fieldName)) {
+                        continue;
+                    }
+                    $conditions[] = "(`$fieldName` IS NOT NULL AND `$fieldName` != '')";
+                }
+
+                if ($hasRecordDate) {
+                    $totalSql = "SELECT COUNT(*) AS c FROM `$table` WHERE 1=1 {$dateSql}";
+                    $total = (int) (DB::select($totalSql, $dateBindings)[0]->c ?? 0);
+                } else {
+                    $total = $model::count();
+                }
+
+                $defects = 0;
+                if (!empty($conditions) && $total > 0) {
+                    $defectWhere = '(' . implode(' OR ', $conditions) . ')';
+                    $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$defectWhere}";
+                    $allBindings = $bindings;
+                    if ($hasRecordDate) {
+                        $sql .= " {$dateSql}";
+                        $allBindings = array_merge($bindings, $dateBindings);
+                    }
+                    $defects = (int) (DB::select($sql, $allBindings)[0]->c ?? 0);
+                }
+
+                $summary[] = [
+                    'slug'    => $slug,
+                    'title'   => $cfg['title'] ?? $slug,
+                    'total'   => $total,
+                    'defects' => $defects,
+                    'percent' => $total > 0 ? round($defects / $total * 100, 1) : 0,
+                ];
+            }
+
+            usort($summary, fn($a, $b) => $b['percent'] <=> $a['percent']);
+
+            return $summary;
+        });
+
+        return response()->json($data);
+    }
+
+    /**
+     * Зона 5 (график по дням для одной категории): количество бракованных записей по дням.
+     */
+    public function zone5Chart(Request $r)
+    {
+        $sheet = $r->input('sheet', 'pgp');
+        $from  = $r->input('from');
+        $to    = $r->input('to');
+
+        $cfg = config("sheets.map.$sheet");
+        abort_unless($cfg && isset($cfg['model']), 404);
+
+        $model = $cfg['model'];
+        $table = (new $model)->getTable();
+
+        $dateSql = '';
+        $dateBindings = [];
+        if ($from) {
+            $dateSql .= " AND DATE(record_date) >= ?";
+            $dateBindings[] = $from;
+        }
+        if ($to) {
+            $dateSql .= " AND DATE(record_date) <= ?";
+            $dateBindings[] = $to;
+        }
+
+        // Собираем условия брака (те же, что в zone5)
+        $conditions = [];
+        $bindings   = [];
+
+        if (isset($cfg['fields']['fault_code'])) {
+            $conditions[] = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
+        }
+
+        foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
+            if (($fieldCfg['type'] ?? '') !== 'select' || empty($fieldCfg['options'])) {
+                continue;
+            }
+            $matched = array_values(array_intersect($fieldCfg['options'], self::DEFECT_VALUES));
+            if (empty($matched)) {
+                continue;
+            }
+            $placeholders = implode(',', array_fill(0, count($matched), '?'));
+            $conditions[] = "`$fieldName` IN ($placeholders)";
+            foreach ($matched as $v) {
+                $bindings[] = $v;
+            }
+        }
+
+        foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
+            if (($fieldCfg['type'] ?? '') !== 'textarea') {
+                continue;
+            }
+            if (!preg_match('/(defect|дефект|брак)/iu', $fieldName)) {
+                continue;
+            }
+            $conditions[] = "(`$fieldName` IS NOT NULL AND `$fieldName` != '')";
+        }
+
+        if (empty($conditions)) {
+            return response()->json(['labels' => [], 'values' => []]);
+        }
+
+        $defectWhere = '(' . implode(' OR ', $conditions) . ')';
+
+        $sql = "
+            SELECT DATE(record_date) AS d, COUNT(*) AS c
+            FROM `$table`
+            WHERE {$defectWhere} {$dateSql}
+            GROUP BY DATE(record_date)
+            ORDER BY d
+        ";
+        $allBindings = array_merge($bindings, $dateBindings);
+        $rows = DB::select($sql, $allBindings);
+
+        $counts = [];
+        foreach ($rows as $row) {
+            $key = substr((string) $row->d, 0, 10);
+            $counts[$key] = (int) $row->c;
+        }
+
+        // Диапазон
+        $rangeFrom = $from ? Carbon::parse($from)->startOfDay() : null;
+        $rangeTo   = $to   ? Carbon::parse($to)->endOfDay()     : now()->endOfDay();
+
+        if (!$rangeFrom) {
+            if (!empty($counts)) {
+                $minDate   = collect(array_keys($counts))->min();
+                $rangeFrom = Carbon::parse($minDate)->startOfDay();
+            } else {
+                $rangeFrom = $rangeTo->copy()->subDays(29)->startOfDay();
+            }
+        }
+
+        if ($rangeTo->lt($rangeFrom)) {
+            $rangeTo = $rangeFrom->copy()->endOfDay();
+        }
+
+        $labels = [];
+        $values = [];
+        $cursor = $rangeFrom->copy();
+        while ($cursor->lte($rangeTo)) {
+            $day      = $cursor->format('Y-m-d');
+            $labels[] = $day;
+            $values[] = $counts[$day] ?? 0;
+            $cursor->addDay();
+        }
+
+        return response()->json(['labels' => $labels, 'values' => $values]);
     }
 }
