@@ -17,11 +17,11 @@ class ImportCommModule extends Command
     protected $description = 'Импорт модулей связи из CSV (manet.csv) в comm_module_records';
 
     /**
-     * Алиасы: CSV-значение => short_name в справочнике.
-     * Раскомментируйте и подставьте, когда узнаете полное ФИО.
+     * Ручные алиасы: CSV-значение => short_name в справочнике.
+     * Нужны, если в CSV опечатка или нестандартное написание.
      */
     private array $workerAliases = [
-        // 'Мешков' => 'Мешков А.А.',
+        // 'Трушкин Ф.В.' => 'Трушкин Ф. В.',
     ];
 
     public function handle(): int
@@ -47,11 +47,29 @@ class ImportCommModule extends Command
             ->pluck('short_name')
             ->all();
 
+        // ---- Карта: фамилия → единственный активный сотрудник ----
+        $surnameMap = [];
+        $surnameCount = [];
+        foreach ($allowedWorkers as $full) {
+            $parts = preg_split('/\s+/u', trim($full), 2);
+            $surname = $parts[0] ?? '';
+            if ($surname === '') continue;
+            $surnameCount[$surname] = ($surnameCount[$surname] ?? 0) + 1;
+            $surnameMap[$surname] = $full;
+        }
+        foreach ($surnameCount as $s => $cnt) {
+            if ($cnt > 1) {
+                $surnameMap[$s] = null; // неоднозначно
+            }
+        }
+
         $row = 0;
         $lastDate = null;
         $created = 0;
         $skipped = 0;
         $errors = [];
+        $statSurname = 0; // сколько подставлено по фамилии
+        $statNormalized = 0; // сколько нормализовано инициалов
 
         if ($dry) {
             $this->warn('=== РЕЖИМ DRY: изменения НЕ сохраняются ===');
@@ -83,7 +101,7 @@ class ImportCommModule extends Command
             $w4    = trim((string) ($line[9]  ?? ''));
             $w5    = trim((string) ($line[10] ?? ''));
 
-            // ---- Дата: наследуем от предыдущей непустой ----
+            // ---- Дата ----
             if ($date !== '') {
                 try {
                     $dt = Carbon::createFromFormat('d.m.Y', $date);
@@ -117,7 +135,7 @@ class ImportCommModule extends Command
                 continue;
             }
 
-            // ---- Разбивка комбинированных ФИО: "Иванов И.И./Петров П.П." или "Иванов И.И, Петров П.П." ----
+            // ---- Разбивка по /,; и подстановка ----
             $splitNames = function (?string $v): array {
                 if ($v === null) return [];
                 return array_values(array_filter(
@@ -129,8 +147,21 @@ class ImportCommModule extends Command
             $allWorkers = [];
             foreach ([$w1, $w2, $w3, $w4, $w5] as $raw) {
                 foreach ($splitNames($raw) as $one) {
+                    // 1. Алиас
                     $one = $this->workerAliases[$one] ?? $one;
-                    $one = $this->normalizeFio($one);
+                    // 2. Нормализация инициалов (убрать пробел между ними, добавить точку)
+                    $normalized = $this->normalizeFio($one);
+                    if ($normalized !== $one) {
+                        $statNormalized++;
+                        $one = $normalized;
+                    }
+                    // 3. Подстановка по фамилии, если осталась только фамилия
+                    if ($one !== null && preg_match('/^[А-ЯЁ][а-яё\-]+$/u', $one)) {
+                        if (!empty($surnameMap[$one])) {
+                            $one = $surnameMap[$one];
+                            $statSurname++;
+                        }
+                    }
                     if ($one !== null && !in_array($one, $allWorkers, true)) {
                         $allWorkers[] = $one;
                     }
@@ -143,7 +174,7 @@ class ImportCommModule extends Command
             $w4 = $allWorkers[3] ?? null;
             $w5 = $allWorkers[4] ?? null;
 
-            // ---- Проверка исполнителей по справочнику активных ----
+            // ---- Проверка ----
             $bad = array_values(array_filter(
                 array_filter([$w1, $w2, $w3, $w4, $w5], fn($w) => $w !== null),
                 fn($w) => !in_array($w, $allowedWorkers, true)
@@ -162,7 +193,7 @@ class ImportCommModule extends Command
                 ? null
                 : trim(preg_replace('/\s+/u', ' ', $notes));
 
-            // ---- S/N: разбиваем по переносам строк ----
+            // ---- S/N ----
             $snList = [];
             if ($sn === '') {
                 $snList = [null];
@@ -213,6 +244,8 @@ class ImportCommModule extends Command
         $this->info('=== Итог ===');
         $this->line("Создано записей: {$created}");
         $this->line("Пропущено строк: {$skipped}");
+        $this->line("Подставлено по фамилии: {$statSurname}");
+        $this->line("Нормализовано инициалов: {$statNormalized}");
 
         if (!empty($errors)) {
             $errPath = '/tmp/manet_errors.csv';
@@ -253,13 +286,20 @@ class ImportCommModule extends Command
     }
 
     /**
-     * Нормализация точки в инициалах: "Смирнов А.В" -> "Смирнов А.В."
+     * Нормализация ФИО:
+     * - "Петров М. И." → "Петров М.И."
+     * - "Смирнов А.В"  → "Смирнов А.В."
+     * - лишние пробелы схлопываются
      */
     private function normalizeFio(?string $v): ?string
     {
         if ($v === null) return null;
+        $v = preg_replace('/\s+/u', ' ', trim($v)) ?? $v;
+        // Убрать пробел между инициалами: "М. И." → "М.И."
+        $v = preg_replace('/([А-ЯЁ])\.\s+([А-ЯЁ])\./u', '$1.$2.', $v) ?? $v;
+        // Добавить точку, если её нет: "Смирнов А.В" → "Смирнов А.В."
         if (preg_match('/^(.+?)\s+([А-ЯЁ])\.([А-ЯЁ])$/u', $v, $m)) {
-            return $m[1] . ' ' . $m[2] . '.' . $m[3] . '.';
+            $v = $m[1] . ' ' . $m[2] . '.' . $m[3] . '.';
         }
         return $v;
     }
