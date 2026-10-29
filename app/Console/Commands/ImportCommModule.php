@@ -1,4 +1,3 @@
-cat > /var/www/uti-exellaravel/app/Console/Commands/ImportCommModule.php << 'PHPEOF'
 <?php
 
 namespace App\Console\Commands;
@@ -15,7 +14,7 @@ class ImportCommModule extends Command
                             {--dry : Проверить без записи в БД}
                             {--user=1 : ID пользователя для created_by}
                             {--allow-unknown : Не пропускать строки с неизвестными исполнителями}
-                            {--placeholder= : Текст для пустого worker1 (например, «—»)}';
+                            {--placeholder= : Текст для пустого worker1}';
 
     protected $description = 'Импорт модулей связи из CSV (manet.csv) в comm_module_records';
 
@@ -72,18 +71,13 @@ class ImportCommModule extends Command
         $statSurname = 0;
         $statNormalized = 0;
         $statAlias = 0;
-        $statPlaceholder = 0;
 
         if ($dry) {
             $this->warn('=== РЕЖИМ DRY: изменения НЕ сохраняются ===');
         }
         $this->line('Активных сотрудников в справочнике: ' . count($allowedWorkers));
-        $this->line('Алиасов задано: ' . count($this->workerAliases));
-        if ($allowUnknown) {
-            $this->warn('--allow-unknown: неизвестные исполнители будут записаны как есть');
-        }
-        if ($placeholder !== '') {
-            $this->line("--placeholder: пустой worker1 будет заменён на '{$placeholder}'");
+        if (!empty($this->workerAliases)) {
+            $this->line('Алиасов задано: ' . count($this->workerAliases));
         }
 
         while (($line = fgetcsv($fh, 0, ';')) !== false) {
@@ -134,15 +128,10 @@ class ImportCommModule extends Command
             $w4 = $this->cleanName($w4);
             $w5 = $this->cleanName($w5);
 
-            if ($w1 === null) {
-                if ($placeholder !== '') {
-                    $w1 = $placeholder;
-                    $statPlaceholder++;
-                } else {
-                    $errors[] = "Строка {$num}: пустое ФИО 1 — пропущена (используйте --placeholder=—, чтобы подставить заглушку)";
-                    $skipped++;
-                    continue;
-                }
+            if ($w1 === null && $placeholder === '') {
+                $errors[] = "Строка {$num}: пустое ФИО 1 — пропущена (--placeholder=—, чтобы подставить)";
+                $skipped++;
+                continue;
             }
 
             $splitNames = function (?string $v): array {
@@ -156,15 +145,18 @@ class ImportCommModule extends Command
             $allWorkers = [];
             foreach ([$w1, $w2, $w3, $w4, $w5] as $raw) {
                 foreach ($splitNames($raw) as $one) {
+                    // 1. Сначала нормализация
                     $normalized = $this->normalizeFio($one);
                     if ($normalized !== $one) {
                         $statNormalized++;
                         $one = $normalized;
                     }
+                    // 2. Потом алиас
                     if (isset($this->workerAliases[$one])) {
                         $one = $this->workerAliases[$one];
                         $statAlias++;
                     }
+                    // 3. Потом подстановка по фамилии
                     if ($one !== null && preg_match('/^[А-ЯЁ][а-яё\-]+$/u', $one)) {
                         if (!empty($surnameMap[$one])) {
                             $one = $surnameMap[$one];
@@ -183,12 +175,17 @@ class ImportCommModule extends Command
             $w4 = $allWorkers[3] ?? null;
             $w5 = $allWorkers[4] ?? null;
 
+            // Заглушка для пустого worker1 ставится ПОСЛЕ splitNames и дедупликации
+            if ($w1 === null && $placeholder !== '') {
+                $w1 = $placeholder;
+            }
+
             $bad = array_values(array_filter(
                 array_filter([$w1, $w2, $w3, $w4, $w5], fn($w) => $w !== null),
                 fn($w) => !in_array($w, $allowedWorkers, true)
             ));
             if (!empty($bad) && !$allowUnknown) {
-                $errors[] = "Строка {$num}: исполнители не из справочника: " . implode(', ', array_unique($bad)) . " — пропущена (используйте --allow-unknown, чтобы записать как есть)";
+                $errors[] = "Строка {$num}: исполнители не из справочника: " . implode(', ', array_unique($bad)) . " — пропущена (--allow-unknown, чтобы записать)";
                 $skipped++;
                 continue;
             }
@@ -252,7 +249,6 @@ class ImportCommModule extends Command
         $this->line("Применено алиасов: {$statAlias}");
         $this->line("Подставлено по фамилии: {$statSurname}");
         $this->line("Нормализовано инициалов: {$statNormalized}");
-        $this->line("Заменено на заглушку: {$statPlaceholder}");
 
         if (!empty($errors)) {
             $errPath = '/tmp/manet_errors.csv';
@@ -303,4 +299,3 @@ class ImportCommModule extends Command
         return $v;
     }
 }
-PHPEOF
