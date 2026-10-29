@@ -1,3 +1,4 @@
+cat > /var/www/uti-exellaravel/app/Console/Commands/ImportCommModule.php << 'PHPEOF'
 <?php
 
 namespace App\Console\Commands;
@@ -12,18 +13,15 @@ class ImportCommModule extends Command
     protected $signature = 'import:comm-module
                             {file : Путь к CSV-файлу}
                             {--dry : Проверить без записи в БД}
-                            {--user=1 : ID пользователя для created_by}';
+                            {--user=1 : ID пользователя для created_by}
+                            {--allow-unknown : Не пропускать строки с неизвестными исполнителями}
+                            {--placeholder= : Текст для пустого worker1 (например, «—»)}';
 
     protected $description = 'Импорт модулей связи из CSV (manet.csv) в comm_module_records';
 
-    /**
-     * Ручные алиасы: CSV-значение => short_name в справочнике.
-     * Нужны, когда в CSV опечатка или нестандартное написание.
-     */
     private array $workerAliases = [
-        'Трушкин Ф.В.' => 'Трушкин Ф.Д.',      // опечатка в CSV: В вместо Д
-        'Карасев А.А.' => 'Карасёв А.А.',      // ё/е — один человек
-        // 'Епишин Е.В.' => 'Епишин Е.В.',     // если добавите в справочник — алиас не нужен
+        'Трушкин Ф.В.' => 'Трушкин Ф.Д.',
+        'Карасев А.А.' => 'Карасёв А.А.',
     ];
 
     public function handle(): int
@@ -31,6 +29,8 @@ class ImportCommModule extends Command
         $path = $this->argument('file');
         $dry  = (bool) $this->option('dry');
         $userId = (int) $this->option('user') ?: null;
+        $allowUnknown = (bool) $this->option('allow-unknown');
+        $placeholder  = (string) $this->option('placeholder');
 
         if (!file_exists($path)) {
             $this->error("Файл не найден: {$path}");
@@ -49,7 +49,6 @@ class ImportCommModule extends Command
             ->pluck('short_name')
             ->all();
 
-        // Карта: фамилия → единственный активный сотрудник (для подстановки "Мешков" → "Мешков А.А.")
         $surnameMap = [];
         $surnameCount = [];
         foreach ($allowedWorkers as $full) {
@@ -73,13 +72,18 @@ class ImportCommModule extends Command
         $statSurname = 0;
         $statNormalized = 0;
         $statAlias = 0;
+        $statPlaceholder = 0;
 
         if ($dry) {
             $this->warn('=== РЕЖИМ DRY: изменения НЕ сохраняются ===');
         }
         $this->line('Активных сотрудников в справочнике: ' . count($allowedWorkers));
-        if (!empty($this->workerAliases)) {
-            $this->line('Алиасов задано: ' . count($this->workerAliases));
+        $this->line('Алиасов задано: ' . count($this->workerAliases));
+        if ($allowUnknown) {
+            $this->warn('--allow-unknown: неизвестные исполнители будут записаны как есть');
+        }
+        if ($placeholder !== '') {
+            $this->line("--placeholder: пустой worker1 будет заменён на '{$placeholder}'");
         }
 
         while (($line = fgetcsv($fh, 0, ';')) !== false) {
@@ -131,9 +135,14 @@ class ImportCommModule extends Command
             $w5 = $this->cleanName($w5);
 
             if ($w1 === null) {
-                $errors[] = "Строка {$num}: пустое ФИО 1 — пропущена";
-                $skipped++;
-                continue;
+                if ($placeholder !== '') {
+                    $w1 = $placeholder;
+                    $statPlaceholder++;
+                } else {
+                    $errors[] = "Строка {$num}: пустое ФИО 1 — пропущена (используйте --placeholder=—, чтобы подставить заглушку)";
+                    $skipped++;
+                    continue;
+                }
             }
 
             $splitNames = function (?string $v): array {
@@ -147,18 +156,15 @@ class ImportCommModule extends Command
             $allWorkers = [];
             foreach ([$w1, $w2, $w3, $w4, $w5] as $raw) {
                 foreach ($splitNames($raw) as $one) {
-                    // 1. Алиас (Трушкин В→Д, Карасев ё→е и т.п.)
-                    if (isset($this->workerAliases[$one])) {
-                        $one = $this->workerAliases[$one];
-                        $statAlias++;
-                    }
-                    // 2. Нормализация инициалов
                     $normalized = $this->normalizeFio($one);
                     if ($normalized !== $one) {
                         $statNormalized++;
                         $one = $normalized;
                     }
-                    // 3. Подстановка по фамилии, если осталась только фамилия
+                    if (isset($this->workerAliases[$one])) {
+                        $one = $this->workerAliases[$one];
+                        $statAlias++;
+                    }
                     if ($one !== null && preg_match('/^[А-ЯЁ][а-яё\-]+$/u', $one)) {
                         if (!empty($surnameMap[$one])) {
                             $one = $surnameMap[$one];
@@ -181,8 +187,8 @@ class ImportCommModule extends Command
                 array_filter([$w1, $w2, $w3, $w4, $w5], fn($w) => $w !== null),
                 fn($w) => !in_array($w, $allowedWorkers, true)
             ));
-            if (!empty($bad)) {
-                $errors[] = "Строка {$num}: исполнители не из справочника: " . implode(', ', array_unique($bad)) . " — пропущена";
+            if (!empty($bad) && !$allowUnknown) {
+                $errors[] = "Строка {$num}: исполнители не из справочника: " . implode(', ', array_unique($bad)) . " — пропущена (используйте --allow-unknown, чтобы записать как есть)";
                 $skipped++;
                 continue;
             }
@@ -246,6 +252,7 @@ class ImportCommModule extends Command
         $this->line("Применено алиасов: {$statAlias}");
         $this->line("Подставлено по фамилии: {$statSurname}");
         $this->line("Нормализовано инициалов: {$statNormalized}");
+        $this->line("Заменено на заглушку: {$statPlaceholder}");
 
         if (!empty($errors)) {
             $errPath = '/tmp/manet_errors.csv';
@@ -296,3 +303,4 @@ class ImportCommModule extends Command
         return $v;
     }
 }
+PHPEOF
