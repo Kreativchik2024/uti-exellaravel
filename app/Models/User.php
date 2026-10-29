@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Rules\NoEmoji;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class User extends Authenticatable
 {
@@ -35,6 +38,24 @@ class User extends Authenticatable
             'last_login_at'     => 'datetime',
             'approved_at'       => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (User $user) {
+            if (! $user->isDirty('name')) {
+                return;
+            }
+
+            $validator = Validator::make(
+                ['name' => $user->name],
+                ['name' => ['required', 'string', 'max:255', new NoEmoji()]]
+            );
+
+            if ($validator->fails()) {
+                throw new ValidationException($validator);
+            }
+        });
     }
 
     public function isAdmin(): bool    { return $this->role === 'admin'; }
