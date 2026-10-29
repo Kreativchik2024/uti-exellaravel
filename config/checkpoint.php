@@ -1,0 +1,201 @@
+<?php
+
+use Checkpoint\Checks;
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Enabled Checks
+    |--------------------------------------------------------------------------
+    |
+    | Every default check is listed here and enabled by default. Set any
+    | entry to `false` to exclude it from `php artisan checkpoint:scan`.
+    |
+    | Checks not listed in this map fall back to enabled — so when you
+    | upgrade Checkpoint and new checks are added, you keep the protection
+    | without re-publishing this file.
+    |
+    */
+
+    'checks' => [
+        Checks\ComposerAuditCheck::class => true,
+        Checks\NpmAuditCheck::class => true,
+        Checks\EnvironmentCheck::class => true,
+        Checks\GitIgnoreCheck::class => true,
+        Checks\FilePermissionsCheck::class => true,
+        Checks\HardcodedSecretsCheck::class => true,
+        Checks\SqlInjectionCheck::class => true,
+        Checks\MassAssignmentCheck::class => true,
+        Checks\XssCheck::class => true,
+        Checks\CsrfCheck::class => true,
+        Checks\OpenRedirectCheck::class => true,
+        Checks\CommandInjectionCheck::class => true,
+        Checks\InsecureDeserializationCheck::class => true,
+        Checks\DebugFunctionsCheck::class => true,
+        Checks\SensitiveExposureCheck::class => true,
+        Checks\SsrfCheck::class => true,
+        Checks\TlsVerificationCheck::class => true,
+        Checks\CorsConfigCheck::class => true,
+        Checks\PackageFreshnessCheck::class => true,
+        Checks\SuspiciousVendorAutoloadCheck::class => true,
+        Checks\SupplyChainToolingCheck::class => true,
+        Checks\PathTraversalCheck::class => true,
+        Checks\WeakCryptographyCheck::class => true,
+        Checks\InsecureRngCheck::class => true,
+        Checks\SessionSecurityCheck::class => true,
+        Checks\EolVersionCheck::class => true,
+        Checks\OutdatedPackagesCheck::class => true,
+        Checks\AbandonedPackagesCheck::class => true,
+        Checks\ComposerConfigCheck::class => true,
+        Checks\XxeCheck::class => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Extra Checks
+    |--------------------------------------------------------------------------
+    |
+    | Register custom AbstractCheck subclasses to run alongside the built-ins.
+    | Classes may take no constructor args, or a single $basePath string.
+    | You can still disable any entry via the `checks` map above.
+    |
+    */
+
+    'extra_checks' => [
+        // \App\Security\MyCustomCheck::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Package Freshness (Supply Chain)
+    |--------------------------------------------------------------------------
+    |
+    | Composer packages released within `minimum_age_days` will fail the
+    | "Package Freshness" check. This mitigates supply-chain attacks that
+    | typically get caught and removed from Packagist within hours or days.
+    |
+    | Add fully-qualified package names to `whitelist` to bypass the age
+    | check for specific dependencies (e.g. a critical security patch you
+    | need to deploy before the freshness window expires).
+    |
+    */
+
+    'package_freshness' => [
+        'minimum_age_days' => 3,
+        'whitelist' => [
+            // Checkpoint exempts itself from the freshness gate so a fresh
+            // release of the scanner cannot block its own user's deploy.
+            'andreapollastri/checkpoint',
+        	'laravel/framework',
+	 'symfony/mime',
+            // 'vendor/package',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Outdated Composer Packages
+    |--------------------------------------------------------------------------
+    |
+    | The "Outdated Composer Packages" check runs `composer outdated --direct`
+    | against composer.lock and warns about direct dependencies that are
+    | behind their latest release. Only production dependencies are checked
+    | unless `include_dev` is true.
+    |
+    | Add package names to `ignore` for dependencies you deliberately pin —
+    | exact matches or `vendor/*` wildcards are both supported.
+    |
+    */
+
+    'outdated_packages' => [
+        'include_dev' => false,
+        'ignore' => [
+            // 'vendor/package',
+            // 'acme/*',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Suspicious Vendor Autoload
+    |--------------------------------------------------------------------------
+    |
+    | The "Suspicious Vendor Autoload" check warns when a package under
+    | vendor/ registers PHP files via `autoload.files` — the exact mechanism
+    | abused by the May 2026 Laravel-Lang supply-chain attack to execute
+    | code on every request.
+    |
+    | A baked-in whitelist already covers packages that legitimately use
+    | this mechanism (laravel/framework, symfony/polyfill-*, guzzlehttp/*,
+    | ramsey/uuid, …). Add your own trusted entries below — exact matches
+    | or `vendor/*` wildcards are both supported.
+    |
+    */
+
+    'suspicious_autoload' => [
+        'whitelist' => [
+	'laravel/agent-detector',
+        'laravel/pao',
+        'laravel/prompts',
+        'mockery/mockery',
+        'myclabs/deep-copy',
+        'nunomaduro/collision',
+        'nunomaduro/termwind',
+        'phpunit/phpunit',
+        'psy/psysh',
+        'sebastian/global-state',
+        'sebastian/type',
+        'spatie/laravel-backup',
+        'symfony/clock',
+        'symfony/string',
+        'symfony/translation',
+        'symfony/var-dumper',
+            // 'my-org/internal-helpers',
+            // 'acme/*',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Suppressed Findings
+    |--------------------------------------------------------------------------
+    |
+    | Add 12-character finding hashes here to silence specific FAIL/WARN
+    | issues you have intentionally accepted (false positive, legacy code,
+    | etc.). Hashes are shown in square brackets next to each finding when
+    | you run the scan — copy the bracketed value into this array.
+    |
+    | The hash is content-stable: refactors that only shift line numbers
+    | will not invalidate it. Package Freshness hashes use package name +
+    | version only, so they stay valid as the displayed release age changes.
+    |
+    | If every finding of a check is suppressed, the check is downgraded to
+    | PASS with an explicit "N suppressed" message.
+    |
+    */
+
+    'suppressed' => [
+        // 'a1b2c3d4e5f6',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Excluded Scan Paths
+    |--------------------------------------------------------------------------
+    |
+    | Paths relative to the project root that file-based checks should skip.
+    | Useful for mounted data directories or folders with different ownership
+    | that are not part of your application source.
+    |
+    | Built-in exclusions (vendor/, node_modules/, storage/, …) always apply;
+    | entries here are merged on top of those defaults.
+    |
+    */
+
+    'exclude_paths' => [
+        // 'storage/app/mounted-data',
+        // 'data/external',
+    ],
+
+];
