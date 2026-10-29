@@ -6,6 +6,7 @@
     <div class="py-8 max-w-3xl mx-auto sm:px-6 lg:px-8">
         <form method="POST" action="{{ route('records.store', $sheet) }}"
               class="bg-white p-6 rounded shadow space-y-4">
+              @csrf
             @include('records._form')
 
             @if($errors->any())
