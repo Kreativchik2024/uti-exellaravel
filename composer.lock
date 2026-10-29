@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "84e1068fddc3d9a2702a9dc76708dd4d",
+    "content-hash": "ec107ce4fa66d3e832114cd5a3b050f1",
     "packages": [
         {
             "name": "brick/math",
@@ -7095,6 +7095,54 @@
                 "source": "https://github.com/tijsverkoyen/CssToInlineStyles/tree/v2.4.0"
             },
             "time": "2025-12-02T11:56:42+00:00"
+        },
+        {
+            "name": "umii/laravel-advance-validator-package",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Umii010/umii-laravel-advance-validator-package.git",
+                "reference": "3e80565f0be98529975d59dce8099f2fbe040ee6"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Umii010/umii-laravel-advance-validator-package/zipball/3e80565f0be98529975d59dce8099f2fbe040ee6",
+                "reference": "3e80565f0be98529975d59dce8099f2fbe040ee6",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/support": ">=9.0",
+                "php": ">=8.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Umii\\AdvanceValidator\\AdvanceValidatorServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Umii\\AdvanceValidator\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Muhammad Umer Shahzad",
+                    "email": "umii020@hotmail.com"
+                }
+            ],
+            "description": "A Laravel package providing advanced validation rules beyond the default set.",
+            "support": {
+                "issues": "https://github.com/Umii010/umii-laravel-advance-validator-package/issues",
+                "source": "https://github.com/Umii010/umii-laravel-advance-validator-package/tree/v1.0.0"
+            },
+            "time": "2025-08-17T16:21:19+00:00"
         },
         {
             "name": "vlucas/phpdotenv",
