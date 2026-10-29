@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 
 class RecordController extends Controller
 {
@@ -15,9 +17,6 @@ class RecordController extends Controller
         return $cfg;
     }
 
-    /**
-     * Значения по умолчанию для полей worker1..5 из сессии.
-     */
     private function workerDefaults(): array
     {
         $workers = session('workstation_workers', []);
@@ -32,8 +31,6 @@ class RecordController extends Controller
     }
 
     /**
-     * Список активных сотрудников для подсказок в полях worker1..5.
-     *
      * @return string[]
      */
     private function employeesList(): array
@@ -48,7 +45,6 @@ class RecordController extends Controller
     public function index(Request $request, string $sheet)
     {
         $cfg = $this->cfg($sheet);
-
         $query = $cfg['model']::query();
 
         $q = trim($request->input('q', ''));
@@ -98,7 +94,6 @@ class RecordController extends Controller
         $cfg = $this->cfg($sheet);
         Gate::authorize('create', $cfg['model']);
 
-        // Автозаполнение исполнителей, если поле вообще не пришло в запросе
         $defaults = $this->workerDefaults();
         foreach ($defaults as $field => $value) {
             if (!$r->exists($field) && $value !== '') {
@@ -110,7 +105,23 @@ class RecordController extends Controller
         $data  = $r->validate($rules);
         $data['created_by'] = auth()->id();
 
-        $cfg['model']::create($data);
+        // Превентивная проверка уникальности до вставки
+        if ($dup = $this->findDuplicate($cfg['model'], $data)) {
+            return back()
+                ->withInput()
+                ->withErrors(['general' => $this->duplicateMessage($dup)]);
+        }
+
+        try {
+            $cfg['model']::create($data);
+        } catch (QueryException $e) {
+            if ($this->isDuplicate($e)) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['general' => 'Такая запись уже существует. Измените дату или исполнителя.']);
+            }
+            throw $e;
+        }
 
         return redirect()->route('records.index', $sheet)->with('ok', 'Запись добавлена');
     }
@@ -136,7 +147,23 @@ class RecordController extends Controller
         $data  = $r->validate($rules);
         $data['updated_by'] = auth()->id();
 
-        $record->update($data);
+        // Превентивная проверка — исключая саму редактируемую запись
+        if ($dup = $this->findDuplicate($cfg['model'], $data, $id)) {
+            return back()
+                ->withInput()
+                ->withErrors(['general' => $this->duplicateMessage($dup)]);
+        }
+
+        try {
+            $record->update($data);
+        } catch (QueryException $e) {
+            if ($this->isDuplicate($e)) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['general' => 'Такая запись уже существует. Измените дату или исполнителя.']);
+            }
+            throw $e;
+        }
 
         return redirect()->route('records.index', $sheet)->with('ok', 'Запись обновлена');
     }
@@ -148,5 +175,82 @@ class RecordController extends Controller
         Gate::authorize('delete', $record);
         $record->delete();
         return back()->with('ok', 'Запись удалена');
+    }
+
+    /**
+     * Ищет в таблице модели уникальный индекс, который уже занят переданными $data.
+     *
+     * @return array{name:string, columns:string[], values:array<string,mixed>}|null
+     */
+    private function findDuplicate(string $modelClass, array $data, ?int $excludeId = null): ?array
+    {
+        $model = new $modelClass;
+        $table = $model->getTable();
+
+        $indexes = collect(Schema::getIndexes($table))->where('unique', true);
+
+        foreach ($indexes as $index) {
+            if ($index['primary'] ?? false) {
+                continue; // автоинкрементный id не считаем
+            }
+
+            $columns = $index['columns'];
+
+            // Все колонки индекса должны присутствовать в $data
+            foreach ($columns as $col) {
+                if (!array_key_exists($col, $data)) {
+                    continue 2;
+                }
+            }
+
+            $query = $modelClass::query();
+            foreach ($columns as $col) {
+                $query->where($col, $data[$col]);
+            }
+
+            if ($excludeId !== null) {
+                $query->where($model->getKeyName(), '!=', $excludeId);
+            }
+
+            if ($query->exists()) {
+                return [
+                    'name'    => $index['name'],
+                    'columns' => $columns,
+                    'values'  => array_intersect_key($data, array_flip($columns)),
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Человеческое сообщение по составу уникального индекса.
+     */
+    private function duplicateMessage(array $dup): string
+    {
+        $labels = [
+            'record_date' => 'дата',
+            'worker1'     => 'исполнитель',
+            'worker2'     => 'исполнитель 2',
+            'worker3'     => 'исполнитель 3',
+            'worker4'     => 'исполнитель 4',
+            'worker5'     => 'исполнитель 5',
+        ];
+
+        $pairs = [];
+        foreach ($dup['values'] as $col => $val) {
+            $label = $labels[$col] ?? $col;
+            $pairs[] = "{$label}: {$val}";
+        }
+
+        return 'Такая запись уже существует (' . implode(', ', $pairs) . '). Измените дату или исполнителя.';
+    }
+
+    private function isDuplicate(QueryException $e): bool
+    {
+        return $e->getCode() === '23000'
+            || str_contains($e->getMessage(), '1062')
+            || str_contains($e->getMessage(), 'Duplicate entry');
     }
 }
