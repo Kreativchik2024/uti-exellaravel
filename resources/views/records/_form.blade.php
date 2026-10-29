@@ -11,13 +11,6 @@
 @endphp
 
 @if($hasWorkers)
-    {{-- Один общий datalist для всех 5 полей исполнителей --}}
-    <datalist id="employees-list">
-        @foreach($employeesList as $emp)
-            <option value="{{ $emp }}"></option>
-        @endforeach
-    </datalist>
-
     <div class="border rounded p-3 bg-gray-50">
         <div class="text-sm font-semibold text-gray-700 mb-2">Исполнители (до 5, первый обязателен)</div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
@@ -25,21 +18,24 @@
                 @if(isset($cfg['fields'][$name]))
                     @php
                         $f     = $cfg['fields'][$name];
-                        $value = old($name, $record->$name ?? ($workerDefaults[$name] ?? null));
+                        $value = old($name, $record->$name ?? ($workerDefaults[$name] ?? ''));
                         $isReq = !empty($f['required_mark']);
                     @endphp
                     <div>
                         <label class="block text-xs text-gray-600 mb-1">
                             {{ $f['label'] }}@if($isReq)<span class="text-red-600">*</span>@endif
                         </label>
-                        <input type="text"
-                               name="{{ $name }}"
-                               value="{{ $value }}"
-                               list="employees-list"
-                               autocomplete="off"
-                               placeholder="Фамилия И.О."
-                               @if($isReq) required @endif
-                               class="w-full border rounded px-2 py-1 text-sm">
+                        <select name="{{ $name }}"
+                                @if($isReq) required @endif
+                                class="w-full border rounded px-2 py-1 text-sm">
+                            <option value="">— выберите —</option>
+                            @foreach($employeesList as $emp)
+                                <option value="{{ $emp }}" @selected($value === $emp)>{{ $emp }}</option>
+                            @endforeach
+                        </select>
+                        @error($name)
+                            <div class="text-red-600 text-xs mt-1">{{ $message }}</div>
+                        @enderror
                     </div>
                 @endif
             @endforeach

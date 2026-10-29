@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Employee;
 use App\Services\StatsService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class WorkstationController extends Controller
 {
@@ -14,7 +15,6 @@ class WorkstationController extends Controller
         $selected = session('workstation_workers', []);
         $intended = $r->query('intended', route('dashboard'));
 
-        // Активные сотрудники из справочника для datalist-подсказок
         $employeesList = Employee::query()
             ->active()
             ->orderBy('short_name')
@@ -26,16 +26,30 @@ class WorkstationController extends Controller
 
     public function store(Request $r)
     {
+        $allowed = Employee::query()
+            ->active()
+            ->orderBy('short_name')
+            ->pluck('short_name')
+            ->all();
+
         $validated = $r->validate([
             'workers'   => ['array', 'max:5'],
-            'workers.*' => ['nullable', 'string', 'max:255'],
+            'workers.*' => ['nullable', 'string', Rule::in($allowed)],
             'intended'  => ['nullable', 'string'],
+        ], [
+            'workers.*.in' => 'Выберите исполнителя из списка.',
         ]);
 
         $workers = array_values(array_filter(
             $validated['workers'] ?? [],
-            fn($w) => $w !== null && $w !== ''
+            fn ($w) => $w !== null && $w !== ''
         ));
+
+        if (empty($workers)) {
+            return back()
+                ->withInput()
+                ->withErrors(['workers' => 'Выберите хотя бы одного исполнителя из списка.']);
+        }
 
         session(['workstation_workers' => $workers]);
 
