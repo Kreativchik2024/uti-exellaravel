@@ -20,7 +20,7 @@ class ImportCommModule extends Command
      * Алиасы: CSV-значение => short_name в справочнике.
      * Раскомментируйте и подставьте, когда узнаете полное ФИО.
      */
-    private array $aliases = [
+    private array $workerAliases = [
         // 'Мешков' => 'Мешков А.А.',
     ];
 
@@ -57,8 +57,8 @@ class ImportCommModule extends Command
             $this->warn('=== РЕЖИМ DRY: изменения НЕ сохраняются ===');
         }
         $this->line('Активных сотрудников в справочнике: ' . count($allowedWorkers));
-        if (!empty($this->aliases)) {
-            $this->line('Алиасов задано: ' . count($this->aliases));
+        if (!empty($this->workerAliases)) {
+            $this->line('Алиасов задано: ' . count($this->workerAliases));
         }
 
         while (($line = fgetcsv($fh, 0, ';')) !== false) {
@@ -129,9 +129,7 @@ class ImportCommModule extends Command
             $allWorkers = [];
             foreach ([$w1, $w2, $w3, $w4, $w5] as $raw) {
                 foreach ($splitNames($raw) as $one) {
-                    // Применяем алиас
-                    $one = $this->aliases[$one] ?? $one;
-                    // Нормализуем точку в инициалах: "Смирнов А.В" -> "Смирнов А.В."
+                    $one = $this->workerAliases[$one] ?? $one;
                     $one = $this->normalizeFio($one);
                     if ($one !== null && !in_array($one, $allWorkers, true)) {
                         $allWorkers[] = $one;
@@ -217,12 +215,11 @@ class ImportCommModule extends Command
         $this->line("Пропущено строк: {$skipped}");
 
         if (!empty($errors)) {
-            // Пишем ВСЕ ошибки в файл
             $errPath = '/tmp/manet_errors.csv';
             $fhErr = fopen($errPath, 'w');
-            fputcsv($fhErr, ['row_num', 'message'], ';');
+            fputcsv($fhErr, ['message'], ';');
             foreach ($errors as $e) {
-                fputcsv($fhErr, [null, $e], ';');
+                fputcsv($fhErr, [$e], ';');
             }
             fclose($fhErr);
 
@@ -257,7 +254,6 @@ class ImportCommModule extends Command
 
     /**
      * Нормализация точки в инициалах: "Смирнов А.В" -> "Смирнов А.В."
-     * Работает только если ровно две заглавные кириллические буквы через точку в конце.
      */
     private function normalizeFio(?string $v): ?string
     {
