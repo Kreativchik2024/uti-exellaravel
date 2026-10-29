@@ -42,3 +42,5 @@ import_cross3.py
 # Прочее
 .DS_Store
 Thumbs.db
+*.pem
+auth.json
