@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\CommModuleRecord;
+use App\Models\Employee;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -32,16 +33,23 @@ class ImportCommModule extends Command
             return self::FAILURE;
         }
 
+        // Список активных сотрудников для проверки исполнителей
+        $allowedWorkers = Employee::query()
+            ->active()
+            ->orderBy('short_name')
+            ->pluck('short_name')
+            ->all();
+
         $row = 0;
         $lastDate = null;
         $created = 0;
         $skipped = 0;
         $errors = [];
-        $totalSkippedNoSn = 0;
 
         if ($dry) {
             $this->warn('=== РЕЖИМ DRY: изменения НЕ сохраняются ===');
         }
+        $this->line('Активных сотрудников в справочнике: ' . count($allowedWorkers));
 
         while (($line = fgetcsv($fh, 0, ';')) !== false) {
             $row++;
@@ -113,6 +121,17 @@ class ImportCommModule extends Command
             $w3 = $workers[2] ?? null;
             $w4 = $workers[3] ?? null;
             $w5 = $workers[4] ?? null;
+
+            // ---- Проверка исполнителей по справочнику активных ----
+            $bad = array_values(array_filter(
+                array_filter([$w1, $w2, $w3, $w4, $w5], fn($w) => $w !== null),
+                fn($w) => !in_array($w, $allowedWorkers, true)
+            ));
+            if (!empty($bad)) {
+                $errors[] = "Строка {$num}: исполнители не из справочника: " . implode(', ', array_unique($bad)) . " — пропущена";
+                $skipped++;
+                continue;
+            }
 
             // ---- IP ----
             $ip = $ip === '' ? null : mb_substr($ip, 0, 64);
