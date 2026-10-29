@@ -2,28 +2,34 @@
 
 namespace App\Providers;
 
+use App\Models\CameraBracketRecord;
 use App\Models\CommModuleRecord;
 use App\Models\Cross1Record;
 use App\Models\Cross3Record;
+use App\Models\Employee;
 use App\Models\FirmwareVersion;
 use App\Models\MiniPcRecord;
+use App\Models\MotorRegulatorRecord;
 use App\Models\News;
 use App\Models\PcCheckRecord;
 use App\Models\PgpRecord;
 use App\Models\ResearchRecord;
+use App\Models\RouterFirmwareRecord;
+use App\Models\SoftwareInstallRecord;
 use App\Models\SophonCheckRecord;
+use App\Models\SpeedSensorRecord;
 use App\Models\TechnologistRecord;
-use App\Models\SpeedSensorRecord;          // ← добавлено
 use App\Observers\FirmwareVersionObserver;
 use App\Policies\FirmwarePolicy;
 use App\Policies\NewsPolicy;
 use App\Policies\RecordPolicy;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
-use App\Models\SoftwareInstallRecord;
-use App\Models\MotorRegulatorRecord;
-use App\Models\CameraBracketRecord;
-use App\Models\RouterFirmwareRecord;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -52,9 +58,70 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(MotorRegulatorRecord::class,  RecordPolicy::class);
         Gate::policy(CameraBracketRecord::class,   RecordPolicy::class);
         Gate::policy(RouterFirmwareRecord::class,  RecordPolicy::class);
-        Gate::policy(SpeedSensorRecord::class,     RecordPolicy::class);   // ← теперь корректно
+        Gate::policy(SpeedSensorRecord::class,     RecordPolicy::class);
 
         // Observer прошивок
         FirmwareVersion::observe(FirmwareVersionObserver::class);
+
+        // Morph map: чтобы в pivot хранилось короткое имя ("pgp"), а не полный класс
+        Relation::morphMap([
+            'pgp'              => PgpRecord::class,
+            'comm_module'      => CommModuleRecord::class,
+            'cross1'           => Cross1Record::class,
+            'cross3'           => Cross3Record::class,
+            'mini_pc'          => MiniPcRecord::class,
+            'research'         => ResearchRecord::class,
+            'technologist'     => TechnologistRecord::class,
+            'pc_check'         => PcCheckRecord::class,
+            'sophon_check'     => SophonCheckRecord::class,
+            'software_install' => SoftwareInstallRecord::class,
+            'motor_regulator'  => MotorRegulatorRecord::class,
+            'camera_bracket'   => CameraBracketRecord::class,
+            'router_firmware'  => RouterFirmwareRecord::class,
+            'speed_sensor'     => SpeedSensorRecord::class,
+        ]);
+
+        // Связь employees() для всех моделей записей
+        foreach (config('sheets.map', []) as $cfg) {
+            if (!isset($cfg['model']) || !class_exists($cfg['model'])) {
+                continue;
+            }
+            $cfg['model']::resolveRelationUsing('employees', function ($model) {
+                return $model->morphToMany(Employee::class, 'record', 'record_employee')
+                    ->withPivot('position')
+                    ->withTimestamps()
+                    ->orderBy('record_employee.position');
+            });
+        }
+
+        // Rate limiting
+        $this->configureRateLimiting();
+    }
+
+    private function configureRateLimiting(): void
+    {
+        // Логин: 5 попыток в минуту на пару email+IP
+        RateLimiter::for('login', function (Request $request) {
+            $key = Str::transliterate(
+                Str::lower((string) $request->input('email')) . '|' . $request->ip()
+            );
+
+            return Limit::perMinute(5)
+                ->by($key)
+                ->response(function (Request $request, array $headers) {
+                    if ($request->expectsJson()) {
+                        return response()->json([
+                            'message' => 'Слишком много попыток входа. Попробуйте через минуту.',
+                        ], 429, $headers);
+                    }
+
+                    return redirect()
+                        ->back()
+                        ->withInput($request->only('email'))
+                        ->withErrors([
+                            'email' => 'Слишком много попыток входа. Попробуйте через минуту.',
+                        ]);
+                });
+        });
     }
 }
