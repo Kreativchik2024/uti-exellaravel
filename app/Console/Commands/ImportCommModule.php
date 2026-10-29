@@ -16,6 +16,14 @@ class ImportCommModule extends Command
 
     protected $description = 'Импорт модулей связи из CSV (manet.csv) в comm_module_records';
 
+    /**
+     * Алиасы: CSV-значение => short_name в справочнике.
+     * Раскомментируйте и подставьте, когда узнаете полное ФИО.
+     */
+    private array $aliases = [
+        // 'Мешков' => 'Мешков А.А.',
+    ];
+
     public function handle(): int
     {
         $path = $this->argument('file');
@@ -33,7 +41,6 @@ class ImportCommModule extends Command
             return self::FAILURE;
         }
 
-        // Список активных сотрудников для проверки исполнителей
         $allowedWorkers = Employee::query()
             ->active()
             ->orderBy('short_name')
@@ -50,16 +57,17 @@ class ImportCommModule extends Command
             $this->warn('=== РЕЖИМ DRY: изменения НЕ сохраняются ===');
         }
         $this->line('Активных сотрудников в справочнике: ' . count($allowedWorkers));
+        if (!empty($this->aliases)) {
+            $this->line('Алиасов задано: ' . count($this->aliases));
+        }
 
         while (($line = fgetcsv($fh, 0, ';')) !== false) {
             $row++;
 
-            // Пропускаем заголовок (и убираем BOM из первого поля)
             if ($row === 1) {
                 continue;
             }
 
-            // Пропускаем пустые строки
             if (count($line) < 3 && trim(implode('', $line)) === '') {
                 continue;
             }
@@ -109,18 +117,33 @@ class ImportCommModule extends Command
                 continue;
             }
 
-            // Дедупликация: worker1..5 не должны повторяться
-            $workers = [$w1];
-            foreach ([$w2, $w3, $w4, $w5] as $w) {
-                if ($w !== null && !in_array($w, $workers, true)) {
-                    $workers[] = $w;
+            // ---- Разбивка комбинированных ФИО: "Иванов И.И./Петров П.П." или "Иванов И.И, Петров П.П." ----
+            $splitNames = function (?string $v): array {
+                if ($v === null) return [];
+                return array_values(array_filter(
+                    array_map(fn($s) => trim($s), preg_split('/[\/,;]+/u', $v)),
+                    fn($s) => $s !== '' && $s !== '-' && $s !== '—'
+                ));
+            };
+
+            $allWorkers = [];
+            foreach ([$w1, $w2, $w3, $w4, $w5] as $raw) {
+                foreach ($splitNames($raw) as $one) {
+                    // Применяем алиас
+                    $one = $this->aliases[$one] ?? $one;
+                    // Нормализуем точку в инициалах: "Смирнов А.В" -> "Смирнов А.В."
+                    $one = $this->normalizeFio($one);
+                    if ($one !== null && !in_array($one, $allWorkers, true)) {
+                        $allWorkers[] = $one;
+                    }
                 }
             }
-            $w1 = $workers[0] ?? null;
-            $w2 = $workers[1] ?? null;
-            $w3 = $workers[2] ?? null;
-            $w4 = $workers[3] ?? null;
-            $w5 = $workers[4] ?? null;
+            $allWorkers = array_slice($allWorkers, 0, 5);
+            $w1 = $allWorkers[0] ?? null;
+            $w2 = $allWorkers[1] ?? null;
+            $w3 = $allWorkers[2] ?? null;
+            $w4 = $allWorkers[3] ?? null;
+            $w5 = $allWorkers[4] ?? null;
 
             // ---- Проверка исполнителей по справочнику активных ----
             $bad = array_values(array_filter(
@@ -136,7 +159,7 @@ class ImportCommModule extends Command
             // ---- IP ----
             $ip = $ip === '' ? null : mb_substr($ip, 0, 64);
 
-            // ---- Примечание: убираем переносы, схлопываем пробелы ----
+            // ---- Примечание ----
             $notes = $notes === ''
                 ? null
                 : trim(preg_replace('/\s+/u', ' ', $notes));
@@ -194,14 +217,24 @@ class ImportCommModule extends Command
         $this->line("Пропущено строк: {$skipped}");
 
         if (!empty($errors)) {
+            // Пишем ВСЕ ошибки в файл
+            $errPath = '/tmp/manet_errors.csv';
+            $fhErr = fopen($errPath, 'w');
+            fputcsv($fhErr, ['row_num', 'message'], ';');
+            foreach ($errors as $e) {
+                fputcsv($fhErr, [null, $e], ';');
+            }
+            fclose($fhErr);
+
             $this->newLine();
-            $this->warn('=== Предупреждения (первые 20) ===');
+            $this->warn('=== Предупреждения (первые 20 из ' . count($errors) . ') ===');
             foreach (array_slice($errors, 0, 20) as $e) {
                 $this->line("  • {$e}");
             }
             if (count($errors) > 20) {
                 $this->line('  … и ещё ' . (count($errors) - 20));
             }
+            $this->warn("Полный список: {$errPath}");
         }
 
         if ($dry) {
@@ -212,9 +245,6 @@ class ImportCommModule extends Command
         return self::SUCCESS;
     }
 
-    /**
-     * Очистка ФИО: trim, `-` → null, удаление переносов.
-     */
     private function cleanName(string $v): ?string
     {
         $v = trim($v);
@@ -223,5 +253,18 @@ class ImportCommModule extends Command
         }
         $v = preg_replace('/\s+/u', ' ', $v) ?? $v;
         return trim($v);
+    }
+
+    /**
+     * Нормализация точки в инициалах: "Смирнов А.В" -> "Смирнов А.В."
+     * Работает только если ровно две заглавные кириллические буквы через точку в конце.
+     */
+    private function normalizeFio(?string $v): ?string
+    {
+        if ($v === null) return null;
+        if (preg_match('/^(.+?)\s+([А-ЯЁ])\.([А-ЯЁ])$/u', $v, $m)) {
+            return $m[1] . ' ' . $m[2] . '.' . $m[3] . '.';
+        }
+        return $v;
     }
 }
