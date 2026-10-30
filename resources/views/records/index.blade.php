@@ -1,82 +1,120 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800">{{ $cfg['title'] }}</h2>
-            <a href="{{ route('records.create', $sheet) }}" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition">
-                + Добавить
-            </a>
+        <div class="flex justify-between items-center gap-4">
+            <div>
+                <h2 class="font-bold text-2xl text-gray-900 tracking-tight">{{ $cfg['title'] }}</h2>
+                <p class="text-sm text-gray-500 mt-1">Всего записей: {{ $records->total() }}</p>
+            </div>
+            @if(auth()->user()->canManageContent())
+                <a href="{{ route('records.create', $sheet) }}"
+                   class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all duration-150 active:scale-95">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Добавить запись
+                </a>
+            @endif
         </div>
     </x-slot>
 
-    <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
+    <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-5">
         @if(session('ok'))
-            <div class="bg-green-100 text-green-800 p-3 rounded">{{ session('ok') }}</div>
+            <div class="flex items-center gap-3 bg-green-50 border border-green-200 text-green-800 p-4 rounded-lg shadow-sm">
+                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                {{ session('ok') }}
+            </div>
         @endif
 
         {{-- Поиск --}}
-        <form method="GET" action="{{ route('records.index', $sheet) }}" class="bg-white p-3 rounded shadow flex gap-2 flex-wrap items-center">
-            <input type="text" name="q" value="{{ $q }}" placeholder="Поиск по S/N, ФИО, номеру борта, IP и т.д."
-                   class="border rounded px-3 py-2 flex-1 min-w-[200px] text-sm">
-            <button class="bg-gray-800 text-white px-4 py-2 rounded text-sm hover:bg-gray-700 transition">Найти</button>
-            @if($q !== '')
-                <a href="{{ route('records.index', $sheet) }}" class="text-sm text-gray-500 hover:text-gray-700 underline">Сбросить</a>
+        <form method="GET" class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex gap-2">
+            <div class="relative flex-1">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input name="q" value="{{ $q }}" placeholder="Поиск по записям..."
+                       class="w-full border border-gray-200 rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition">
+            </div>
+            <button type="submit" class="bg-gray-900 hover:bg-gray-800 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition active:scale-95">
+                Найти
+            </button>
+            @if($q)
+                <a href="{{ route('records.index', $sheet) }}" class="text-gray-500 hover:text-gray-700 px-4 py-2.5 text-sm flex items-center transition">
+                    Сброс
+                </a>
             @endif
         </form>
 
         {{-- Таблица --}}
-        <div class="bg-white rounded shadow overflow-x-auto">
-            <table class="min-w-full text-sm">
-                <thead class="bg-gray-100">
-                <tr>
-                    @foreach($cfg['list_columns'] as $col)
-                        <th class="p-2 text-left">{{ $cfg['fields'][$col]['label'] ?? $col }}</th>
-                    @endforeach
-                    <th class="p-2 text-left">Исполнители</th>
-                    <th class="p-2 text-left">Автор</th>
-                    <th class="p-2 text-left">Действия</th>
-                </tr>
-                </thead>
-                <tbody>
-                @forelse($records as $rec)
-                    <tr class="border-t">
-                        @foreach($cfg['list_columns'] as $col)
-                            <td class="p-2">
-                                @if(($cfg['fields'][$col]['type'] ?? '') === 'date' && $rec->$col)
-                                    {{ \Carbon\Carbon::parse($rec->$col)->format('d.m.Y') }}
-                                @else
-                                    {{ $rec->$col }}
-                                @endif
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="bg-gray-50/80 border-b border-gray-100">
+                            @foreach($cfg['list_columns'] as $col)
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                    {{ $cfg['fields'][$col]['label'] ?? $col }}
+                                </th>
+                            @endforeach
+                            <th class="w-10"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                    @forelse($records as $record)
+                        <tr onclick="window.location='{{ route('records.show', [$sheet, $record->id]) }}'"
+                            class="group cursor-pointer transition-all duration-150 hover:bg-blue-50/60 active:bg-blue-100">
+                            @foreach($cfg['list_columns'] as $col)
+                                <td class="px-4 py-3 text-gray-700">
+                                    @if($col === 'created_by')
+                                        {{ $record->creator?->name ?? '—' }}
+                                    @elseif($col === 'is_repaired')
+                                        @if($record->is_repaired)
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                                Да
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                                                Нет
+                                            </span>
+                                        @endif
+                                    @elseif(in_array($col, ['record_date']))
+                                        <span class="font-medium text-gray-900">
+                                            {{ $record->$col ? \Carbon\Carbon::parse($record->$col)->format('d.m.Y') : '—' }}
+                                        </span>
+                                    @else
+                                        {{ $record->$col ?: '—' }}
+                                    @endif
+                                </td>
+                            @endforeach
+                            <td class="px-4 py-3 text-right">
+                                <svg class="w-4 h-4 text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
                             </td>
-                        @endforeach
-                        <td class="p-2 text-sm">
-                            {{ collect([$rec->worker1,$rec->worker2,$rec->worker3,$rec->worker4,$rec->worker5])->filter()->join(', ') }}
-                        </td>
-                        <td class="p-2 text-xs text-gray-500">{{ $rec->creator?->name ?? '—' }}</td>
-                        <td class="p-2 whitespace-nowrap space-x-2">
-                            @can('update', $rec)
-                                <a href="{{ route('records.edit', [$sheet, $rec->id]) }}"
-                                   class="text-blue-600 underline">Ред.</a>
-                            @endcan
-                            @can('delete', $rec)
-                                <form method="POST" action="{{ route('records.destroy', [$sheet, $rec->id]) }}"
-                                      class="inline" onsubmit="return confirm('Удалить запись?')">
-                                    @csrf @method('DELETE')
-                                    <button class="text-red-600 underline">Удалить</button>
-                                </form>
-                            @endcan
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="100" class="p-4 text-center text-gray-500">
-                        @if($q !== '')
-                            По запросу «{{ $q }}» ничего не найдено.
-                        @else
-                            Нет записей
-                        @endif
-                    </td></tr>
-                @endforelse
-                </tbody>
-            </table>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="{{ count($cfg['list_columns']) + 1 }}" class="px-4 py-16 text-center">
+                                <div class="flex flex-col items-center gap-3 text-gray-400">
+                                    <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    <p class="text-sm">Записей пока нет</p>
+                                    @if(auth()->user()->canManageContent())
+                                        <a href="{{ route('records.create', $sheet) }}" class="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                                            Добавить первую запись →
+                                        </a>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div>{{ $records->links() }}</div>

@@ -19,10 +19,6 @@ class RecordController extends Controller
         return $cfg;
     }
 
-    /**
-     * Значения по умолчанию для worker1..5 из сессии.
-     * Невалидные (не из списка активных сотрудников) отбрасываются.
-     */
     private function workerDefaults(): array
     {
         $workers = session('workstation_workers', []);
@@ -42,9 +38,6 @@ class RecordController extends Controller
         );
     }
 
-    /**
-     * @return string[]
-     */
     private function employeesList(): array
     {
         return Employee::query()
@@ -54,11 +47,6 @@ class RecordController extends Controller
             ->all();
     }
 
-    /**
-     * Проверяет, что все непустые workerN входят в список активных сотрудников.
-     *
-     * @throws ValidationException
-     */
     private function validateWorkers(array $data): void
     {
         $allowed = $this->employeesList();
@@ -88,7 +76,7 @@ class RecordController extends Controller
     public function index(Request $request, string $sheet)
     {
         $cfg = $this->cfg($sheet);
-        $query = $cfg['model']::query();
+        $query = $cfg['model']::query()->with('creator');
 
         $q = trim($request->input('q', ''));
         if ($q !== '') {
@@ -119,6 +107,15 @@ class RecordController extends Controller
         $records = $query->paginate(50)->withQueryString();
 
         return view('records.index', compact('sheet','cfg','records', 'q'));
+    }
+
+    public function show(string $sheet, int $id)
+    {
+        $cfg = $this->cfg($sheet);
+        $record = $cfg['model']::with('creator')->findOrFail($id);
+        Gate::authorize('view', $record);
+
+        return view('records.show', compact('sheet', 'cfg', 'record'));
     }
 
     public function create(string $sheet)
@@ -154,9 +151,7 @@ class RecordController extends Controller
             $cfg['model']::create($data);
         } catch (QueryException $e) {
             if ($this->isDuplicate($e)) {
-                return back()
-                    ->withInput()
-                    ->withErrors(['general' => 'Такая запись уже существует.']);
+                return back()->withInput()->withErrors(['general' => 'Такая запись уже существует.']);
             }
             throw $e;
         }
@@ -191,9 +186,7 @@ class RecordController extends Controller
             $record->update($data);
         } catch (QueryException $e) {
             if ($this->isDuplicate($e)) {
-                return back()
-                    ->withInput()
-                    ->withErrors(['general' => 'Такая запись уже существует.']);
+                return back()->withInput()->withErrors(['general' => 'Такая запись уже существует.']);
             }
             throw $e;
         }
@@ -207,7 +200,8 @@ class RecordController extends Controller
         $record = $cfg['model']::findOrFail($id);
         Gate::authorize('delete', $record);
         $record->delete();
-        return back()->with('ok', 'Запись удалена');
+
+        return redirect()->route('records.index', $sheet)->with('ok', 'Запись удалена');
     }
 
     private function isDuplicate(QueryException $e): bool

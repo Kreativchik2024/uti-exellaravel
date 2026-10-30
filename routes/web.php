@@ -13,7 +13,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkstationController;
 use Illuminate\Support\Facades\Route;
 
-// Маршруты выбора исполнителей (доступны без middleware workers)
+// Маршруты выбора исполнителей
 Route::middleware('auth')->group(function () {
     Route::get('/workstation/select',  [WorkstationController::class, 'show'])->name('workstation.show');
     Route::post('/workstation/select', [WorkstationController::class, 'store'])->name('workstation.store');
@@ -39,13 +39,11 @@ Route::middleware(['auth', 'workers', 'role:admin'])->group(function () {
     Route::patch('/users/{user}/password',   [UserController::class, 'resetPassword'])->name('users.password');
     Route::delete('/users/{user}',           [UserController::class, 'destroy'])->name('users.destroy');
 
-    // Сотрудники: импорт/экспорт/шаблон — ПЕРЕД {employee}
     Route::get('/employees/export',   [EmployeeController::class, 'export'])->name('employees.export');
     Route::get('/employees/template', [EmployeeController::class, 'template'])->name('employees.template');
     Route::get('/employees/import',   [EmployeeController::class, 'importForm'])->name('employees.importForm');
     Route::post('/employees/import',  [EmployeeController::class, 'import'])->name('employees.import');
 
-    // CRUD сотрудников
     Route::get('/employees',                 [EmployeeController::class, 'index'])->name('employees.index');
     Route::get('/employees/create',          [EmployeeController::class, 'create'])->name('employees.create');
     Route::post('/employees',                [EmployeeController::class, 'store'])->name('employees.store');
@@ -54,8 +52,6 @@ Route::middleware(['auth', 'workers', 'role:admin'])->group(function () {
     Route::delete('/employees/{employee}',   [EmployeeController::class, 'destroy'])->name('employees.destroy');
 });
 
-// === Попап новостей: только для залогиненных, без workers ===
-// ВАЖНО: должно быть ДО /news и /news/{news}, чтобы latest не матчился как {news}
 Route::middleware('auth')->group(function () {
     Route::get('/news/latest', [NewsController::class, 'latest'])->name('news.latest');
 });
@@ -93,6 +89,10 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/records/{sheet}',           [RecordController::class, 'index'])->name('records.index');
     Route::get('/records/{sheet}/create',    [RecordController::class, 'create'])->name('records.create');
     Route::post('/records/{sheet}',          [RecordController::class, 'store'])->name('records.store');
+    
+    // Роут просмотра карточки записи (добавлен)
+    Route::get('/records/{sheet}/{id}',      [RecordController::class, 'show'])->name('records.show');
+    
     Route::get('/records/{sheet}/{id}/edit', [RecordController::class, 'edit'])->name('records.edit');
     Route::put('/records/{sheet}/{id}',      [RecordController::class, 'update'])->name('records.update');
     Route::delete('/records/{sheet}/{id}',   [RecordController::class, 'destroy'])->name('records.destroy');

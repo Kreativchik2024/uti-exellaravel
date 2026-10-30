@@ -47,7 +47,7 @@
     @if(in_array($name, $workerFields)) @continue @endif
 
     @php
-        $value = old($name, $record->$name ?? null);
+        $value = old($name, $record->$name ?? ($f['default'] ?? null));
         $isReq = str_contains($f['rules'], 'required') && !str_contains($f['rules'], 'nullable');
     @endphp
     <div>
@@ -63,8 +63,14 @@
             <select name="{{ $name }}" @if($isReq) required @endif
                     class="w-full border rounded px-3 py-2">
                 <option value="">— выберите —</option>
-                @foreach($f['options'] as $opt)
-                    <option value="{{ $opt }}" @selected($value === $opt)>{{ $opt }}</option>
+                @foreach($f['options'] as $optKey => $optVal)
+                    @php
+                        $optValue = is_string($optKey) ? $optKey : $optVal;
+                        $optLabel = is_string($optKey) ? $optVal : $optVal;
+                    @endphp
+                    <option value="{{ $optValue }}" @selected((string)$value === (string)$optValue)>
+                        {{ $optLabel }}
+                    </option>
                 @endforeach
             </select>
 

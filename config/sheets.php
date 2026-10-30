@@ -15,9 +15,6 @@ $faultCode = [
 return [
     'map' => [
 
-        // =====================================================
-        // ПГП (борта)
-        // =====================================================
         'pgp' => [
             'title'  => 'ПГП (борта)',
             'model'  => \App\Models\PgpRecord::class,
@@ -39,9 +36,6 @@ return [
             'list_columns' => ['record_date','post_number','board_number','status','fault_code'],
         ],
 
-        // =====================================================
-        // Модуль связи (одна запись = один модуль: S/N + IP)
-        // =====================================================
         'comm_module' => [
             'title'  => 'Модуль связи',
             'model'  => \App\Models\CommModuleRecord::class,
@@ -56,9 +50,6 @@ return [
             'list_columns' => ['record_date','serial_number','ip_address','fault_code'],
         ],
 
-        // =====================================================
-        // Кросс 1
-        // =====================================================
         'cross1' => [
             'title'  => 'Кросс 1',
             'model'  => \App\Models\Cross1Record::class,
@@ -72,9 +63,6 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
-        // =====================================================
-        // Кросс 3
-        // =====================================================
         'cross3' => [
             'title'  => 'Кросс 3',
             'model'  => \App\Models\Cross3Record::class,
@@ -92,9 +80,6 @@ return [
             'list_columns' => ['record_date','serial_number','pc_version','fault_code'],
         ],
 
-        // =====================================================
-        // Мини ПК
-        // =====================================================
         'mini_pc' => [
             'title'  => 'Мини ПК',
             'model'  => \App\Models\MiniPcRecord::class,
@@ -111,7 +96,7 @@ return [
         ],
 
         // =====================================================
-        // Исследования
+        // Исследования (created_by убран из list_columns)
         // =====================================================
         'research' => [
             'title'  => 'Исследования',
@@ -130,13 +115,12 @@ return [
                 'analysis_actions'=> ['label'=>'Действия для анализа','type'=>'textarea','rules'=>'nullable|string'],
                 'found_defect'    => ['label'=>'Дефект при анализе','type'=>'textarea','rules'=>'nullable|string'],
                 'result'          => ['label'=>'Результат','type'=>'textarea','rules'=>'nullable|string'],
+                'is_repaired'     => ['label'=>'Отремонтировано','type'=>'select','rules'=>'required|boolean',
+                                      'options'=>['1'=>'Да','0'=>'Нет']],
             ], $faultCode),
-            'list_columns' => ['record_date','fuselage_no','reported_defect','found_defect','result','fault_code'],
+            'list_columns' => ['record_date','fuselage_no','frame_serial','bracket_serial','is_repaired'],
         ],
 
-        // =====================================================
-        // Проверка ПК
-        // =====================================================
         'pc_check' => [
             'title'  => 'Проверка ПК',
             'model'  => \App\Models\PcCheckRecord::class,
@@ -150,9 +134,6 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
-        // =====================================================
-        // Проверка Sophon
-        // =====================================================
         'sophon_check' => [
             'title'  => 'Проверка Sophon',
             'model'  => \App\Models\SophonCheckRecord::class,
@@ -171,9 +152,6 @@ return [
             'list_columns' => ['record_date','reported_defect','found_defect','status','fault_code'],
         ],
 
-        // =====================================================
-        // Установка ПО на борт
-        // =====================================================
         'software_install' => [
             'title'  => 'Установка ПО на борт',
             'model'  => \App\Models\SoftwareInstallRecord::class,
@@ -187,9 +165,6 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
-        // =====================================================
-        // Регулятор мотора
-        // =====================================================
         'motor_regulator' => [
             'title'  => 'Регулятор мотора',
             'model'  => \App\Models\MotorRegulatorRecord::class,
@@ -203,9 +178,6 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
-        // =====================================================
-        // Провода питания
-        // =====================================================
         'power_wires' => [
             'title'  => 'Провода питания',
             'model'  => \App\Models\PowerWiresRecord::class,
@@ -219,9 +191,6 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
-        // =====================================================
-        // Data 15
-        // =====================================================
         'data15' => [
             'title'  => 'Data 15',
             'model'  => \App\Models\Data15Record::class,
@@ -235,9 +204,6 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
-        // =====================================================
-        // Data 17
-        // =====================================================
         'data17' => [
             'title'  => 'Data 17',
             'model'  => \App\Models\Data17Record::class,
@@ -251,9 +217,6 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
-        // =====================================================
-        // Кронштейн с камерой
-        // =====================================================
         'camera_bracket' => [
             'title'  => 'Кронштейн с камерой',
             'model'  => \App\Models\CameraBracketRecord::class,
@@ -276,9 +239,6 @@ return [
             'list_columns' => ['record_date','serial_number','camera_status','night_camera_status','fault_code'],
         ],
 
-        // =====================================================
-        // Прошивка роутеров
-        // =====================================================
         'router_firmware' => [
             'title'  => 'Прошивка роутеров',
             'model'  => \App\Models\RouterFirmwareRecord::class,
@@ -292,9 +252,6 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
-        // =====================================================
-        // Датчик скорости
-        // =====================================================
         'speed_sensor' => [
             'title'  => 'Датчик скорости',
             'model'  => \App\Models\SpeedSensorRecord::class,
