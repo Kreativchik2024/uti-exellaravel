@@ -58,7 +58,7 @@
                     </x-nav-link>
 
                     <x-nav-link :href="route('firmware.index')" :active="request()->routeIs('firmware.*')">
-                        {{ __('Прошивки') }}
+                        {{ __('Прошивки и инструкции') }}
                     </x-nav-link>
 
                     <x-nav-link :href="route('stats.index')" :active="request()->routeIs('stats.*')">
@@ -141,7 +141,7 @@
                         <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                     </svg>
                 </button>
-                <div x-show="expanded" x-collapse class="ps-4">
+                <div x-show="expanded" class="ps-4">
                     @foreach([
                         'pgp' => 'ПГП (борта)',
                         'comm_module' => 'Модуль связи',
@@ -172,7 +172,7 @@
             </x-responsive-nav-link>
 
             <x-responsive-nav-link :href="route('firmware.index')" :active="request()->routeIs('firmware.*')">
-                {{ __('Прошивки') }}
+                {{ __('Прошивки и инструкции') }}
             </x-responsive-nav-link>
 
             <x-responsive-nav-link :href="route('stats.index')" :active="request()->routeIs('stats.*')">
@@ -187,7 +187,7 @@
                             <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                         </svg>
                     </button>
-                    <div x-show="expanded" x-collapse class="ps-4">
+                    <div x-show="expanded" class="ps-4">
                         <x-responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
                             {{ __('Пользователи') }}
                         </x-responsive-nav-link>

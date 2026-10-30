@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class FirmwareController extends Controller
 {
@@ -46,14 +48,39 @@ class FirmwareController extends Controller
         Gate::authorize('create', FirmwareVersion::class);
 
         $data = $r->validate([
-            'category_id' => ['required', 'exists:firmware_categories,id'],
+            'category_id' => ['nullable', 'exists:firmware_categories,id'],
+            'new_category'=> ['nullable', 'string', 'max:100'],
             'version'     => ['required', 'string', 'max:80'],
             'file'        => ['required', 'file', 'max:512000'],
             'notes'       => ['nullable', 'string'],
             'make_actual' => ['nullable', 'boolean'],
         ]);
 
-        $cat  = FirmwareCategory::findOrFail($data['category_id']);
+        if (!$r->filled('category_id') && !$r->filled('new_category')) {
+            throw ValidationException::withMessages([
+                'category_id' => ['Выберите категорию из списка или впишите новую.'],
+            ]);
+        }
+
+        // Логика создания новой категории на лету
+        if ($r->filled('new_category')) {
+            $title = trim($data['new_category']);
+            $slug  = Str::slug($title);
+            if (empty($slug)) $slug = 'cat-' . time();
+            
+            // Если категория с таким slug уже есть — берем её
+            $cat = FirmwareCategory::firstOrCreate(
+                ['slug' => $slug],
+                [
+                    'title'      => $title,
+                    'is_system'  => false,
+                    'sort_order' => 99,
+                ]
+            );
+        } else {
+            $cat = FirmwareCategory::findOrFail($data['category_id']);
+        }
+
         $path = $r->file('file')->store("firmware/{$cat->slug}", 'local');
 
         $version = FirmwareVersion::create([
@@ -65,10 +92,11 @@ class FirmwareController extends Controller
             'sha256'      => hash_file('sha256', $r->file('file')->getRealPath()),
             'notes'       => $data['notes'] ?? null,
             'uploaded_by' => auth()->id(),
+            'uploaded_at' => now(),
         ]);
 
         return redirect()->route('firmware.index', ['tab' => $version->status])
-            ->with('ok', 'Прошивка загружена');
+            ->with('ok', 'Файл загружен' . ($r->filled('new_category') ? ' (категория создана)' : ''));
     }
 
     public function status(Request $r, FirmwareVersion $version)
@@ -85,17 +113,17 @@ class FirmwareController extends Controller
     }
 
     public function download(FirmwareVersion $version)
-{
-    Gate::authorize('download', $version);
+    {
+        Gate::authorize('download', $version);
 
-    $full = storage_path("app/private/{$version->file_path}");
-    abort_unless(is_file($full), 404, 'Файл не найден на диске');
+        $full = storage_path("app/private/{$version->file_path}");
+        abort_unless(is_file($full), 404, 'Файл не найден на диске');
 
-    $ext  = pathinfo($version->file_path, PATHINFO_EXTENSION) ?: 'bin';
-    $name = "{$version->category->slug}_{$version->version}.{$ext}";
+        $ext  = pathinfo($version->file_path, PATHINFO_EXTENSION) ?: 'bin';
+        $name = "{$version->category->slug}_{$version->version}.{$ext}";
 
-    return response()->download($full, $name);
-}
+        return response()->download($full, $name);
+    }
 
     public function destroy(FirmwareVersion $version)
     {

@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800">Загрузить прошивку</h2>
+        <h2 class="font-semibold text-xl text-gray-800">Загрузить файл (прошивку / инструкцию)</h2>
     </x-slot>
 
     <div class="py-8 max-w-2xl mx-auto sm:px-6 lg:px-8">
@@ -15,9 +15,9 @@
             @endif
 
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Категория</label>
-                <select name="category_id" required class="w-full border rounded px-3 py-2">
-                    <option value="">— выберите —</option>
+                <label class="block text-sm text-gray-600 mb-1">Выберите категорию</label>
+                <select name="category_id" id="cat_select" class="w-full border rounded px-3 py-2">
+                    <option value="">— выберите из списка —</option>
                     @foreach($categories as $c)
                         <option value="{{ $c->id }}" @selected(old('category_id') == $c->id)>{{ $c->title }}</option>
                     @endforeach
@@ -25,6 +25,13 @@
             </div>
 
             <div>
+                <label class="block text-sm text-gray-600 mb-1">…или создайте новую категорию</label>
+                <input name="new_category" id="new_cat_input" value="{{ old('new_category') }}" maxlength="100"
+                       class="w-full border rounded px-3 py-2" placeholder="Например: Инструкции по настройке">
+                <p class="text-xs text-gray-500 mt-1">Если вы впишете новую категорию, список выше будет проигнорирован.</p>
+            </div>
+
+            <div class="border-t pt-4">
                 <label class="block text-sm text-gray-600 mb-1">Версия</label>
                 <input name="version" value="{{ old('version') }}" required maxlength="80"
                        class="w-full border rounded px-3 py-2 font-mono" placeholder="например 4738 или 1.1.0">
@@ -51,4 +58,20 @@
             </div>
         </form>
     </div>
+
+    {{-- Небольшой скрипт, чтобы визуально развести выбор и ввод новой категории --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const select = document.getElementById('cat_select');
+            const input  = document.getElementById('new_cat_input');
+
+            select.addEventListener('change', () => {
+                if (select.value !== '') input.value = '';
+            });
+
+            input.addEventListener('input', () => {
+                if (input.value.trim() !== '') select.value = '';
+            });
+        });
+    </script>
 </x-app-layout>

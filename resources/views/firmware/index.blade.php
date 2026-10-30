@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800">Прошивки</h2>
+            <h2 class="font-semibold text-xl text-gray-800">Прошивки и инструкции</h2>
             <div class="flex gap-2">
                 @if(auth()->user()->canManageContent())
                     <a href="{{ route('firmware.create') }}" class="bg-blue-600 text-white px-4 py-2 rounded">+ Загрузить</a>
