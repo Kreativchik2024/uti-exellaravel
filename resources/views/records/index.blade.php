@@ -5,7 +5,6 @@
                 <h2 class="font-bold text-2xl text-gray-900 tracking-tight">{{ $cfg['title'] }}</h2>
                 <p class="text-sm text-gray-500 mt-1">Всего записей: {{ $records->total() }}</p>
             </div>
-            {{-- Кнопка видна всем залогиненным; права всё равно проверяются в контроллере --}}
             <a href="{{ route('records.create', $sheet) }}"
                class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all duration-150 active:scale-95">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -72,8 +71,8 @@
                                     @if($col === 'created_by')
                                         {{ $record->creator?->name ?? '—' }}
                                     @elseif($col === 'worker1')
-                                        {{-- Исполнитель 1 --}}
-                                        {{ $record->worker1 ?: '—' }}
+                                        {{-- Все исполнители через запятую --}}
+                                        {{ $record->workers_list ?: '—' }}
                                     @elseif($col === 'post_number')
                                         {{ $record->post_number ? 'Пост ' . $record->post_number : '—' }}
                                     @elseif($col === 'peripheral_number')

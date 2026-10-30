@@ -94,6 +94,21 @@ class RecordController extends Controller
         }
     }
 
+    /**
+     * Собирает строку со всеми исполнителями (worker1..5) через запятую.
+     */
+    private function collectWorkers($record): string
+    {
+        $names = [];
+        foreach (self::WORKER_FIELDS as $field) {
+            $val = $record->{$field} ?? null;
+            if (!empty($val)) {
+                $names[] = $val;
+            }
+        }
+        return implode(', ', $names);
+    }
+
     public function index(Request $request, string $sheet)
     {
         $cfg = $this->cfg($sheet);
@@ -129,15 +144,17 @@ class RecordController extends Controller
 
         // Формируем колонки: гарантированно добавляем worker1 и created_by
         $listColumns = $cfg['list_columns'];
-
-        // Исполнитель (worker1) — если есть в fields
         if (array_key_exists('worker1', $cfg['fields']) && !in_array('worker1', $listColumns)) {
             $listColumns[] = 'worker1';
         }
-
-        // Автор (created_by) — добавляем в конец, если ещё нет
         if (!in_array('created_by', $listColumns)) {
             $listColumns[] = 'created_by';
+        }
+
+        // Прокидываем в каждую запись строку со всеми исполнителями
+        // (чтобы в шаблоне не считать implode по 5 полям)
+        foreach ($records as $record) {
+            $record->workers_list = $this->collectWorkers($record);
         }
 
         return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns'));
