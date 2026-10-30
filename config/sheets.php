@@ -16,7 +16,7 @@ return [
     'map' => [
 
         // =====================================================
-        // ПГП (борта) — peripheral_number убран из list_columns
+        // ПГП (борта)
         // =====================================================
         'pgp' => [
             'title'  => 'ПГП (борта)',
@@ -41,7 +41,7 @@ return [
         ],
 
         // =====================================================
-        // Модуль связи (одна запись = один модуль: S/N + IP)
+        // Модуль связи
         // =====================================================
         'comm_module' => [
             'title'  => 'Модуль связи',
@@ -91,6 +91,22 @@ return [
                 'defect' => ['label'=>'Дефект','type'=>'textarea','rules'=>'nullable|string'],
             ], $faultCode),
             'list_columns' => ['record_date','serial_number','pc_version','fault_code'],
+        ],
+
+        // =====================================================
+        // Кросс 5 (по аналогии с Регулятор мотора)
+        // =====================================================
+        'cross5' => [
+            'title'  => 'Кросс 5',
+            'model'  => \App\Models\Cross5Record::class,
+            'policy' => \App\Policies\RecordPolicy::class,
+            'fields' => array_merge([
+                'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
+                'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
+            ], $workers, [
+                'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
+            ], $faultCode),
+            'list_columns' => ['record_date','qty','fault_code'],
         ],
 
         // =====================================================

@@ -6,6 +6,7 @@ use App\Models\CameraBracketRecord;
 use App\Models\CommModuleRecord;
 use App\Models\Cross1Record;
 use App\Models\Cross3Record;
+use App\Models\Cross5Record;
 use App\Models\Data15Record;
 use App\Models\Data17Record;
 use App\Models\Employee;
@@ -51,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(CommModuleRecord::class,   RecordPolicy::class);
         Gate::policy(Cross1Record::class,       RecordPolicy::class);
         Gate::policy(Cross3Record::class,       RecordPolicy::class);
+        Gate::policy(Cross5Record::class,       RecordPolicy::class); // <-- ДОБАВЛЕНО
         Gate::policy(MiniPcRecord::class,       RecordPolicy::class);
         Gate::policy(ResearchRecord::class,     RecordPolicy::class);
         Gate::policy(PcCheckRecord::class,      RecordPolicy::class);
@@ -67,12 +69,13 @@ class AppServiceProvider extends ServiceProvider
         // Observer прошивок
         FirmwareVersion::observe(FirmwareVersionObserver::class);
 
-        // Morph map: чтобы в pivot хранилось короткое имя ("pgp"), а не полный класс
+        // Morph map
         Relation::morphMap([
             'pgp'              => PgpRecord::class,
             'comm_module'      => CommModuleRecord::class,
             'cross1'           => Cross1Record::class,
             'cross3'           => Cross3Record::class,
+            'cross5'           => Cross5Record::class, // <-- ДОБАВЛЕНО
             'mini_pc'          => MiniPcRecord::class,
             'research'         => ResearchRecord::class,
             'pc_check'         => PcCheckRecord::class,
@@ -106,7 +109,6 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureRateLimiting(): void
     {
-        // Логин: 5 попыток в минуту на пару email+IP
         RateLimiter::for('login', function (Request $request) {
             $key = Str::transliterate(
                 Str::lower((string) $request->input('email')) . '|' . $request->ip()
