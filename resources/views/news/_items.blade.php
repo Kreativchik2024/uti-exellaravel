@@ -6,11 +6,11 @@
 
     <article class="bg-white rounded shadow overflow-hidden {{ $item->is_pinned ? 'ring-2 ring-blue-300' : '' }}">
         @if($cover)
-            {{-- Обложка: большая картинка сверху --}}
+            {{-- Обложка: превью 400px, фиксированная высота 320px --}}
             <a href="{{ route('media.show', ['path' => $cover->path]) }}" target="_blank" class="block">
-                <img src="{{ route('media.show', ['path' => $cover->path]) }}"
+                <img src="{{ route('media.show', ['path' => $cover->thumb_path ?? $cover->path]) }}"
                      alt="{{ $cover->caption ?? $item->title ?? 'Новость' }}"
-                     class="w-full max-h-[480px] object-cover"
+                     class="w-full h-[320px] object-cover"
                      loading="lazy">
             </a>
         @endif
@@ -30,7 +30,6 @@
                 <h3 class="font-semibold text-lg">{{ $item->title }}</h3>
             @endif
 
-            {{-- Текст как описание под картинкой --}}
             <p class="whitespace-pre-line text-gray-700">{{ $item->body }}</p>
 
             @if($cover && $cover->caption)
@@ -38,12 +37,11 @@
             @endif
 
             @if($rest->count())
-                {{-- Остальные картинки — галереей под текстом --}}
                 <div class="mt-3 flex flex-wrap gap-3">
                     @foreach($rest as $img)
                         <figure class="text-center max-w-[160px]">
                             <a href="{{ route('media.show', ['path' => $img->path]) }}" target="_blank">
-                                <img src="{{ route('media.show', ['path' => $img->thumb_path]) }}"
+                                <img src="{{ route('media.show', ['path' => $img->thumb_path ?? $img->path]) }}"
                                      class="w-32 h-32 object-cover rounded border mx-auto"
                                      alt="{{ $img->caption ?? '' }}"
                                      loading="lazy">

@@ -90,7 +90,6 @@ class NewsController extends Controller
             'is_pinned' => $r->boolean('is_pinned'),
         ]);
 
-        // Обновляем подписи существующих картинок
         if ($r->has('existing_captions')) {
             foreach ($r->input('existing_captions', []) as $imageId => $caption) {
                 $img = $news->images()->find($imageId);
@@ -132,10 +131,6 @@ class NewsController extends Controller
         return back()->with('ok', 'Картинка удалена');
     }
 
-    /**
-     * JSON для попапа новостей (polling).
-     * Отдаёт самую свежую опубликованную новость с id > after.
-     */
     public function latest(Request $request)
     {
         $after = (int) $request->query('after', 0);
@@ -148,22 +143,19 @@ class NewsController extends Controller
             ->first();
 
         if (!$news || (int) $news->id <= $after) {
-            return response()
-                ->json(null)
-                ->header('Cache-Control', 'no-store');
+            return response()->json(null)->header('Cache-Control', 'no-store');
         }
 
         $cover = $news->images()->orderBy('sort_order')->first();
 
-        return response()
-            ->json([
-                'id'        => $news->id,
-                'title'     => $news->title ?: Str::limit(strip_tags($news->body), 80),
-                'body'      => Str::limit(strip_tags($news->body ?? ''), 600),
-                'cover_url' => $cover ? route('media.show', ['path' => $cover->path]) : null,
-                'url'       => route('news.index'),
-            ])
-            ->header('Cache-Control', 'no-store');
+        // Для попапа берём ПРЕВЬЮ (thumb, 400px), а не оригинал — и легче, и не «растягивается»
+        return response()->json([
+            'id'        => $news->id,
+            'title'     => $news->title ?: Str::limit(strip_tags($news->body), 80),
+            'body'      => Str::limit(strip_tags($news->body ?? ''), 600),
+            'cover_url' => $cover ? route('media.show', ['path' => $cover->thumb_path ?? $cover->path]) : null,
+            'url'       => route('news.index'),
+        ])->header('Cache-Control', 'no-store');
     }
 
     private function attachImages(News $news, array $files, array $captions = []): void

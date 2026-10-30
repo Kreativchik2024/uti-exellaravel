@@ -18,7 +18,6 @@
         <div class="min-h-screen bg-gray-100">
             @include('layouts.navigation')
 
-            <!-- Page Heading -->
             @isset($header)
                 <header class="bg-white shadow">
                     <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -27,24 +26,22 @@
                 </header>
             @endisset
 
-            <!-- Page Content -->
             <main>
                 {{ $slot }}
             </main>
         </div>
 
-        {{-- Стек для скриптов страниц (Chart.js, Alpine-логика зон статистики) --}}
         @stack('scripts')
 
         @auth
-        {{-- Поп-ап новостей для залогиненных: показывается всем активным, закрыть можно через 5 сек --}}
+        {{-- Поп-ап новостей для залогиненных --}}
         <div id="news-popup"
              style="display:none;"
              class="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4">
             <div class="bg-white rounded-lg shadow-2xl max-w-lg w-full overflow-hidden">
                 <div id="news-popup-cover-wrap" style="display:none;">
                     <img id="news-popup-cover" src="" alt=""
-                         class="w-full max-h-[300px] object-cover">
+                         class="w-full h-[220px] object-cover">
                 </div>
                 <div class="p-6">
                     <h2 id="news-popup-title" class="text-xl font-semibold text-gray-900 mb-3"></h2>
