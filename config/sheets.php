@@ -135,36 +135,6 @@ return [
         ],
 
         // =====================================================
-        // Лист технолога
-        // =====================================================
-        'technologist' => [
-            'title'  => 'Лист технолога',
-            'model'  => \App\Models\TechnologistRecord::class,
-            'policy' => \App\Policies\RecordPolicy::class,
-            'fields' => array_merge([
-                'record_date'       => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
-                'act_number'        => ['label'=>'№ акта','type'=>'text','rules'=>'nullable|string|max:80'],
-                'node_name'         => ['label'=>'Наименование узла','type'=>'text','rules'=>'nullable|string|max:120'],
-                'serial_number'     => ['label'=>'Серийный/Заводской №','type'=>'text','rules'=>'nullable|string|max:120'],
-                'rejected_by'       => ['label'=>'Кто забраковал','type'=>'text','rules'=>'nullable|string|max:120'],
-                'defect_description'=> ['label'=>'Описание неисправности','type'=>'textarea','rules'=>'nullable|string'],
-                'defect_node'       => ['label'=>'Дефектный узел','type'=>'text','rules'=>'nullable|string|max:120'],
-                'conclusion'        => ['label'=>'Заключение технолога','type'=>'textarea','rules'=>'nullable|string'],
-                'technologist'      => ['label'=>'ФИО технолога','type'=>'text','rules'=>'nullable|string|max:120'],
-                'from_section'      => ['label'=>'Участок-отправитель','type'=>'text','rules'=>'nullable|string|max:120'],
-                'to_section'        => ['label'=>'Участок-получатель','type'=>'text','rules'=>'nullable|string|max:120'],
-                'sent_to_repair_at' => ['label'=>'Дата передачи в ремонт','type'=>'date','rules'=>'nullable|date'],
-                'repair_status'     => ['label'=>'Статус ремонта','type'=>'text','rules'=>'nullable|string|max:80'],
-                'planned_ready_at'  => ['label'=>'Плановая дата готовности','type'=>'date','rules'=>'nullable|date'],
-                'responsible'       => ['label'=>'Ответственный за ремонт','type'=>'text','rules'=>'nullable|string|max:120'],
-                'actual_return_at'  => ['label'=>'Фактическая дата возврата','type'=>'date','rules'=>'nullable|date'],
-            ], $workers, [
-                'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
-            ], $faultCode),
-            'list_columns' => ['record_date','act_number','node_name','serial_number','repair_status','fault_code'],
-        ],
-
-        // =====================================================
         // Проверка ПК
         // =====================================================
         'pc_check' => [
@@ -234,6 +204,54 @@ return [
         ],
 
         // =====================================================
+        // Провода питания
+        // =====================================================
+        'power_wires' => [
+            'title'  => 'Провода питания',
+            'model'  => \App\Models\PowerWiresRecord::class,
+            'policy' => \App\Policies\RecordPolicy::class,
+            'fields' => array_merge([
+                'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
+                'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
+            ], $workers, [
+                'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
+            ], $faultCode),
+            'list_columns' => ['record_date','qty','fault_code'],
+        ],
+
+        // =====================================================
+        // Data 15
+        // =====================================================
+        'data15' => [
+            'title'  => 'Data 15',
+            'model'  => \App\Models\Data15Record::class,
+            'policy' => \App\Policies\RecordPolicy::class,
+            'fields' => array_merge([
+                'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
+                'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
+            ], $workers, [
+                'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
+            ], $faultCode),
+            'list_columns' => ['record_date','qty','fault_code'],
+        ],
+
+        // =====================================================
+        // Data 17
+        // =====================================================
+        'data17' => [
+            'title'  => 'Data 17',
+            'model'  => \App\Models\Data17Record::class,
+            'policy' => \App\Policies\RecordPolicy::class,
+            'fields' => array_merge([
+                'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
+                'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
+            ], $workers, [
+                'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
+            ], $faultCode),
+            'list_columns' => ['record_date','qty','fault_code'],
+        ],
+
+        // =====================================================
         // Кронштейн с камерой
         // =====================================================
         'camera_bracket' => [
@@ -243,7 +261,6 @@ return [
             'fields' => array_merge([
                 'record_date'         => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
                 'serial_number'       => ['label'=>'S/N кронштейна','type'=>'text','rules'=>'nullable|string|max:120'],
-                //'frame_serial'        => ['label'=>'№ моторамы','type'=>'text','rules'=>'nullable|string|max:120'],
                 'camera_status'       => ['label'=>'Камера','type'=>'select','rules'=>'nullable',
                                             'options'=>['Работает','Не работает','Требует ремонта']],
                 'night_camera_status' => ['label'=>'Ночная камера','type'=>'select','rules'=>'nullable',

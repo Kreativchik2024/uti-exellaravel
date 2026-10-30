@@ -6,6 +6,8 @@ use App\Models\CameraBracketRecord;
 use App\Models\CommModuleRecord;
 use App\Models\Cross1Record;
 use App\Models\Cross3Record;
+use App\Models\Data15Record;
+use App\Models\Data17Record;
 use App\Models\Employee;
 use App\Models\FirmwareVersion;
 use App\Models\MiniPcRecord;
@@ -13,12 +15,12 @@ use App\Models\MotorRegulatorRecord;
 use App\Models\News;
 use App\Models\PcCheckRecord;
 use App\Models\PgpRecord;
+use App\Models\PowerWiresRecord;
 use App\Models\ResearchRecord;
 use App\Models\RouterFirmwareRecord;
 use App\Models\SoftwareInstallRecord;
 use App\Models\SophonCheckRecord;
 use App\Models\SpeedSensorRecord;
-use App\Models\TechnologistRecord;
 use App\Observers\FirmwareVersionObserver;
 use App\Policies\FirmwarePolicy;
 use App\Policies\NewsPolicy;
@@ -51,11 +53,13 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Cross3Record::class,       RecordPolicy::class);
         Gate::policy(MiniPcRecord::class,       RecordPolicy::class);
         Gate::policy(ResearchRecord::class,     RecordPolicy::class);
-        Gate::policy(TechnologistRecord::class, RecordPolicy::class);
         Gate::policy(PcCheckRecord::class,      RecordPolicy::class);
         Gate::policy(SophonCheckRecord::class,  RecordPolicy::class);
         Gate::policy(SoftwareInstallRecord::class, RecordPolicy::class);
         Gate::policy(MotorRegulatorRecord::class,  RecordPolicy::class);
+        Gate::policy(PowerWiresRecord::class,      RecordPolicy::class);
+        Gate::policy(Data15Record::class,          RecordPolicy::class);
+        Gate::policy(Data17Record::class,          RecordPolicy::class);
         Gate::policy(CameraBracketRecord::class,   RecordPolicy::class);
         Gate::policy(RouterFirmwareRecord::class,  RecordPolicy::class);
         Gate::policy(SpeedSensorRecord::class,     RecordPolicy::class);
@@ -71,11 +75,13 @@ class AppServiceProvider extends ServiceProvider
             'cross3'           => Cross3Record::class,
             'mini_pc'          => MiniPcRecord::class,
             'research'         => ResearchRecord::class,
-            'technologist'     => TechnologistRecord::class,
             'pc_check'         => PcCheckRecord::class,
             'sophon_check'     => SophonCheckRecord::class,
             'software_install' => SoftwareInstallRecord::class,
             'motor_regulator'  => MotorRegulatorRecord::class,
+            'power_wires'      => PowerWiresRecord::class,
+            'data15'           => Data15Record::class,
+            'data17'           => Data17Record::class,
             'camera_bracket'   => CameraBracketRecord::class,
             'router_firmware'  => RouterFirmwareRecord::class,
             'speed_sensor'     => SpeedSensorRecord::class,
