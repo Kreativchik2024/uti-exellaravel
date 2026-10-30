@@ -13,6 +13,7 @@ class EnsureWorkersSelected
         // Эти маршруты доступны без выбора исполнителей
         if (
             $request->routeIs('workstation.*') ||
+            $request->routeIs('news.latest') ||     // попап новостей — polling без workers
             $request->routeIs('logout') ||
             $request->routeIs('profile.*') ||
             $request->routeIs('password.*')

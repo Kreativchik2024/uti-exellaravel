@@ -54,6 +54,12 @@ Route::middleware(['auth', 'workers', 'role:admin'])->group(function () {
     Route::delete('/employees/{employee}',   [EmployeeController::class, 'destroy'])->name('employees.destroy');
 });
 
+// === Попап новостей: только для залогиненных, без workers ===
+// ВАЖНО: должно быть ДО /news и /news/{news}, чтобы latest не матчился как {news}
+Route::middleware('auth')->group(function () {
+    Route::get('/news/latest', [NewsController::class, 'latest'])->name('news.latest');
+});
+
 Route::get('/news', [NewsController::class, 'index'])->name('news.index');
 
 Route::middleware(['auth', 'workers', 'role:admin,master'])->group(function () {

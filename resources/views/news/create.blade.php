@@ -27,8 +27,11 @@
             </div>
 
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Картинки (можно несколько)</label>
-                <input type="file" name="images[]" accept="image/*" multiple>
+                <label class="block text-sm text-gray-600 mb-1">Картинки с подписями (до 10)</label>
+                <input type="file" name="images[]" id="news-images-input" accept="image/*" multiple
+                       class="text-sm">
+                <p class="text-xs text-gray-500 mt-1">После выбора файлов появятся поля для подписей.</p>
+                <div id="caption-fields" class="mt-3 space-y-2"></div>
             </div>
 
             <label class="flex items-center gap-2">
@@ -42,4 +45,36 @@
             </div>
         </form>
     </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var input = document.getElementById('news-images-input');
+        var container = document.getElementById('caption-fields');
+        if (!input || !container) return;
+
+        input.addEventListener('change', function () {
+            container.innerHTML = '';
+            Array.prototype.forEach.call(this.files, function (file, i) {
+                var row = document.createElement('div');
+                row.className = 'flex gap-2 items-center';
+
+                var name = document.createElement('span');
+                name.className = 'text-xs text-gray-500 truncate';
+                name.style.maxWidth = '180px';
+                name.textContent = file.name;
+
+                var inp = document.createElement('input');
+                inp.type = 'text';
+                inp.name = 'captions[' + i + ']';
+                inp.placeholder = 'Подпись к фото (необязательно)';
+                inp.maxLength = 255;
+                inp.className = 'flex-1 border rounded px-2 py-1 text-sm';
+
+                row.appendChild(name);
+                row.appendChild(inp);
+                container.appendChild(row);
+            });
+        });
+    });
+    </script>
 </x-app-layout>

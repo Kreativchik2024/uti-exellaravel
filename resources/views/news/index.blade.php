@@ -41,12 +41,20 @@
                 <p class="whitespace-pre-line">{{ $item->body }}</p>
 
                 @if($item->images->count())
-                    <div class="mt-3 flex flex-wrap gap-2">
+                    <div class="mt-4 flex flex-wrap gap-4">
                         @foreach($item->images as $img)
-                            <a href="{{ route('media.show', ['path' => $img->path]) }}" target="_blank">
-                                <img src="{{ route('media.show', ['path' => $img->thumb_path]) }}"
-                                     class="w-32 h-32 object-cover rounded border">
-                            </a>
+                            <figure class="text-center max-w-[180px]">
+                                <a href="{{ route('media.show', ['path' => $img->path]) }}" target="_blank">
+                                    <img src="{{ route('media.show', ['path' => $img->thumb_path]) }}"
+                                         class="w-32 h-32 object-cover rounded border mx-auto"
+                                         alt="{{ $img->caption ?? '' }}">
+                                </a>
+                                @if($img->caption)
+                                    <figcaption class="text-xs text-gray-500 mt-1 italic">
+                                        {{ $img->caption }}
+                                    </figcaption>
+                                @endif
+                            </figure>
                         @endforeach
                     </div>
                 @endif
