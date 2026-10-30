@@ -16,4 +16,8 @@ class PowerWiresRecord extends Model
         'record_date' => 'date',
         'qty'         => 'integer',
     ];
+    public function creator()
+{
+    return $this->belongsTo(\App\Models\User::class, 'created_by');
+}
 }
