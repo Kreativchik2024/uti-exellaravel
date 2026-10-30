@@ -7,11 +7,9 @@
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
-        <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
-        <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased">
@@ -34,25 +32,25 @@
         @stack('scripts')
 
         @auth
-        {{-- Поп-ап новостей для залогиненных --}}
+        {{-- Поп-ап новостей --}}
         <div id="news-popup"
-             style="display:none;"
-             class="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4">
-            <div class="bg-white rounded-lg shadow-2xl max-w-lg w-full overflow-hidden">
+             style="display:none; position:fixed; inset:0; z-index:99999; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); padding:16px;">
+            <div style="background:#fff; border-radius:8px; max-width:512px; width:100%; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
                 <div id="news-popup-cover-wrap" style="display:none;">
-                    <img id="news-popup-cover" src="" alt=""
-                         class="w-full h-[220px] object-cover">
+                    {{-- Вместо img используем div с фоновой картинкой, чтобы CSS не мог его растянуть --}}
+                    <div id="news-popup-cover"
+                         style="width:100%; height:220px; background-size:cover; background-position:center; background-repeat:no-repeat;"></div>
                 </div>
-                <div class="p-6">
-                    <h2 id="news-popup-title" class="text-xl font-semibold text-gray-900 mb-3"></h2>
+                <div style="padding:24px;">
+                    <h2 id="news-popup-title" style="font-size:20px; font-weight:600; color:#111827; margin:0 0 12px;"></h2>
                     <div id="news-popup-body"
-                         class="text-gray-700 text-sm mb-4 whitespace-pre-line max-h-[40vh] overflow-y-auto"></div>
+                         style="color:#374151; font-size:14px; margin-bottom:16px; white-space:pre-line; max-height:40vh; overflow-y:auto;"></div>
                     <a id="news-popup-more" href="#"
-                       class="text-indigo-600 text-sm underline mb-4 inline-block">Читать полностью →</a>
+                       style="color:#4f46e5; font-size:14px; text-decoration:underline; display:inline-block; margin-bottom:16px;">Читать полностью →</a>
                     <button id="news-popup-close"
                             type="button"
                             disabled
-                            class="w-full bg-indigo-600 text-white px-4 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed">
+                            style="width:100%; background:#4f46e5; color:#fff; padding:8px 16px; border-radius:4px; border:none; cursor:pointer;">
                         Закрыть (<span id="news-popup-countdown">5</span>)
                     </button>
                 </div>
@@ -90,10 +88,11 @@
                 body.textContent  = news.body || '';
 
                 if (news.cover_url) {
-                    cover.src = news.cover_url;
+                    cover.style.backgroundImage = "url('" + news.cover_url + "')";
                     coverWrap.style.display = 'block';
                 } else {
                     coverWrap.style.display = 'none';
+                    cover.style.backgroundImage = '';
                 }
 
                 more.href = news.url || '/news';
@@ -102,6 +101,8 @@
 
                 var left = CLOSE_DELAY_SEC;
                 btn.disabled = true;
+                btn.style.background = '#d1d5db';
+                btn.style.cursor = 'not-allowed';
                 btn.innerHTML = 'Закрыть (<span id="news-popup-countdown">' + left + '</span>)';
                 popup.style.display = 'flex';
 
@@ -110,6 +111,8 @@
                     if (left <= 0) {
                         clearInterval(timer);
                         btn.disabled = false;
+                        btn.style.background = '#4f46e5';
+                        btn.style.cursor = 'pointer';
                         btn.textContent = 'Закрыть';
                     } else {
                         var c = document.getElementById('news-popup-countdown');

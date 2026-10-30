@@ -6,12 +6,9 @@
 
     <article class="bg-white rounded shadow overflow-hidden {{ $item->is_pinned ? 'ring-2 ring-blue-300' : '' }}">
         @if($cover)
-            {{-- Обложка: превью 400px, фиксированная высота 320px --}}
+            {{-- Обложка: div с background-image (не растягивается) --}}
             <a href="{{ route('media.show', ['path' => $cover->path]) }}" target="_blank" class="block">
-                <img src="{{ route('media.show', ['path' => $cover->thumb_path ?? $cover->path]) }}"
-                     alt="{{ $cover->caption ?? $item->title ?? 'Новость' }}"
-                     class="w-full h-[320px] object-cover"
-                     loading="lazy">
+                <div style="width:100%; height:320px; background-image:url('{{ route('media.show', ['path' => $cover->thumb_path ?? $cover->path]) }}'); background-size:cover; background-position:center; background-repeat:no-repeat;"></div>
             </a>
         @endif
 
@@ -41,10 +38,8 @@
                     @foreach($rest as $img)
                         <figure class="text-center max-w-[160px]">
                             <a href="{{ route('media.show', ['path' => $img->path]) }}" target="_blank">
-                                <img src="{{ route('media.show', ['path' => $img->thumb_path ?? $img->path]) }}"
-                                     class="w-32 h-32 object-cover rounded border mx-auto"
-                                     alt="{{ $img->caption ?? '' }}"
-                                     loading="lazy">
+                                {{-- Маленькие превью тоже через div --}}
+                                <div style="width:128px; height:128px; background-image:url('{{ route('media.show', ['path' => $img->thumb_path ?? $img->path]) }}'); background-size:cover; background-position:center; background-repeat:no-repeat; border-radius:4px; border:1px solid #e5e7eb;"></div>
                             </a>
                             @if($img->caption)
                                 <figcaption class="text-xs text-gray-500 mt-1 italic">
