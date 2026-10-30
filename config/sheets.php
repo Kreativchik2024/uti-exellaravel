@@ -250,9 +250,6 @@ return [
             'list_columns' => ['record_date','serial_number','camera_status','night_camera_status','fault_code'],
         ],
 
-        // =====================================================
-        // Ночная камера в сборе с дневной
-        // =====================================================
         'night_camera_assembly' => [
             'title'  => 'Ночная камера в сборе с дневной',
             'model'  => \App\Models\NightCameraAssemblyRecord::class,
@@ -294,6 +291,22 @@ return [
                 'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
             ], $faultCode),
             'list_columns' => ['record_date','serial_number','is_working','runs_count','fault_code'],
+        ],
+
+        // =====================================================
+        // Проверка винтов
+        // =====================================================
+        'screw_check' => [
+            'title'  => 'Проверка винтов',
+            'model'  => \App\Models\ScrewCheckRecord::class,
+            'policy' => \App\Policies\RecordPolicy::class,
+            'fields' => array_merge([
+                'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
+                'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
+            ], $workers, [
+                'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
+            ], $faultCode),
+            'list_columns' => ['record_date','qty','fault_code'],
         ],
 
     ],

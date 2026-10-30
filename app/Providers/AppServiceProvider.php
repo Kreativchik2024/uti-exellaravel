@@ -20,6 +20,7 @@ use App\Models\PgpRecord;
 use App\Models\PowerWiresRecord;
 use App\Models\ResearchRecord;
 use App\Models\RouterFirmwareRecord;
+use App\Models\ScrewCheckRecord;
 use App\Models\SoftwareInstallRecord;
 use App\Models\SophonCheckRecord;
 use App\Models\SpeedSensorRecord;
@@ -62,9 +63,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Data15Record::class,          RecordPolicy::class);
         Gate::policy(Data17Record::class,          RecordPolicy::class);
         Gate::policy(CameraBracketRecord::class,   RecordPolicy::class);
-        Gate::policy(NightCameraAssemblyRecord::class, RecordPolicy::class); // <-- ДОБАВЛЕНО
+        Gate::policy(NightCameraAssemblyRecord::class, RecordPolicy::class);
         Gate::policy(RouterFirmwareRecord::class,  RecordPolicy::class);
         Gate::policy(SpeedSensorRecord::class,     RecordPolicy::class);
+        Gate::policy(ScrewCheckRecord::class,      RecordPolicy::class); // <-- ДОБАВЛЕНО
 
         FirmwareVersion::observe(FirmwareVersionObserver::class);
 
@@ -84,9 +86,10 @@ class AppServiceProvider extends ServiceProvider
             'data15'                => Data15Record::class,
             'data17'                => Data17Record::class,
             'camera_bracket'        => CameraBracketRecord::class,
-            'night_camera_assembly' => NightCameraAssemblyRecord::class, // <-- ДОБАВЛЕНО
+            'night_camera_assembly' => NightCameraAssemblyRecord::class,
             'router_firmware'       => RouterFirmwareRecord::class,
             'speed_sensor'          => SpeedSensorRecord::class,
+            'screw_check'           => ScrewCheckRecord::class, // <-- ДОБАВЛЕНО
         ]);
 
         foreach (config('sheets.map', []) as $cfg) {

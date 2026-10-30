@@ -52,12 +52,20 @@ Route::middleware(['auth', 'workers', 'role:admin'])->group(function () {
     Route::delete('/employees/{employee}',   [EmployeeController::class, 'destroy'])->name('employees.destroy');
 });
 
+// === Попап новостей (для залогиненных, без workers) ===
 Route::middleware('auth')->group(function () {
     Route::get('/news/latest', [NewsController::class, 'latest'])->name('news.latest');
 });
 
+// Список новостей
 Route::get('/news', [NewsController::class, 'index'])->name('news.index');
 
+// Детальная страница новости (только числовой id)
+Route::get('/news/{news}', [NewsController::class, 'show'])
+    ->name('news.show')
+    ->whereNumber('news');
+
+// Управление новостями (admin/master)
 Route::middleware(['auth', 'workers', 'role:admin,master'])->group(function () {
     Route::get('/news/create',                   [NewsController::class, 'create'])->name('news.create');
     Route::post('/news',                         [NewsController::class, 'store'])->name('news.store');
@@ -89,10 +97,7 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/records/{sheet}',           [RecordController::class, 'index'])->name('records.index');
     Route::get('/records/{sheet}/create',    [RecordController::class, 'create'])->name('records.create');
     Route::post('/records/{sheet}',          [RecordController::class, 'store'])->name('records.store');
-    
-    // Роут просмотра карточки записи (добавлен)
     Route::get('/records/{sheet}/{id}',      [RecordController::class, 'show'])->name('records.show');
-    
     Route::get('/records/{sheet}/{id}/edit', [RecordController::class, 'edit'])->name('records.edit');
     Route::put('/records/{sheet}/{id}',      [RecordController::class, 'update'])->name('records.update');
     Route::delete('/records/{sheet}/{id}',   [RecordController::class, 'destroy'])->name('records.destroy');

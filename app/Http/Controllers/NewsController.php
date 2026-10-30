@@ -23,6 +23,18 @@ class NewsController extends Controller
         return view('news.index', compact('news'));
     }
 
+    public function show(News $news)
+    {
+        // Гости могут смотреть только опубликованные
+        if (!$news->is_published && !auth()->check()) {
+            abort(404);
+        }
+
+        $news->load(['author', 'images']);
+
+        return view('news.show', compact('news'));
+    }
+
     public function create()
     {
         Gate::authorize('create', News::class);
@@ -52,11 +64,7 @@ class NewsController extends Controller
             'published_at' => now(),
         ]);
 
-        $this->attachImages(
-            $news,
-            $r->file('images', []),
-            $r->input('captions', [])
-        );
+        $this->attachImages($news, $r->file('images', []), $r->input('captions', []));
 
         return redirect()->route('dashboard')->with('ok', 'Новость опубликована');
     }
@@ -99,11 +107,7 @@ class NewsController extends Controller
             }
         }
 
-        $this->attachImages(
-            $news,
-            $r->file('images', []),
-            $r->input('captions', [])
-        );
+        $this->attachImages($news, $r->file('images', []), $r->input('captions', []));
 
         return redirect()->route('news.index')->with('ok', 'Новость обновлена');
     }
@@ -117,7 +121,7 @@ class NewsController extends Controller
         }
         $news->delete();
 
-        return back()->with('ok', 'Новость удалена');
+        return redirect()->route('news.index')->with('ok', 'Новость удалена');
     }
 
     public function destroyImage(News $news, NewsImage $image)
@@ -148,13 +152,12 @@ class NewsController extends Controller
 
         $cover = $news->images()->orderBy('sort_order')->first();
 
-        // Для попапа берём ПРЕВЬЮ (thumb, 400px), а не оригинал — и легче, и не «растягивается»
         return response()->json([
             'id'        => $news->id,
             'title'     => $news->title ?: Str::limit(strip_tags($news->body), 80),
             'body'      => Str::limit(strip_tags($news->body ?? ''), 600),
             'cover_url' => $cover ? route('media.show', ['path' => $cover->thumb_path ?? $cover->path]) : null,
-            'url'       => route('news.index'),
+            'url'       => route('news.show', $news),
         ])->header('Cache-Control', 'no-store');
     }
 

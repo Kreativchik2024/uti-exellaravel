@@ -32,12 +32,11 @@
         @stack('scripts')
 
         @auth
-        {{-- Поп-ап новостей --}}
+        {{-- Поп-ап новостей для залогиненных --}}
         <div id="news-popup"
              style="display:none; position:fixed; inset:0; z-index:99999; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); padding:16px;">
             <div style="background:#fff; border-radius:8px; max-width:512px; width:100%; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
                 <div id="news-popup-cover-wrap" style="display:none;">
-                    {{-- Вместо img используем div с фоновой картинкой, чтобы CSS не мог его растянуть --}}
                     <div id="news-popup-cover"
                          style="width:100%; height:220px; background-size:cover; background-position:center; background-repeat:no-repeat;"></div>
                 </div>
@@ -96,6 +95,12 @@
                 }
 
                 more.href = news.url || '/news';
+
+                // ВАЖНО: при клике на «Читать полностью» запоминаем id новости,
+                // чтобы на открывшейся странице попап не выскочил снова.
+                more.onclick = function () {
+                    setLastId(news.id);
+                };
 
                 document.body.style.overflow = 'hidden';
 
