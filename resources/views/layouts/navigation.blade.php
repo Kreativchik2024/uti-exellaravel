@@ -44,6 +44,7 @@
                                 'data15' => 'Data 15',
                                 'data17' => 'Data 17',
                                 'camera_bracket' => 'Кронштейн с камерой',
+                                'night_camera_assembly' => 'Ночная камера в сборе с дневной',
                                 'speed_sensor' => 'Датчик скорости',
                                 'router_firmware' => 'Прошивка роутеров',
                             ] as $slug => $label)
@@ -159,6 +160,7 @@
                         'data15' => 'Data 15',
                         'data17' => 'Data 17',
                         'camera_bracket' => 'Кронштейн с камерой',
+                        'night_camera_assembly' => 'Ночная камера в сборе с дневной',
                         'speed_sensor' => 'Датчик скорости',
                         'router_firmware' => 'Прошивка роутеров',
                     ] as $slug => $label)

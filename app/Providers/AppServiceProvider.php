@@ -14,6 +14,7 @@ use App\Models\FirmwareVersion;
 use App\Models\MiniPcRecord;
 use App\Models\MotorRegulatorRecord;
 use App\Models\News;
+use App\Models\NightCameraAssemblyRecord;
 use App\Models\PcCheckRecord;
 use App\Models\PgpRecord;
 use App\Models\PowerWiresRecord;
@@ -43,16 +44,14 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Новости и прошивки
         Gate::policy(News::class, NewsPolicy::class);
         Gate::policy(FirmwareVersion::class, FirmwarePolicy::class);
 
-        // Все вкладки-записи
         Gate::policy(PgpRecord::class,          RecordPolicy::class);
         Gate::policy(CommModuleRecord::class,   RecordPolicy::class);
         Gate::policy(Cross1Record::class,       RecordPolicy::class);
         Gate::policy(Cross3Record::class,       RecordPolicy::class);
-        Gate::policy(Cross5Record::class,       RecordPolicy::class); // <-- ДОБАВЛЕНО
+        Gate::policy(Cross5Record::class,       RecordPolicy::class);
         Gate::policy(MiniPcRecord::class,       RecordPolicy::class);
         Gate::policy(ResearchRecord::class,     RecordPolicy::class);
         Gate::policy(PcCheckRecord::class,      RecordPolicy::class);
@@ -63,34 +62,33 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Data15Record::class,          RecordPolicy::class);
         Gate::policy(Data17Record::class,          RecordPolicy::class);
         Gate::policy(CameraBracketRecord::class,   RecordPolicy::class);
+        Gate::policy(NightCameraAssemblyRecord::class, RecordPolicy::class); // <-- ДОБАВЛЕНО
         Gate::policy(RouterFirmwareRecord::class,  RecordPolicy::class);
         Gate::policy(SpeedSensorRecord::class,     RecordPolicy::class);
 
-        // Observer прошивок
         FirmwareVersion::observe(FirmwareVersionObserver::class);
 
-        // Morph map
         Relation::morphMap([
-            'pgp'              => PgpRecord::class,
-            'comm_module'      => CommModuleRecord::class,
-            'cross1'           => Cross1Record::class,
-            'cross3'           => Cross3Record::class,
-            'cross5'           => Cross5Record::class, // <-- ДОБАВЛЕНО
-            'mini_pc'          => MiniPcRecord::class,
-            'research'         => ResearchRecord::class,
-            'pc_check'         => PcCheckRecord::class,
-            'sophon_check'     => SophonCheckRecord::class,
-            'software_install' => SoftwareInstallRecord::class,
-            'motor_regulator'  => MotorRegulatorRecord::class,
-            'power_wires'      => PowerWiresRecord::class,
-            'data15'           => Data15Record::class,
-            'data17'           => Data17Record::class,
-            'camera_bracket'   => CameraBracketRecord::class,
-            'router_firmware'  => RouterFirmwareRecord::class,
-            'speed_sensor'     => SpeedSensorRecord::class,
+            'pgp'                   => PgpRecord::class,
+            'comm_module'           => CommModuleRecord::class,
+            'cross1'                => Cross1Record::class,
+            'cross3'                => Cross3Record::class,
+            'cross5'                => Cross5Record::class,
+            'mini_pc'               => MiniPcRecord::class,
+            'research'              => ResearchRecord::class,
+            'pc_check'              => PcCheckRecord::class,
+            'sophon_check'          => SophonCheckRecord::class,
+            'software_install'      => SoftwareInstallRecord::class,
+            'motor_regulator'       => MotorRegulatorRecord::class,
+            'power_wires'           => PowerWiresRecord::class,
+            'data15'                => Data15Record::class,
+            'data17'                => Data17Record::class,
+            'camera_bracket'        => CameraBracketRecord::class,
+            'night_camera_assembly' => NightCameraAssemblyRecord::class, // <-- ДОБАВЛЕНО
+            'router_firmware'       => RouterFirmwareRecord::class,
+            'speed_sensor'          => SpeedSensorRecord::class,
         ]);
 
-        // Связь employees() для всех моделей записей
         foreach (config('sheets.map', []) as $cfg) {
             if (!isset($cfg['model']) || !class_exists($cfg['model'])) {
                 continue;
@@ -103,7 +101,6 @@ class AppServiceProvider extends ServiceProvider
             });
         }
 
-        // Rate limiting
         $this->configureRateLimiting();
     }
 
