@@ -16,7 +16,7 @@ return [
     'map' => [
 
         // =====================================================
-        // ПГП (борта) - обновлено: добавлен Пост/Периферия
+        // ПГП (борта) — peripheral_number убран из list_columns
         // =====================================================
         'pgp' => [
             'title'  => 'ПГП (борта)',
@@ -37,7 +37,7 @@ return [
                 'defect_reason'   => ['label'=>'Причина','type'=>'textarea','rules'=>'nullable|string'],
                 'actions_taken'   => ['label'=>'Действия','type'=>'textarea','rules'=>'nullable|string'],
             ], $faultCode),
-            'list_columns' => ['record_date','post_number','peripheral_number','board_number','status','fault_code'],
+            'list_columns' => ['record_date','post_number','board_number','status','fault_code'],
         ],
 
         // =====================================================
@@ -112,7 +112,7 @@ return [
         ],
 
         // =====================================================
-        // Исследования - обновлено: добавлено "Отремонтировано", убран автор
+        // Исследования
         // =====================================================
         'research' => [
             'title'  => 'Исследования',
