@@ -60,6 +60,13 @@
                             $displayVal = \Carbon\Carbon::parse($val)->format('d.m.Y');
                         }
 
+                        // Префиксы для отображения
+                        if ($name === 'post_number' && $val) {
+                            $displayVal = 'Пост ' . $val;
+                        } elseif ($name === 'peripheral_number' && $val) {
+                            $displayVal = 'Периферия ' . $val;
+                        }
+
                         $show = fn($v) => ($v === null || $v === '') ? '—' : $v;
                     @endphp
 

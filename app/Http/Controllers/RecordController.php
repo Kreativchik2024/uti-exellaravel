@@ -38,6 +38,27 @@ class RecordController extends Controller
         );
     }
 
+    private function defaults(string $sheet, array $cfg): array
+    {
+        $defaults = $this->workerDefaults();
+
+        if (array_key_exists('post_number', $cfg['fields'])) {
+            $post = session('workstation_post');
+            if ($post) {
+                $defaults['post_number'] = (int) $post;
+            }
+        }
+
+        if (array_key_exists('peripheral_number', $cfg['fields'])) {
+            $peripheral = session('workstation_peripheral');
+            if ($peripheral) {
+                $defaults['peripheral_number'] = (int) $peripheral;
+            }
+        }
+
+        return $defaults;
+    }
+
     private function employeesList(): array
     {
         return Employee::query()
@@ -106,7 +127,20 @@ class RecordController extends Controller
 
         $records = $query->paginate(50)->withQueryString();
 
-        return view('records.index', compact('sheet','cfg','records', 'q'));
+        // Формируем колонки: гарантированно добавляем worker1 и created_by
+        $listColumns = $cfg['list_columns'];
+
+        // Исполнитель (worker1) — если есть в fields
+        if (array_key_exists('worker1', $cfg['fields']) && !in_array('worker1', $listColumns)) {
+            $listColumns[] = 'worker1';
+        }
+
+        // Автор (created_by) — добавляем в конец, если ещё нет
+        if (!in_array('created_by', $listColumns)) {
+            $listColumns[] = 'created_by';
+        }
+
+        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns'));
     }
 
     public function show(string $sheet, int $id)
@@ -123,7 +157,7 @@ class RecordController extends Controller
         $cfg = $this->cfg($sheet);
         Gate::authorize('create', $cfg['model']);
 
-        $defaults      = $this->workerDefaults();
+        $defaults      = $this->defaults($sheet, $cfg);
         $employeesList = $this->employeesList();
 
         return view('records.create', compact('sheet','cfg','defaults','employeesList'));
@@ -134,9 +168,9 @@ class RecordController extends Controller
         $cfg = $this->cfg($sheet);
         Gate::authorize('create', $cfg['model']);
 
-        $defaults = $this->workerDefaults();
+        $defaults = $this->defaults($sheet, $cfg);
         foreach ($defaults as $field => $value) {
-            if (!$r->exists($field) && $value !== '') {
+            if (!$r->exists($field) && $value !== '' && $value !== null) {
                 $r->merge([$field => $value]);
             }
         }
@@ -200,7 +234,6 @@ class RecordController extends Controller
         $record = $cfg['model']::findOrFail($id);
         Gate::authorize('delete', $record);
         $record->delete();
-
         return redirect()->route('records.index', $sheet)->with('ok', 'Запись удалена');
     }
 

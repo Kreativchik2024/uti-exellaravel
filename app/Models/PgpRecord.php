@@ -9,6 +9,7 @@ class PgpRecord extends Model
     protected $fillable = [
         'record_date',
         'post_number',
+        'peripheral_number', // <-- ДОБАВЛЕНО
         'worker1','worker2','worker3','worker4','worker5',
         'work_start','work_end',
         'board_number','ip_address','fuselage_number',
@@ -20,9 +21,11 @@ class PgpRecord extends Model
     protected function casts(): array
     {
         return [
-            'record_date' => 'date',
-            'work_start'  => 'datetime:H:i',
-            'work_end'    => 'datetime:H:i',
+            'record_date'       => 'date',
+            'work_start'        => 'datetime:H:i',
+            'work_end'          => 'datetime:H:i',
+            'post_number'       => 'integer', // <-- ДОБАВЛЕНО
+            'peripheral_number' => 'integer', // <-- ДОБАВЛЕНО
         ];
     }
 

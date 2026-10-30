@@ -47,7 +47,12 @@
     @if(in_array($name, $workerFields)) @continue @endif
 
     @php
-        $value = old($name, $record->$name ?? ($f['default'] ?? null));
+        // ВАЖНО: теперь $defaults[$name] используется как fallback для ЛЮБОГО поля,
+        // а не только для worker1..5. Это чинит авто-подстановку post_number и peripheral_number.
+        $value = old(
+            $name,
+            $record->$name ?? ($defaults[$name] ?? ($f['default'] ?? null))
+        );
         $isReq = str_contains($f['rules'], 'required') && !str_contains($f['rules'], 'nullable');
     @endphp
     <div>
