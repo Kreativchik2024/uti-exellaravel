@@ -7,7 +7,7 @@
         <div class="bg-white rounded-lg shadow p-6">
 
             <p class="text-sm text-gray-600 mb-6">
-                Выберите до 5 исполнителей. ПИН каждого сотрудника обязателен.
+                Выберите до 5 исполнителей (можно ни одного — тогда нажмите «Пропустить»).
                 Если работаете на прогоне бортов — укажите, где вы находитесь: на посту (1–30) или на периферии (1–50).
             </p>
 
@@ -29,9 +29,9 @@
                             @php $current = $slots[$i] ?? ''; @endphp
                             <div>
                                 <label class="block text-xs text-gray-600 mb-1">
-                                    Исполнитель {{ $i + 1 }}@if($i === 0)<span class="text-red-600">*</span>@endif
+                                    Исполнитель {{ $i + 1 }}
                                 </label>
-                                <select name="workers[{{ $i }}]" @if($i === 0) required @endif
+                                <select name="workers[{{ $i }}]"
                                         x-model="selected[{{ $i }}]"
                                         @change="onChange({{ $i }})"
                                         class="w-full border rounded px-2 py-1 text-sm">
@@ -133,15 +133,15 @@
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded">
                         Продолжить
                     </button>
-                    <button type="submit" form="skipForm" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded">
+
+                    {{-- «Пропустить» — без JS, через formaction. Отправляет POST на workstation.skip --}}
+                    <button type="submit"
+                            formaction="{{ route('workstation.skip') }}"
+                            formmethod="POST"
+                            class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded">
                         Пропустить (без исполнителей)
                     </button>
                 </div>
-            </form>
-
-            <form id="skipForm" method="POST" action="{{ route('workstation.skip') }}" class="hidden">
-                @csrf
-                <input type="hidden" name="intended" value="{{ $intended }}">
             </form>
         </div>
     </div>
@@ -180,7 +180,6 @@
                 },
 
                 onChange(index) {
-                    console.log('[PIN/WS] onChange', index, '->', this.selected[index]);
                     const newVal = this.selected[index];
 
                     if (newVal === '') {
@@ -188,7 +187,6 @@
                         return;
                     }
 
-                    // авто-сброс дубля в других полях
                     for (let i = 0; i < 5; i++) {
                         if (i !== index && this.selected[i] === newVal) {
                             this.selected[i] = '';
@@ -196,10 +194,7 @@
                         }
                     }
 
-                    if (this.confirmed[index] === newVal) {
-                        console.log('[PIN/WS] already confirmed, skip modal');
-                        return;
-                    }
+                    if (this.confirmed[index] === newVal) return;
 
                     this.pinTarget = newVal;
                     this.pinTargetIndex = index;
@@ -234,7 +229,6 @@
                             credentials: 'same-origin',
                         });
                         const data = await res.json().catch(() => ({}));
-                        console.log('[PIN/WS] response', res.status, data);
                         if (res.ok && data.ok) {
                             this.confirmed[this.pinTargetIndex] = this.pinTarget;
                             this.pinModalOpen = false;
@@ -243,7 +237,6 @@
                             this.pinError = data.error || ('Ошибка ' + res.status);
                         }
                     } catch (e) {
-                        console.error('[PIN/WS] error', e);
                         this.pinError = 'Ошибка соединения.';
                     }
                     this.pinLoading = false;

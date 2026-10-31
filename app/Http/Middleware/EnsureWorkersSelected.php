@@ -13,7 +13,7 @@ class EnsureWorkersSelected
         // Эти маршруты доступны без выбора исполнителей
         if (
             $request->routeIs('workstation.*') ||
-            $request->routeIs('news.latest') ||     // попап новостей — polling без workers
+            $request->routeIs('news.latest') ||
             $request->routeIs('logout') ||
             $request->routeIs('profile.*') ||
             $request->routeIs('password.*')
@@ -21,10 +21,16 @@ class EnsureWorkersSelected
             return $next($request);
         }
 
-        if (!session()->has('workstation_workers')) {
-            return redirect()->route('workstation.show', ['intended' => $request->fullUrl()]);
+        // Пользователь явно нажал «Пропустить (без исполнителей)» — пропускаем
+        if (session('workstation_skipped', false)) {
+            return $next($request);
         }
 
-        return $next($request);
+        // Ключ есть в сессии: имена или [] (нажал «Продолжить» без выбора)
+        if (session()->has('workstation_workers')) {
+            return $next($request);
+        }
+
+        return redirect()->route('workstation.show', ['intended' => $request->fullUrl()]);
     }
 }
