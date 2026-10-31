@@ -46,6 +46,23 @@
             </div>
 
             <div>
+                <label class="block text-sm text-gray-600 mb-1">Учётная запись (логин)</label>
+                <select name="user_id" class="w-full border rounded px-3 py-2 bg-white">
+                    <option value="">— не привязан —</option>
+                    @foreach($users as $u)
+                        <option value="{{ $u->id }}" @selected((string) old('user_id') === (string) $u->id)>
+                            {{ $u->name }} ({{ $u->email }})
+                        </option>
+                    @endforeach
+                </select>
+                @error('user_id') <div class="text-red-600 text-xs mt-1">{{ $message }}</div> @enderror
+                <p class="text-xs text-gray-500 mt-1">
+                    Сотрудник без привязки к учётке не появляется в форме записи.
+                    Один логин можно привязать только к одному сотруднику.
+                </p>
+            </div>
+
+            <div>
                 <label class="inline-flex items-center">
                     <input type="hidden" name="is_active" value="0">
                     <input type="checkbox" name="is_active" value="1" @checked(old('is_active', true))

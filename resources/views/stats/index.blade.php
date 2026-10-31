@@ -7,7 +7,7 @@
             <a href="{{ route('stats.export', [
                     'from'   => $from ? $from->format('Y-m-d') : null,
                     'to'     => $to   ? $to->format('Y-m-d')   : null,
-                    'worker' => $worker ?: null,
+                    'worker' => $canSeeWorkersStats ? ($worker ?: null) : null,
                     'mode'   => request('mode'),
                 ]) }}"
                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow transition">
@@ -22,7 +22,7 @@
              initialTo: '{{ $to ? $to->format('Y-m-d') : '' }}'
          })">
 
-        {{-- ============ ФИЛЬТРЫ ============ --}}
+        {{-- ФИЛЬТРЫ --}}
         <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
             <form method="GET" action="{{ route('stats.index') }}" class="flex flex-wrap items-end gap-4">
                 @if(auth()->user()->isExecutor() && request('mode'))
@@ -39,15 +39,17 @@
                     <input type="date" name="to" value="{{ $to ? $to->format('Y-m-d') : '' }}"
                            class="border rounded px-3 py-1 text-sm">
                 </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Исполнитель</label>
-                    <select name="worker" class="border rounded px-3 py-1 text-sm bg-white min-w-[220px]">
-                        <option value="">— все —</option>
-                        @foreach($workersList as $w)
-                            <option value="{{ $w }}" @selected($worker === $w)>{{ $w }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                @if($canSeeWorkersStats)
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Исполнитель</label>
+                        <select name="worker" class="border rounded px-3 py-1 text-sm bg-white min-w-[220px]">
+                            <option value="">— все —</option>
+                            @foreach($workersList as $w)
+                                <option value="{{ $w }}" @selected($worker === $w)>{{ $w }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
 
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Применить</button>
                 <a href="{{ route('stats.index') }}" class="text-sm text-gray-500 hover:text-gray-800 underline px-2 py-1">Сбросить</a>
@@ -55,11 +57,11 @@
 
             @if(auth()->user()->isExecutor())
                 <div class="mt-3 flex gap-1">
-                    <a href="{{ route('stats.index', ['from' => $from ? $from->format('Y-m-d') : null, 'to' => $to ? $to->format('Y-m-d') : null, 'worker' => $worker ?: null, 'mode' => 'my']) }}"
+                    <a href="{{ route('stats.index', ['from' => $from ? $from->format('Y-m-d') : null, 'to' => $to ? $to->format('Y-m-d') : null, 'mode' => 'my']) }}"
                        class="px-3 py-1 text-sm rounded border {{ request('mode') !== 'all' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300' }}">
                         Моя
                     </a>
-                    <a href="{{ route('stats.index', ['from' => $from ? $from->format('Y-m-d') : null, 'to' => $to ? $to->format('Y-m-d') : null, 'worker' => $worker ?: null, 'mode' => 'all']) }}"
+                    <a href="{{ route('stats.index', ['from' => $from ? $from->format('Y-m-d') : null, 'to' => $to ? $to->format('Y-m-d') : null, 'mode' => 'all']) }}"
                        class="px-3 py-1 text-sm rounded border {{ request('mode') === 'all' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300' }}">
                         Общая
                     </a>
@@ -69,58 +71,43 @@
 
         <div class="text-sm text-gray-600">
             <strong>{{ $periodLabel }}</strong>
-            @if($worker)
+            @if($canSeeWorkersStats && $worker)
                 <span class="ml-2 text-amber-700">· исполнитель: {{ $worker }}</span>
             @endif
             @if($targetUser && $targetUser->isExecutor())
-                <span class="ml-2 text-amber-700">· автор: {{ $targetUser->name }}</span>
+                <span class="ml-2 text-amber-700">· ваша статистика ({{ $targetUser->name }})</span>
             @endif
         </div>
 
-        {{-- ============ ЗОНА 1: сводка по вкладкам ============ --}}
+        {{-- ЗОНА 1: сводка по вкладкам --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">1. Сводка по вкладкам</h3>
                 <div class="flex gap-2">
-                    <button x-show="!expanded1" @click="toggleZone1()"
-                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
-                    <button x-show="expanded1" @click="toggleZone1()"
-                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+                    <button x-show="!expanded1" @click="toggleZone1()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
+                    <button x-show="expanded1" @click="toggleZone1()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
                 </div>
             </div>
             <div x-show="expanded1" x-cloak>
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
                     @foreach($perSheet as $slug => $data)
                         <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition border border-gray-200 p-6 flex flex-col items-center justify-center text-center">
-                            <div class="text-sm font-medium text-gray-500 mb-3 truncate w-full" title="{{ $data['title'] }}">
-                                {{ $data['title'] }}
-                            </div>
-                            <div class="flex flex-col items-center justify-center">
-                                <span class="text-5xl font-extrabold {{ $data['total'] > 0 ? 'text-blue-600' : 'text-gray-300' }} leading-none mb-1">
-                                    {{ $data['total'] }}
-                                </span>
-                                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                    {{ $data['unit'] === 'записей' ? 'штук' : $data['unit'] }}
-                                </span>
-                            </div>
+                            <div class="text-sm font-medium text-gray-500 mb-3 truncate w-full" title="{{ $data['title'] }}">{{ $data['title'] }}</div>
+                            <span class="text-5xl font-extrabold {{ $data['total'] > 0 ? 'text-blue-600' : 'text-gray-300' }} leading-none mb-1">{{ $data['total'] }}</span>
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">{{ $data['unit'] === 'записей' ? 'штук' : $data['unit'] }}</span>
                         </div>
                     @endforeach
                 </div>
             </div>
         </div>
 
-        {{-- ============ ЗОНА 2: детализация по постам ============ --}}
+        {{-- ЗОНА 2: детализация по постам --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
-                <h3 class="font-semibold text-lg text-gray-800">
-                    2. Детализация по постам
-                    <span class="text-sm font-normal text-gray-400">({{ $periodLabel }})</span>
-                </h3>
+                <h3 class="font-semibold text-lg text-gray-800">2. Детализация по постам <span class="text-sm font-normal text-gray-400">({{ $periodLabel }})</span></h3>
                 <div class="flex gap-2">
-                    <button x-show="!expanded3" @click="toggleZone3()"
-                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
-                    <button x-show="expanded3" @click="toggleZone3()"
-                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+                    <button x-show="!expanded3" @click="toggleZone3()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
+                    <button x-show="expanded3" @click="toggleZone3()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
                 </div>
             </div>
             <div x-show="expanded3" x-cloak>
@@ -151,177 +138,151 @@
             </div>
         </div>
 
-        {{-- ============ ЗОНА 3: сводка по исполнителю ============ --}}
-        <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="font-semibold text-lg text-gray-800">3. Сводка по исполнителю</h3>
-                <div class="flex gap-2">
-                    <button x-show="!expanded2" @click="toggleZone2()"
-                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
-                    <button x-show="expanded2" @click="toggleZone2()"
-                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+        {{-- ЗОНА 3: сводка по исполнителю — только admin/master --}}
+        @if($canSeeWorkersStats)
+            <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-lg text-gray-800">3. Сводка по исполнителю</h3>
+                    <div class="flex gap-2">
+                        <button x-show="!expanded2" @click="toggleZone2()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
+                        <button x-show="expanded2" @click="toggleZone2()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+                    </div>
                 </div>
-            </div>
-            <div x-show="expanded2" x-cloak>
-                <div x-show="loading2" class="text-gray-500 text-sm">Загрузка…</div>
-                <div x-show="loaded2 && !loading2">
-                    <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
-                        <label class="text-sm text-gray-600">
-                            С: <input type="date" x-model="dateFrom2" @change="loadZone2(true)" class="border rounded px-2 py-1 ml-1">
-                        </label>
-                        <label class="text-sm text-gray-600">
-                            По: <input type="date" x-model="dateTo2" @change="loadZone2(true)" class="border rounded px-2 py-1 ml-1">
-                        </label>
-                        <button @click="resetDates()" class="text-sm text-gray-500 hover:text-gray-800 underline">Сбросить даты</button>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-xs text-gray-500 mb-1">Исполнитель</label>
-                        <select x-model="selectedExecutor" @change="onExecutorChange()"
-                                class="border rounded px-3 py-2 text-sm bg-white w-full md:w-1/2">
-                            <option value="">— Все исполнители —</option>
-                            <template x-for="row in zone2Rows" :key="row.name">
-                                <option :value="row.name" x-text="row.name + ' (' + row.cnt + ')'"></option>
-                            </template>
-                        </select>
-                    </div>
-
-                    <template x-if="!selectedExecutor">
-                        <div>
-                            <div class="mb-4 flex items-baseline gap-2">
-                                <span class="text-sm text-gray-600">Найдено записей:</span>
-                                <span class="text-3xl font-extrabold text-blue-700" x-text="zone2Total"></span>
-                            </div>
-                            <div class="relative h-72"><canvas id="zone2Chart"></canvas></div>
-                            <div x-show="chartError" x-text="chartError" class="mt-2 text-sm text-red-600"></div>
+                <div x-show="expanded2" x-cloak>
+                    <div x-show="loading2" class="text-gray-500 text-sm">Загрузка…</div>
+                    <div x-show="loaded2 && !loading2">
+                        <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
+                            <label class="text-sm text-gray-600">С: <input type="date" x-model="dateFrom2" @change="loadZone2(true)" class="border rounded px-2 py-1 ml-1"></label>
+                            <label class="text-sm text-gray-600">По: <input type="date" x-model="dateTo2" @change="loadZone2(true)" class="border rounded px-2 py-1 ml-1"></label>
+                            <button @click="resetDates()" class="text-sm text-gray-500 hover:text-gray-800 underline">Сбросить даты</button>
                         </div>
-                    </template>
+                        <div class="mb-4">
+                            <label class="block text-xs text-gray-500 mb-1">Исполнитель</label>
+                            <select x-model="selectedExecutor" @change="onExecutorChange()" class="border rounded px-3 py-2 text-sm bg-white w-full md:w-1/2">
+                                <option value="">— Все исполнители —</option>
+                                <template x-for="row in zone2Rows" :key="row.name">
+                                    <option :value="row.name" x-text="row.name + ' (' + row.cnt + ')'"></option>
+                                </template>
+                            </select>
+                        </div>
 
-                    <template x-if="selectedExecutor">
-                        <div>
-                            <div x-show="loadingDetails" class="text-gray-500 text-sm py-4">Загрузка категорий…</div>
-                            <div x-show="!loadingDetails">
-                                <div class="mb-3 flex items-baseline gap-2">
-                                    <span class="text-sm text-gray-600">Исполнитель:</span>
-                                    <span class="text-lg font-bold text-gray-800" x-text="selectedExecutor"></span>
-                                    <span class="text-sm text-gray-500">
-                                        · категорий: <strong x-text="workerCategories.length"></strong>
-                                    </span>
+                        <template x-if="!selectedExecutor">
+                            <div>
+                                <div class="mb-4 flex items-baseline gap-2">
+                                    <span class="text-sm text-gray-600">Найдено записей:</span>
+                                    <span class="text-3xl font-extrabold text-blue-700" x-text="zone2Total"></span>
                                 </div>
+                                <div class="relative h-72"><canvas id="zone2Chart"></canvas></div>
+                                <div x-show="chartError" x-text="chartError" class="mt-2 text-sm text-red-600"></div>
+                            </div>
+                        </template>
 
-                                <div class="space-y-2">
-                                    <template x-for="cat in workerCategories" :key="cat.slug">
-                                        <div class="border border-gray-200 rounded">
-                                            <button type="button" @click="toggleCategory(cat.slug)"
-                                                    class="w-full flex justify-between items-center p-3 hover:bg-gray-50 text-left">
-                                                <span class="font-medium text-gray-800" x-text="cat.title"></span>
-                                                <span class="flex items-baseline gap-2">
-                                                    <span class="text-blue-700 font-bold text-lg" x-text="cat.total"></span>
-                                                    <span class="text-xs text-gray-500" x-text="cat.unit"></span>
-                                                    <span class="ml-2 text-gray-400 text-xs"
-                                                          x-text="expandedCategories[cat.slug] ? '▼' : '▶'"></span>
-                                                </span>
-                                            </button>
-                                            <div x-show="expandedCategories[cat.slug]" x-cloak class="border-t border-gray-200 bg-gray-50 p-3">
-                                                <div x-show="loadingRecords[cat.slug]" class="text-sm text-gray-500">Загрузка записей…</div>
-                                                <div x-show="!loadingRecords[cat.slug]">
-                                                    <div class="overflow-x-auto">
-                                                        <table class="min-w-full text-sm">
-                                                            <thead class="text-gray-600">
-                                                                <tr>
-                                                                    <th class="p-2 text-left">Дата</th>
-                                                                    <th class="p-2 text-left">Пост</th>
-                                                                    <th class="p-2 text-left">Статус</th>
-                                                                    <th class="p-2 text-right">Кол-во</th>
-                                                                    <th class="p-2 text-left">Код неиспр.</th>
-                                                                    <th class="p-2 text-left">Поле</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                <template x-for="rec in (workerRecords[cat.slug] || [])" :key="rec.id">
-                                                                    <tr class="border-t border-gray-200 hover:bg-white">
-                                                                        <td class="p-2 text-gray-700" x-text="rec.date || '—'"></td>
-                                                                        <td class="p-2 text-gray-700" x-text="rec.post || '—'"></td>
-                                                                        <td class="p-2 text-gray-700" x-text="rec.status || '—'"></td>
-                                                                        <td class="p-2 text-right text-gray-700" x-text="rec.qty ?? '—'"></td>
-                                                                        <td class="p-2 font-mono text-xs text-gray-700" x-text="rec.fault_code || '—'"></td>
-                                                                        <td class="p-2 text-xs text-gray-400" x-text="rec.worker_field || '—'"></td>
+                        <template x-if="selectedExecutor">
+                            <div>
+                                <div x-show="loadingDetails" class="text-gray-500 text-sm py-4">Загрузка категорий…</div>
+                                <div x-show="!loadingDetails">
+                                    <div class="mb-3 flex items-baseline gap-2">
+                                        <span class="text-sm text-gray-600">Исполнитель:</span>
+                                        <span class="text-lg font-bold text-gray-800" x-text="selectedExecutor"></span>
+                                        <span class="text-sm text-gray-500">· категорий: <strong x-text="workerCategories.length"></strong></span>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <template x-for="cat in workerCategories" :key="cat.slug">
+                                            <div class="border border-gray-200 rounded">
+                                                <button type="button" @click="toggleCategory(cat.slug)" class="w-full flex justify-between items-center p-3 hover:bg-gray-50 text-left">
+                                                    <span class="font-medium text-gray-800" x-text="cat.title"></span>
+                                                    <span class="flex items-baseline gap-2">
+                                                        <span class="text-blue-700 font-bold text-lg" x-text="cat.total"></span>
+                                                        <span class="text-xs text-gray-500" x-text="cat.unit"></span>
+                                                        <span class="ml-2 text-gray-400 text-xs" x-text="expandedCategories[cat.slug] ? '▼' : '▶'"></span>
+                                                    </span>
+                                                </button>
+                                                <div x-show="expandedCategories[cat.slug]" x-cloak class="border-t border-gray-200 bg-gray-50 p-3">
+                                                    <div x-show="loadingRecords[cat.slug]" class="text-sm text-gray-500">Загрузка записей…</div>
+                                                    <div x-show="!loadingRecords[cat.slug]">
+                                                        <div class="overflow-x-auto">
+                                                            <table class="min-w-full text-sm">
+                                                                <thead class="text-gray-600">
+                                                                    <tr>
+                                                                        <th class="p-2 text-left">Дата</th>
+                                                                        <th class="p-2 text-left">Пост</th>
+                                                                        <th class="p-2 text-left">Статус</th>
+                                                                        <th class="p-2 text-right">Кол-во</th>
+                                                                        <th class="p-2 text-left">Код неиспр.</th>
+                                                                        <th class="p-2 text-left">Поле</th>
                                                                     </tr>
-                                                                </template>
-                                                            </tbody>
-                                                        </table>
-                                                        <div x-show="(workerRecords[cat.slug] || []).length === 0"
-                                                             class="p-2 text-sm text-gray-500">Нет записей</div>
+                                                                </thead>
+                                                                <tbody>
+                                                                    <template x-for="rec in (workerRecords[cat.slug] || [])" :key="rec.id">
+                                                                        <tr class="border-t border-gray-200 hover:bg-white">
+                                                                            <td class="p-2 text-gray-700" x-text="rec.date || '—'"></td>
+                                                                            <td class="p-2 text-gray-700" x-text="rec.post || '—'"></td>
+                                                                            <td class="p-2 text-gray-700" x-text="rec.status || '—'"></td>
+                                                                            <td class="p-2 text-right text-gray-700" x-text="rec.qty ?? '—'"></td>
+                                                                            <td class="p-2 font-mono text-xs text-gray-700" x-text="rec.fault_code || '—'"></td>
+                                                                            <td class="p-2 text-xs text-gray-400" x-text="rec.worker_field || '—'"></td>
+                                                                        </tr>
+                                                                    </template>
+                                                                </tbody>
+                                                            </table>
+                                                            <div x-show="(workerRecords[cat.slug] || []).length === 0" class="p-2 text-sm text-gray-500">Нет записей</div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </template>
-                                </div>
-
-                                <div x-show="workerCategories.length === 0" class="p-3 text-sm text-gray-500">
-                                    За выбранный период исполнитель не участвовал ни в одной категории.
+                                        </template>
+                                    </div>
+                                    <div x-show="workerCategories.length === 0" class="p-3 text-sm text-gray-500">За выбранный период исполнитель не участвовал ни в одной категории.</div>
                                 </div>
                             </div>
-                        </div>
-                    </template>
+                        </template>
+                    </div>
                 </div>
             </div>
-        </div>
+        @endif
 
-        {{-- ============ ЗОНА 4: график по постам ============ --}}
-        <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="font-semibold text-lg text-gray-800">4. График по постам</h3>
-                <div class="flex gap-2">
-                    <button x-show="!expanded4" @click="toggleZone4()"
-                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Открыть график</button>
-                    <button x-show="expanded4" @click="toggleZone4()"
-                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+        {{-- ЗОНА 4: график по постам — только admin/master --}}
+        @if($canSeeWorkersStats)
+            <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-lg text-gray-800">4. График по постам</h3>
+                    <div class="flex gap-2">
+                        <button x-show="!expanded4" @click="toggleZone4()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Открыть график</button>
+                        <button x-show="expanded4" @click="toggleZone4()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+                    </div>
+                </div>
+                <div x-show="expanded4" x-cloak>
+                    <div class="flex flex-wrap gap-3 mb-3 items-end bg-gray-50 p-3 rounded border border-gray-100">
+                        <label class="text-sm text-gray-600">С: <input type="date" x-model="dateFrom" @change="loadZone4()" class="border rounded px-2 py-1 ml-1"></label>
+                        <label class="text-sm text-gray-600">По: <input type="date" x-model="dateTo" @change="loadZone4()" class="border rounded px-2 py-1 ml-1"></label>
+                        <button @click="resetDates4()" class="text-sm text-gray-500 hover:text-gray-800 underline">Сбросить даты</button>
+                        <span class="text-xs text-gray-500 ml-auto">Клик по точке → список записей поста за день</span>
+                    </div>
+                    <div class="relative h-80"><canvas id="zone4Chart" style="cursor:pointer"></canvas></div>
+                    <div x-show="zone4Error" x-text="zone4Error" class="mt-2 text-sm text-red-600"></div>
                 </div>
             </div>
-            <div x-show="expanded4" x-cloak>
-                <div class="flex flex-wrap gap-3 mb-3 items-end bg-gray-50 p-3 rounded border border-gray-100">
-                    <label class="text-sm text-gray-600">
-                        С: <input type="date" x-model="dateFrom" @change="loadZone4()" class="border rounded px-2 py-1 ml-1">
-                    </label>
-                    <label class="text-sm text-gray-600">
-                        По: <input type="date" x-model="dateTo" @change="loadZone4()" class="border rounded px-2 py-1 ml-1">
-                    </label>
-                    <button @click="resetDates4()" class="text-sm text-gray-500 hover:text-gray-800 underline">Сбросить даты</button>
-                    <span class="text-xs text-gray-500 ml-auto">Клик по точке → список записей поста за день</span>
-                </div>
-                <div class="relative h-80"><canvas id="zone4Chart" style="cursor:pointer"></canvas></div>
-                <div x-show="zone4Error" x-text="zone4Error" class="mt-2 text-sm text-red-600"></div>
-            </div>
-        </div>
+        @endif
 
-        {{-- ============ ЗОНА 5: брак по категориям ============ --}}
+        {{-- ЗОНА 5: брак по категориям --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">5. Брак по категориям</h3>
                 <div class="flex gap-2">
-                    <button x-show="!expanded5" @click="toggleZone5()"
-                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
-                    <button x-show="expanded5" @click="toggleZone5()"
-                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+                    <button x-show="!expanded5" @click="toggleZone5()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
+                    <button x-show="expanded5" @click="toggleZone5()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
                 </div>
             </div>
             <div x-show="expanded5" x-cloak>
                 <div x-show="loading5" class="text-gray-500 text-sm">Загрузка…</div>
                 <div x-show="loaded5 && !loading5">
                     <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
-                        <label class="text-sm text-gray-600">
-                            С: <input type="date" x-model="dateFrom5" @change="onZone5FiltersChange()" class="border rounded px-2 py-1 ml-1">
-                        </label>
-                        <label class="text-sm text-gray-600">
-                            По: <input type="date" x-model="dateTo5" @change="onZone5FiltersChange()" class="border rounded px-2 py-1 ml-1">
-                        </label>
+                        <label class="text-sm text-gray-600">С: <input type="date" x-model="dateFrom5" @change="onZone5FiltersChange()" class="border rounded px-2 py-1 ml-1"></label>
+                        <label class="text-sm text-gray-600">По: <input type="date" x-model="dateTo5" @change="onZone5FiltersChange()" class="border rounded px-2 py-1 ml-1"></label>
                         <button @click="resetDates5()" class="text-sm text-gray-500 hover:text-gray-800 underline">Сбросить даты</button>
                         <div class="flex-1 min-w-[240px]">
                             <label class="block text-xs text-gray-500 mb-1">Категория</label>
-                            <select x-model="selectedCategory" @change="onCategoryChange()"
-                                    class="border rounded px-3 py-2 text-sm bg-white w-full">
+                            <select x-model="selectedCategory" @change="onCategoryChange()" class="border rounded px-3 py-2 text-sm bg-white w-full">
                                 <option value="">— Все категории —</option>
                                 <template x-for="row in zone5Rows" :key="row.slug">
                                     <option :value="row.slug" x-text="row.title + ' (' + row.percent + '%)'"></option>
@@ -329,38 +290,30 @@
                             </select>
                         </div>
                     </div>
-
                     <div class="relative h-96"><canvas id="zone5Chart"></canvas></div>
                 </div>
             </div>
         </div>
 
-        {{-- ============ ЗОНА 6: рейтинг кодов неисправностей ============ --}}
+        {{-- ЗОНА 6: рейтинг кодов неисправностей --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">6. Рейтинг кодов неисправностей</h3>
                 <div class="flex gap-2">
-                    <button x-show="!expanded6" @click="toggleZone6()"
-                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
-                    <button x-show="expanded6" @click="toggleZone6()"
-                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+                    <button x-show="!expanded6" @click="toggleZone6()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
+                    <button x-show="expanded6" @click="toggleZone6()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
                 </div>
             </div>
             <div x-show="expanded6" x-cloak>
                 <div x-show="loading6" class="text-gray-500 text-sm">Загрузка…</div>
                 <div x-show="loaded6 && !loading6">
                     <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
-                        <label class="text-sm text-gray-600">
-                            С: <input type="date" x-model="dateFrom6" @change="loadZone6(true)" class="border rounded px-2 py-1 ml-1">
-                        </label>
-                        <label class="text-sm text-gray-600">
-                            По: <input type="date" x-model="dateTo6" @change="loadZone6(true)" class="border rounded px-2 py-1 ml-1">
-                        </label>
+                        <label class="text-sm text-gray-600">С: <input type="date" x-model="dateFrom6" @change="loadZone6(true)" class="border rounded px-2 py-1 ml-1"></label>
+                        <label class="text-sm text-gray-600">По: <input type="date" x-model="dateTo6" @change="loadZone6(true)" class="border rounded px-2 py-1 ml-1"></label>
                         <button @click="resetDates6()" class="text-sm text-gray-500 hover:text-gray-800 underline">Сбросить даты</button>
                         <div class="flex-1 min-w-[240px]">
                             <label class="block text-xs text-gray-500 mb-1">Категория</label>
-                            <select x-model="selectedCategory6" @change="loadZone6(true)"
-                                    class="border rounded px-3 py-2 text-sm bg-white w-full">
+                            <select x-model="selectedCategory6" @change="loadZone6(true)" class="border rounded px-3 py-2 text-sm bg-white w-full">
                                 <option value="">— Все категории —</option>
                                 @foreach(config('sheets.map', []) as $slug => $cfg)
                                     @if(isset($cfg['fields']['fault_code']))
@@ -370,12 +323,10 @@
                             </select>
                         </div>
                     </div>
-
                     <div class="mb-4 flex flex-wrap gap-4 items-baseline text-sm">
                         <span class="text-gray-600">Всего кодов: <strong class="text-lg text-gray-800" x-text="zone6Rows.length"></strong></span>
                         <span class="text-gray-600">Суммарно вхождений: <strong class="text-lg text-blue-700" x-text="zone6Total()"></strong></span>
                     </div>
-
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-sm">
                             <thead class="bg-gray-50 text-gray-600">
@@ -407,7 +358,7 @@
             </div>
         </div>
 
-        {{-- ============ МОДАЛКА: записи поста за день ============ --}}
+        {{-- МОДАЛКА: записи поста за день --}}
         <div x-show="recordsModalOpen" x-cloak
              class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
              @click.self="recordsModalOpen = false">
@@ -583,12 +534,6 @@
                         }
                     },
 
-                    currentSummary() {
-                        if (!this.selectedExecutor) return this.zone2Total;
-                        const found = this.zone2Rows.find(r => r.name === this.selectedExecutor);
-                        return found ? Number(found.cnt) : 0;
-                    },
-
                     async loadZone2Chart() {
                         if (typeof Chart === 'undefined') { this.chartError = 'Chart.js не загрузился.'; return; }
                         this.chartError = '';
@@ -635,7 +580,6 @@
                             this.expandedCategories = {};
                             return;
                         }
-
                         this.loadingDetails = true;
                         this.workerCategories = [];
                         this.workerRecords = {};
@@ -650,14 +594,9 @@
                             const data = await res.json();
                             const cats = data.categories || {};
                             this.workerCategories = Object.entries(cats).map(([slug, c]) => ({
-                                slug,
-                                title: c.title,
-                                total: Number(c.total),
-                                unit:  c.unit,
+                                slug, title: c.title, total: Number(c.total), unit: c.unit,
                             }));
-                        } catch (e) {
-                            console.error('[zone2Worker]', e);
-                        }
+                        } catch (e) { console.error('[zone2Worker]', e); }
                         this.loadingDetails = false;
                     },
 
@@ -670,10 +609,7 @@
 
                         this.loadingRecords = { ...this.loadingRecords, [slug]: true };
                         try {
-                            const params = new URLSearchParams({
-                                executor: this.selectedExecutor,
-                                sheet:    slug,
-                            });
+                            const params = new URLSearchParams({ executor: this.selectedExecutor, sheet: slug });
                             if (this.dateFrom2) params.set('from', this.dateFrom2);
                             if (this.dateTo2)   params.set('to',   this.dateTo2);
                             const res = await fetch('{{ route("stats.zone2Worker") }}?' + params.toString());
@@ -693,10 +629,7 @@
                         this.loaded4 = true;
                         this.zone4Error = '';
                         if (this.recordsModalOpen) this.recordsModalOpen = false;
-                        if (typeof Chart === 'undefined') {
-                            this.zone4Error = 'Chart.js не загрузился.';
-                            return;
-                        }
+                        if (typeof Chart === 'undefined') { this.zone4Error = 'Chart.js не загрузился.'; return; }
                         try {
                             const params = new URLSearchParams({ sheet: 'pgp' });
                             if (this.dateFrom) params.set('from', this.dateFrom);
@@ -712,9 +645,7 @@
 
                             const datasets = (data.datasets || []).map(ds => ({
                                 ...ds,
-                                pointRadius: 4,
-                                pointHoverRadius: 9,
-                                pointBorderWidth: 2,
+                                pointRadius: 4, pointHoverRadius: 9, pointBorderWidth: 2,
                                 pointBackgroundColor: ds.borderColor,
                             }));
 
@@ -722,8 +653,7 @@
                                 type: 'line',
                                 data: { labels: data.labels, datasets },
                                 options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
+                                    responsive: true, maintainAspectRatio: false,
                                     interaction: { mode: 'nearest', intersect: true },
                                     onClick: (evt, elements, chart) => {
                                         let hit = null;
@@ -737,8 +667,7 @@
                                                 if (!meta || !meta.data) return;
                                                 meta.data.forEach((pt, pi) => {
                                                     if (!pt || pt.skip) return;
-                                                    const dx = pt.x - clickX;
-                                                    const dy = pt.y - clickY;
+                                                    const dx = pt.x - clickX, dy = pt.y - clickY;
                                                     const d = Math.sqrt(dx * dx + dy * dy);
                                                     if (d < bestDist) { bestDist = d; hit = { di, pi }; }
                                                 });
@@ -782,9 +711,7 @@
                         this.recordsLoading = false;
                     },
 
-                    recordUrl(id) {
-                        return '{{ url("/records/pgp") }}/' + id;
-                    },
+                    recordUrl(id) { return '{{ url("/records/pgp") }}/' + id; },
 
                     recordWorkers(rec) {
                         return ['worker1', 'worker2', 'worker3', 'worker4', 'worker5']

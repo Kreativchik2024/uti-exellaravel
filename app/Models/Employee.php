@@ -2,11 +2,16 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class Employee extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
+        'user_id',
         'last_name',
         'first_name',
         'middle_name',
@@ -20,37 +25,25 @@ class Employee extends Model
         'is_active' => 'boolean',
     ];
 
-    /**
-     * Собрать short_name из ФИО (если не задан явно).
-     * «Иванов Иван Иванович» → «Иванов И.И.»
-     */
-    public static function buildShortName(string $last, string $first, ?string $middle = null): string
+    public function user()
     {
-        $short = trim($last);
+        return $this->belongsTo(User::class);
+    }
 
-        if ($first !== '') {
-            $short .= ' ' . mb_strtoupper(mb_substr($first, 0, 1)) . '.';
-        }
-        if ($middle !== null && $middle !== '') {
-            $short .= mb_strtoupper(mb_substr($middle, 0, 1)) . '.';
-        }
-
-        return $short;
+    public function scopeActive($q)
+    {
+        return $q->where('is_active', true);
     }
 
     /**
-     * Scope: только активные.
+     * Только сотрудники, привязанные к User.
+     * Безопасно, если колонки user_id ещё нет — просто не фильтрует.
      */
-    public function scopeActive($query)
+    public function scopeWithUser($q)
     {
-        return $query->where('is_active', true);
-    }
-
-    /**
-     * Полное ФИО для отображения (если нужно где-то).
-     */
-    public function getFullNameAttribute(): string
-    {
-        return trim($this->last_name . ' ' . $this->first_name . ' ' . ($this->middle_name ?? ''));
+        if (!Schema::hasColumn($this->getTable(), 'user_id')) {
+            return $q;
+        }
+        return $q->whereNotNull('user_id');
     }
 }

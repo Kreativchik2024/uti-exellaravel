@@ -7,8 +7,8 @@
         <div class="bg-white rounded-lg shadow p-6">
 
             <p class="text-sm text-gray-600 mb-6">
-                Выберите до 5 исполнителей. Если работаете на прогоне бортов — укажите,
-                где вы находитесь: на посту (1–30) или на периферии (1–50).
+                Выберите до 5 исполнителей. ПИН каждого сотрудника обязателен.
+                Если работаете на прогоне бортов — укажите, где вы находитесь: на посту (1–30) или на периферии (1–50).
             </p>
 
             <form method="POST" action="{{ route('workstation.store') }}">
@@ -21,30 +21,65 @@
                     $type  = old('type', $workplaceType);
                 @endphp
 
-                {{-- Исполнители --}}
-                <div class="text-sm font-semibold text-gray-700 mb-2">Исполнители</div>
-                @for($i = 0; $i < 5; $i++)
-                    @php $current = $slots[$i] ?? ''; @endphp
-                    <div class="mb-3">
-                        <label class="block text-xs text-gray-600 mb-1">
-                            Исполнитель {{ $i + 1 }}@if($i === 0)<span class="text-red-600">*</span>@endif
-                        </label>
-                        <select name="workers[]" class="border rounded px-3 py-2 w-full bg-white">
-                            <option value="">— не выбран —</option>
-                            @foreach(($employeesList ?? []) as $emp)
-                                <option value="{{ $emp }}" @selected($current === $emp)>
-                                    {{ $emp }}
-                                </option>
-                            @endforeach
-                            @if($current !== '' && !in_array($current, $employeesList ?? [], true))
-                                <option value="{{ $current }}" selected>{{ $current }} (не в справочнике)</option>
-                            @endif
-                        </select>
-                        @error("workers.$i")
-                            <div class="text-red-600 text-xs mt-1">{{ $message }}</div>
-                        @enderror
+                {{-- Исполнители + PIN-модалка --}}
+                <div x-data="workstationWorkers()">
+                    <div class="text-sm font-semibold text-gray-700 mb-2">Исполнители</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                        @for($i = 0; $i < 5; $i++)
+                            @php $current = $slots[$i] ?? ''; @endphp
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">
+                                    Исполнитель {{ $i + 1 }}@if($i === 0)<span class="text-red-600">*</span>@endif
+                                </label>
+                                <select name="workers[{{ $i }}]" @if($i === 0) required @endif
+                                        x-model="selected[{{ $i }}]"
+                                        @change="onChange({{ $i }})"
+                                        class="w-full border rounded px-2 py-1 text-sm">
+                                    <option value="">— не выбран —</option>
+                                    <template x-for="emp in availableFor({{ $i }})" :key="emp">
+                                        <option :value="emp" x-text="emp"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        @endfor
                     </div>
-                @endfor
+
+                    @if($errors->any())
+                        <div class="bg-red-100 text-red-800 p-3 rounded mt-4">
+                            @foreach($errors->all() as $e)<div>{{ $e }}</div>@endforeach
+                        </div>
+                    @endif
+
+                    {{-- PIN-модалка --}}
+                    <div x-show="pinModalOpen" x-cloak
+                         class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+                         @click.self="cancelPin()">
+                        <div class="bg-white rounded-lg shadow-xl w-72 p-4 space-y-2">
+                            <h3 class="font-semibold text-base text-gray-800">ПИН сотрудника</h3>
+                            <p class="text-xs text-gray-600 leading-snug">
+                                Подтвердите выбор:<br>
+                                <strong x-text="pinTarget"></strong>
+                            </p>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-1">ПИН (4–6 цифр)</label>
+                                <input type="password" x-model="pinValue" x-ref="pinInput"
+                                       inputmode="numeric" pattern="\d{4,6}"
+                                       @keydown.enter.prevent="submitPin()"
+                                       class="border rounded px-2 py-1.5 w-full text-sm">
+                            </div>
+                            <div x-show="pinError" x-text="pinError" class="text-red-600 text-xs"></div>
+                            <div class="flex justify-end gap-2 pt-1">
+                                <button type="button" @click="cancelPin()"
+                                        class="px-2.5 py-1 text-xs text-gray-600 hover:text-gray-900">
+                                    Отмена
+                                </button>
+                                <button type="button" @click="submitPin()" :disabled="pinLoading"
+                                        class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 text-xs rounded disabled:opacity-50"
+                                        x-text="pinLoading ? 'Проверка…' : 'Подтвердить'"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 {{-- Тип рабочего места --}}
                 <div class="text-sm font-semibold text-gray-700 mt-6 mb-2">Рабочее место</div>
@@ -64,13 +99,11 @@
                     </label>
                 </div>
 
-                {{-- Пост --}}
                 <div id="block-post" class="{{ $type === 'post' ? '' : 'hidden' }} mb-3">
                     <label class="block text-xs text-gray-600 mb-1">Пост (1–30)</label>
                     <select name="post" class="border rounded px-3 py-2 w-full bg-white">
                         <option value="">— не выбран —</option>
                         @foreach($posts as $p)
-                            {{-- ВАЖНО: value — число, надпись — «Пост N» --}}
                             <option value="{{ $p }}" @selected((string) old('post', $selectedPost) === (string) $p)>
                                 Пост {{ $p }}
                             </option>
@@ -81,7 +114,6 @@
                     @enderror
                 </div>
 
-                {{-- Периферия --}}
                 <div id="block-peripheral" class="{{ $type === 'peripheral' ? '' : 'hidden' }} mb-3">
                     <label class="block text-xs text-gray-600 mb-1">Периферия (1–50)</label>
                     <select name="peripheral" class="border rounded px-3 py-2 w-full bg-white">
@@ -96,12 +128,6 @@
                         <div class="text-red-600 text-xs mt-1">{{ $message }}</div>
                     @enderror
                 </div>
-
-                @if($errors->any())
-                    <div class="bg-red-100 text-red-800 p-3 rounded mb-4">
-                        @foreach($errors->all() as $e)<div>{{ $e }}</div>@endforeach
-                    </div>
-                @endif
 
                 <div class="flex flex-wrap gap-3 mt-6">
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded">
@@ -121,6 +147,117 @@
     </div>
 
     <script>
+        window.workstationWorkers = function() {
+            const all = @json($employeesList);
+            const pinUrl = '{{ route('records.pinCheck') }}';
+            const csrf = '{{ csrf_token() }}';
+
+            const initial = {};
+            const confirmed = {};
+            for (let i = 0; i < 5; i++) {
+                const el = document.querySelector(`select[name="workers[${i}]"]`);
+                const v = el ? el.value : '';
+                initial[i] = v;
+                confirmed[i] = v;
+            }
+
+            return {
+                all,
+                selected: initial,
+                confirmed,
+                pinModalOpen: false,
+                pinValue: '',
+                pinTarget: '',
+                pinTargetIndex: null,
+                pinLoading: false,
+                pinError: '',
+
+                availableFor(index) {
+                    const used = Object.entries(this.selected)
+                        .filter(([i, v]) => Number(i) !== index && v)
+                        .map(([, v]) => v);
+                    return this.all.filter(e => !used.includes(e) || e === this.selected[index]);
+                },
+
+                onChange(index) {
+                    console.log('[PIN/WS] onChange', index, '->', this.selected[index]);
+                    const newVal = this.selected[index];
+
+                    if (newVal === '') {
+                        this.confirmed[index] = '';
+                        return;
+                    }
+
+                    // авто-сброс дубля в других полях
+                    for (let i = 0; i < 5; i++) {
+                        if (i !== index && this.selected[i] === newVal) {
+                            this.selected[i] = '';
+                            this.confirmed[i] = '';
+                        }
+                    }
+
+                    if (this.confirmed[index] === newVal) {
+                        console.log('[PIN/WS] already confirmed, skip modal');
+                        return;
+                    }
+
+                    this.pinTarget = newVal;
+                    this.pinTargetIndex = index;
+                    this.pinValue = '';
+                    this.pinError = '';
+                    this.pinModalOpen = true;
+                    this.$nextTick(() => this.$refs.pinInput?.focus());
+                },
+
+                async submitPin() {
+                    this.pinError = '';
+                    const pin = (this.pinValue || '').trim();
+                    if (!/^\d{4,6}$/.test(pin)) {
+                        this.pinError = 'ПИН — 4–6 цифр.';
+                        return;
+                    }
+                    this.pinLoading = true;
+                    try {
+                        const body = new URLSearchParams();
+                        body.set('_token', csrf);
+                        body.set('short_name', this.pinTarget);
+                        body.set('pin', pin);
+
+                        const res = await fetch(pinUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            body: body.toString(),
+                            credentials: 'same-origin',
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        console.log('[PIN/WS] response', res.status, data);
+                        if (res.ok && data.ok) {
+                            this.confirmed[this.pinTargetIndex] = this.pinTarget;
+                            this.pinModalOpen = false;
+                            this.pinValue = '';
+                        } else {
+                            this.pinError = data.error || ('Ошибка ' + res.status);
+                        }
+                    } catch (e) {
+                        console.error('[PIN/WS] error', e);
+                        this.pinError = 'Ошибка соединения.';
+                    }
+                    this.pinLoading = false;
+                },
+
+                cancelPin() {
+                    this.selected[this.pinTargetIndex] = this.confirmed[this.pinTargetIndex] || '';
+                    this.pinModalOpen = false;
+                    this.pinValue = '';
+                    this.pinError = '';
+                },
+            };
+        };
+
         (function () {
             var radios = document.querySelectorAll('input[name="type"]');
             var postBlock = document.getElementById('block-post');
@@ -129,8 +266,8 @@
             function sync() {
                 var val = document.querySelector('input[name="type"]:checked');
                 val = val ? val.value : null;
-                postBlock.classList.toggle('hidden', val !== 'post');
-                peripheralBlock.classList.toggle('hidden', val !== 'peripheral');
+                if (postBlock) postBlock.classList.toggle('hidden', val !== 'post');
+                if (peripheralBlock) peripheralBlock.classList.toggle('hidden', val !== 'peripheral');
             }
 
             radios.forEach(function (r) { r.addEventListener('change', sync); });

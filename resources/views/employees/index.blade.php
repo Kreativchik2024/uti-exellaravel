@@ -69,6 +69,7 @@
                         <th class="p-3 text-left">Кратко</th>
                         <th class="p-3 text-left">Должность</th>
                         <th class="p-3 text-left">Участок</th>
+                        <th class="p-3 text-left">Учётка</th>
                         <th class="p-3 text-center">Активен</th>
                         <th class="p-3 text-right">Действия</th>
                     </tr>
@@ -83,6 +84,14 @@
                             <td class="p-3 font-mono text-xs">{{ $e->short_name }}</td>
                             <td class="p-3">{{ $e->position }}</td>
                             <td class="p-3">{{ $e->department }}</td>
+                            <td class="p-3 text-sm">
+                                @if($e->user)
+                                    <div class="text-gray-800">{{ $e->user->name }}</div>
+                                    <div class="text-xs text-gray-500">{{ $e->user->email }}</div>
+                                @else
+                                    <span class="text-amber-600 text-xs">— не привязан —</span>
+                                @endif
+                            </td>
                             <td class="p-3 text-center">
                                 @if($e->is_active)
                                     <span class="text-green-700">✓</span>
@@ -102,7 +111,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="9" class="p-6 text-center text-gray-500">Сотрудников пока нет</td></tr>
+                        <tr><td colspan="10" class="p-6 text-center text-gray-500">Сотрудников пока нет</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Facades\Excel;
 
 class StatsController extends Controller
@@ -18,10 +19,6 @@ class StatsController extends Controller
         'Не работает', 'Требует ремонта', 'Требует замены',
     ];
 
-    /**
-     * Только для executor: режим «Моя / Общая».
-     * Для admin/master всегда null (общая).
-     */
     private function resolveTargetUser(Request $r): ?User
     {
         $user = auth()->user();
@@ -52,8 +49,10 @@ class StatsController extends Controller
         [$from, $to] = $this->resolveDateRange($r);
         $targetUser  = $this->resolveTargetUser($r);
 
-        $worker      = trim((string) $r->input('worker', ''));
-        $workersList = $s->listWorkers();
+        $canSeeWorkersStats = auth()->user()->isAdmin() || auth()->user()->isMaster();
+
+        $worker      = $canSeeWorkersStats ? trim((string) $r->input('worker', '')) : '';
+        $workersList = $canSeeWorkersStats ? $s->listWorkers() : [];
 
         $perSheet = $s->forPeriod($from, $to, $targetUser, $worker !== '' ? $worker : null);
         $totals   = $s->totals($perSheet);
@@ -64,7 +63,7 @@ class StatsController extends Controller
         return view('stats.index', compact(
             'from', 'to', 'periodLabel',
             'perSheet', 'totals', 'byPosts',
-            'targetUser', 'worker', 'workersList'
+            'targetUser', 'worker', 'workersList', 'canSeeWorkersStats'
         ));
     }
 
@@ -72,7 +71,9 @@ class StatsController extends Controller
     {
         [$from, $to] = $this->resolveDateRange($r);
         $targetUser  = $this->resolveTargetUser($r);
-        $worker      = trim((string) $r->input('worker', ''));
+        $canSeeWorkersStats = auth()->user()->isAdmin() || auth()->user()->isMaster();
+
+        $worker = $canSeeWorkersStats ? trim((string) $r->input('worker', '')) : '';
 
         $perSheet = $s->forPeriod($from, $to, $targetUser, $worker !== '' ? $worker : null);
         $totals   = $s->totals($perSheet);
@@ -88,9 +89,13 @@ class StatsController extends Controller
         return Excel::download(new StatsExport(0, $from, $perSheet, $totals), $filename);
     }
 
-    // === ЗОНА 3 ===
+    /**
+     * Зона 3 «Сводка по исполнителю» — только admin/master.
+     */
     public function zone2Worker(Request $r, StatsService $s)
     {
+        abort_unless(auth()->user()->isAdmin() || auth()->user()->isMaster(), 403);
+
         $worker = trim((string) $r->input('executor', ''));
         $slug   = trim((string) $r->input('sheet', ''));
 
@@ -118,11 +123,8 @@ class StatsController extends Controller
             $summary = [];
 
             foreach (config('sheets.map', []) as $slug => $cfg) {
-                if (!isset($cfg['model']) || !class_exists($cfg['model'])) {
-                    continue;
-                }
+                if (!isset($cfg['model']) || !class_exists($cfg['model'])) continue;
                 $model = $cfg['model'];
-
                 $summary[] = [
                     'slug'  => $slug,
                     'title' => $cfg['title'] ?? $slug,
@@ -131,15 +133,19 @@ class StatsController extends Controller
                     'week'  => $model::where('created_at', '>=', now()->subDays(7))->count(),
                 ];
             }
-
             return $summary;
         });
 
         return response()->json($data);
     }
 
+    /**
+     * Зона 3 «Сводка по исполнителю» — данные селекта. Только admin/master.
+     */
     public function zone2(Request $r)
     {
+        abort_unless(auth()->user()->isAdmin() || auth()->user()->isMaster(), 403);
+
         $sheet = $r->input('sheet', 'pgp');
         $from  = $r->input('from');
         $to    = $r->input('to');
@@ -152,14 +158,8 @@ class StatsController extends Controller
 
         $whereSql = '';
         $bindings = [];
-        if ($from) {
-            $whereSql .= " AND DATE(record_date) >= ?";
-            $bindings[] = $from;
-        }
-        if ($to) {
-            $whereSql .= " AND DATE(record_date) <= ?";
-            $bindings[] = $to;
-        }
+        if ($from) { $whereSql .= " AND DATE(record_date) >= ?"; $bindings[] = $from; }
+        if ($to)   { $whereSql .= " AND DATE(record_date) <= ?"; $bindings[] = $to; }
 
         $unionBindings = array_merge($bindings, $bindings, $bindings, $bindings, $bindings);
         $cacheKey = "stats.zone2.$sheet.{$from}_{$to}";
@@ -172,9 +172,7 @@ class StatsController extends Controller
                     UNION ALL SELECT worker3 FROM `$table` WHERE worker3 IS NOT NULL AND worker3 != '' {$whereSql}
                     UNION ALL SELECT worker4 FROM `$table` WHERE worker4 IS NOT NULL AND worker4 != '' {$whereSql}
                     UNION ALL SELECT worker5 FROM `$table` WHERE worker5 IS NOT NULL AND worker5 != '' {$whereSql}
-                ) w
-                GROUP BY name
-                ORDER BY cnt DESC
+                ) w GROUP BY name ORDER BY cnt DESC
             ";
             $rows = DB::select($sql, $unionBindings);
 
@@ -189,15 +187,19 @@ class StatsController extends Controller
                 ) {$whereSql}
             ";
             $total = (int) (DB::select($totalSql, $bindings)[0]->total ?? 0);
-
             return ['rows' => $rows, 'total' => $total];
         });
 
         return response()->json($result);
     }
 
+    /**
+     * Зона 3 — график по дням. Только admin/master.
+     */
     public function zone2Chart(Request $r)
     {
+        abort_unless(auth()->user()->isAdmin() || auth()->user()->isMaster(), 403);
+
         $sheet    = $r->input('sheet', 'pgp');
         $executor = $r->input('executor');
         $from     = $r->input('from');
@@ -211,22 +213,14 @@ class StatsController extends Controller
 
         $whereSql = '';
         $bindings = [];
-        if ($from) {
-            $whereSql .= " AND DATE(record_date) >= ?";
-            $bindings[] = $from;
-        }
-        if ($to) {
-            $whereSql .= " AND DATE(record_date) <= ?";
-            $bindings[] = $to;
-        }
+        if ($from) { $whereSql .= " AND DATE(record_date) >= ?"; $bindings[] = $from; }
+        if ($to)   { $whereSql .= " AND DATE(record_date) <= ?"; $bindings[] = $to; }
 
         if ($executor) {
             $sql = "
                 SELECT DATE(record_date) AS record_date, COUNT(*) AS cnt FROM `$table`
                 WHERE (worker1 = ? OR worker2 = ? OR worker3 = ? OR worker4 = ? OR worker5 = ?)
-                {$whereSql}
-                GROUP BY DATE(record_date)
-                ORDER BY record_date
+                {$whereSql} GROUP BY DATE(record_date) ORDER BY record_date
             ";
             $execBindings = [$executor, $executor, $executor, $executor, $executor];
             $rows = DB::select($sql, array_merge($execBindings, $bindings));
@@ -239,40 +233,27 @@ class StatsController extends Controller
                     OR (worker3 IS NOT NULL AND worker3 != '')
                     OR (worker4 IS NOT NULL AND worker4 != '')
                     OR (worker5 IS NOT NULL AND worker5 != '')
-                ) {$whereSql}
-                GROUP BY DATE(record_date)
-                ORDER BY record_date
+                ) {$whereSql} GROUP BY DATE(record_date) ORDER BY record_date
             ";
             $rows = DB::select($sql, $bindings);
         }
 
         $counts = [];
-        foreach ($rows as $row) {
-            $key = substr((string) $row->record_date, 0, 10);
-            $counts[$key] = (int) $row->cnt;
-        }
+        foreach ($rows as $row) $counts[substr((string) $row->record_date, 0, 10)] = (int) $row->cnt;
 
         $rangeFrom = $from ? Carbon::parse($from)->startOfDay() : null;
         $rangeTo   = $to   ? Carbon::parse($to)->endOfDay()     : now()->endOfDay();
 
         if (!$rangeFrom) {
-            if (!empty($counts)) {
-                $minDate   = collect(array_keys($counts))->min();
-                $rangeFrom = Carbon::parse($minDate)->startOfDay();
-            } else {
-                $rangeFrom = $rangeTo->copy()->subDays(29)->startOfDay();
-            }
+            if (!empty($counts)) $rangeFrom = Carbon::parse(collect(array_keys($counts))->min())->startOfDay();
+            else $rangeFrom = $rangeTo->copy()->subDays(29)->startOfDay();
         }
+        if ($rangeTo->lt($rangeFrom)) $rangeTo = $rangeFrom->copy()->endOfDay();
 
-        if ($rangeTo->lt($rangeFrom)) {
-            $rangeTo = $rangeFrom->copy()->endOfDay();
-        }
-
-        $labels = [];
-        $values = [];
+        $labels = []; $values = [];
         $cursor = $rangeFrom->copy();
         while ($cursor->lte($rangeTo)) {
-            $day      = $cursor->format('Y-m-d');
+            $day = $cursor->format('Y-m-d');
             $labels[] = $day;
             $values[] = $counts[$day] ?? 0;
             $cursor->addDay();
@@ -281,6 +262,9 @@ class StatsController extends Controller
         return response()->json(['labels' => $labels, 'values' => $values]);
     }
 
+    /**
+     * Зона 2 «Детализация по постам» — видна ВСЕМ. Без abort.
+     */
     public function zone3(Request $r)
     {
         $sheet = $r->input('sheet', 'pgp');
@@ -291,63 +275,69 @@ class StatsController extends Controller
         abort_unless($cfg && isset($cfg['model'], $cfg['fields']['post_number']), 404);
 
         $model = $cfg['model'];
+        $table = (new $model)->getTable();
+
+        if (!Schema::hasColumn($table, 'post_number')) {
+            return response()->json([]);
+        }
 
         $query = $model::select('post_number', DB::raw('COUNT(*) AS cnt'))
             ->whereNotNull('post_number');
 
-        if ($from) $query->whereDate('record_date', '>=', $from);
-        if ($to)   $query->whereDate('record_date', '<=', $to);
+        if ($from && Schema::hasColumn($table, 'record_date')) {
+            $query->whereDate('record_date', '>=', $from);
+        }
+        if ($to && Schema::hasColumn($table, 'record_date')) {
+            $query->whereDate('record_date', '<=', $to);
+        }
 
-        $rows = $query->groupBy('post_number')
-            ->orderByDesc('cnt')
-            ->orderBy('post_number')
-            ->get();
-
-        return response()->json($rows);
+        return response()->json(
+            $query->groupBy('post_number')->orderByDesc('cnt')->orderBy('post_number')->get()
+        );
     }
 
     /**
-     * Зона 4: график по постам.
-     * Исправлено: whereDate для корректного захвата последнего дня периода.
+     * Зона 4 «График по постам» — только admin/master.
      */
     public function zone4(Request $r)
     {
+        abort_unless(auth()->user()->isAdmin() || auth()->user()->isMaster(), 403);
+
         $sheet = $r->input('sheet', 'pgp');
         $cfg   = config("sheets.map.$sheet");
         abort_unless($cfg && isset($cfg['model'], $cfg['fields']['post_number']), 404);
 
         $model = $cfg['model'];
-        $from  = $r->input('from');
-        $to    = $r->input('to');
+        $table = (new $model)->getTable();
+
+        if (!Schema::hasColumn($table, 'post_number') || !Schema::hasColumn($table, 'record_date')) {
+            return response()->json(['labels' => [], 'datasets' => []]);
+        }
+
+        $from = $r->input('from');
+        $to   = $r->input('to');
 
         $query = $model::select('post_number', 'record_date', DB::raw('COUNT(*) AS cnt'))
             ->whereNotNull('post_number');
-
         if ($from) $query->whereDate('record_date', '>=', $from);
         if ($to)   $query->whereDate('record_date', '<=', $to);
 
-        $rows = $query->groupBy('post_number', 'record_date')
-            ->orderBy('record_date')
-            ->get();
+        $rows = $query->groupBy('post_number', 'record_date')->orderBy('record_date')->get();
 
-        $dates = $rows->pluck('record_date')
-            ->map(fn($d) => Carbon::parse($d)->format('Y-m-d'))
+        $dates = $rows->pluck('record_date')->map(fn($d) => Carbon::parse($d)->format('Y-m-d'))
             ->unique()->sort()->values()->all();
         $posts = $rows->pluck('post_number')->unique()->sort()->values()->all();
 
-        $colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#14b8a6'];
+        $colors = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6'];
         $datasets = [];
 
         foreach ($posts as $i => $post) {
             $values = [];
             foreach ($dates as $date) {
-                $found = $rows->first(fn($r) =>
-                    $r->post_number == $post
-                    && Carbon::parse($r->record_date)->format('Y-m-d') === $date
-                );
+                $found = $rows->first(fn($r) => $r->post_number == $post
+                    && Carbon::parse($r->record_date)->format('Y-m-d') === $date);
                 $values[] = $found ? (int) $found->cnt : 0;
             }
-
             $datasets[] = [
                 'label'           => 'Пост ' . $post,
                 'data'            => $values,
@@ -357,26 +347,30 @@ class StatsController extends Controller
             ];
         }
 
-        return response()->json([
-            'labels'   => $dates,
-            'datasets' => $datasets,
-        ]);
+        return response()->json(['labels' => $dates, 'datasets' => $datasets]);
     }
 
     /**
-     * Зона 4 — конкретные записи ПГП данного поста за конкретный день.
+     * Зона 4 — записи поста за день. Только admin/master.
      */
     public function zone4Records(Request $r)
     {
+        abort_unless(auth()->user()->isAdmin() || auth()->user()->isMaster(), 403);
+
         $sheet = $r->input('sheet', 'pgp');
         $cfg   = config("sheets.map.$sheet");
         abort_unless($cfg && isset($cfg['model'], $cfg['fields']['post_number']), 404);
+
+        $model = $cfg['model'];
+        $table = (new $model)->getTable();
 
         $post = $r->input('post');
         $date = $r->input('date');
         abort_unless($post !== null && $date, 422);
 
-        $model = $cfg['model'];
+        if (!Schema::hasColumn($table, 'post_number') || !Schema::hasColumn($table, 'record_date')) {
+            return response()->json([]);
+        }
 
         $records = $model::query()
             ->where('post_number', $post)
@@ -392,38 +386,40 @@ class StatsController extends Controller
                 : substr((string) $row->record_date, 0, 10);
             $out[] = $arr;
         }
-
         return response()->json($out);
     }
 
+    /**
+     * Зона 5 «Брак по категориям» — видна всем.
+     * Каждое поле проверяется через Schema::hasColumn() — защита от рассинхрона
+     * конфига и БД (например, barometer_status в cross3 без колонки).
+     */
     public function zone5(Request $r)
     {
         $from = $r->input('from');
         $to   = $r->input('to');
-
         $cacheKey = "stats.zone5.{$from}_{$to}";
 
         $data = Cache::remember($cacheKey, 120, function () use ($from, $to) {
             $summary = [];
 
-            $dateSql = '';
-            $dateBindings = [];
-            if ($from) { $dateSql .= " AND DATE(record_date) >= ?"; $dateBindings[] = $from; }
-            if ($to)   { $dateSql .= " AND DATE(record_date) <= ?"; $dateBindings[] = $to; }
-
             foreach (config('sheets.map', []) as $slug => $cfg) {
                 if (!isset($cfg['model']) || !class_exists($cfg['model'])) continue;
-
                 $model = $cfg['model'];
                 $table = (new $model)->getTable();
 
-                $hasRecordDate = isset($cfg['fields']['record_date']);
-                $hasStatus     = isset($cfg['fields']['status']);
+                $hasRecordDate = Schema::hasColumn($table, 'record_date');
+                $hasStatus     = Schema::hasColumn($table, 'status');
+                $hasFaultCode  = Schema::hasColumn($table, 'fault_code');
+
+                $dateSql = ''; $dateBindings = [];
+                if ($from && $hasRecordDate) { $dateSql .= " AND DATE(record_date) >= ?"; $dateBindings[] = $from; }
+                if ($to   && $hasRecordDate) { $dateSql .= " AND DATE(record_date) <= ?"; $dateBindings[] = $to; }
 
                 $defectConditions = []; $defectBindings = [];
                 $fixedConditions  = []; $fixedBindings  = [];
 
-                if (isset($cfg['fields']['fault_code'])) {
+                if ($hasFaultCode && isset($cfg['fields']['fault_code'])) {
                     if ($hasStatus) {
                         $defectConditions[] = "( `fault_code` IS NOT NULL AND `fault_code` != '' AND (`status` IS NULL OR `status` != 'Сдан') )";
                         $fixedConditions[]  = "( `fault_code` IS NOT NULL AND `fault_code` != '' AND `status` = 'Сдан' )";
@@ -434,6 +430,7 @@ class StatsController extends Controller
 
                 foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
                     if (($fieldCfg['type'] ?? '') !== 'select' || empty($fieldCfg['options'])) continue;
+                    if (!Schema::hasColumn($table, $fieldName)) continue;
                     $matched = array_values(array_intersect($fieldCfg['options'], self::DEFECT_VALUES));
                     if (empty($matched)) continue;
                     $placeholders = implode(',', array_fill(0, count($matched), '?'));
@@ -444,6 +441,7 @@ class StatsController extends Controller
                 foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
                     if (($fieldCfg['type'] ?? '') !== 'textarea') continue;
                     if (!preg_match('/(defect|дефект|брак)/iu', $fieldName)) continue;
+                    if (!Schema::hasColumn($table, $fieldName)) continue;
                     if ($hasStatus) {
                         $defectConditions[] = "( `$fieldName` IS NOT NULL AND `$fieldName` != '' AND (`status` IS NULL OR `status` != 'Сдан') )";
                         $fixedConditions[]  = "( `$fieldName` IS NOT NULL AND `$fieldName` != '' AND `status` = 'Сдан' )";
@@ -495,6 +493,9 @@ class StatsController extends Controller
         return response()->json($data);
     }
 
+    /**
+     * Зона 5 — детальный график по дням. Видна всем.
+     */
     public function zone5Chart(Request $r)
     {
         $sheet = $r->input('sheet', 'pgp');
@@ -507,15 +508,21 @@ class StatsController extends Controller
         $model = $cfg['model'];
         $table = (new $model)->getTable();
 
+        if (!Schema::hasColumn($table, 'record_date')) {
+            return response()->json(['labels' => [], 'defects' => [], 'fixed' => []]);
+        }
+
         $dateSql = ''; $dateBindings = [];
         if ($from) { $dateSql .= " AND DATE(record_date) >= ?"; $dateBindings[] = $from; }
         if ($to)   { $dateSql .= " AND DATE(record_date) <= ?"; $dateBindings[] = $to; }
 
-        $hasStatus = isset($cfg['fields']['status']);
+        $hasStatus    = Schema::hasColumn($table, 'status');
+        $hasFaultCode = Schema::hasColumn($table, 'fault_code');
+
         $defectConditions = []; $defectBindings = [];
         $fixedConditions  = []; $fixedBindings  = [];
 
-        if (isset($cfg['fields']['fault_code'])) {
+        if ($hasFaultCode && isset($cfg['fields']['fault_code'])) {
             if ($hasStatus) {
                 $defectConditions[] = "( `fault_code` IS NOT NULL AND `fault_code` != '' AND (`status` IS NULL OR `status` != 'Сдан') )";
                 $fixedConditions[]  = "( `fault_code` IS NOT NULL AND `fault_code` != '' AND `status` = 'Сдан' )";
@@ -526,6 +533,7 @@ class StatsController extends Controller
 
         foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
             if (($fieldCfg['type'] ?? '') !== 'select' || empty($fieldCfg['options'])) continue;
+            if (!Schema::hasColumn($table, $fieldName)) continue;
             $matched = array_values(array_intersect($fieldCfg['options'], self::DEFECT_VALUES));
             if (empty($matched)) continue;
             $placeholders = implode(',', array_fill(0, count($matched), '?'));
@@ -536,6 +544,7 @@ class StatsController extends Controller
         foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
             if (($fieldCfg['type'] ?? '') !== 'textarea') continue;
             if (!preg_match('/(defect|дефект|брак)/iu', $fieldName)) continue;
+            if (!Schema::hasColumn($table, $fieldName)) continue;
             if ($hasStatus) {
                 $defectConditions[] = "( `$fieldName` IS NOT NULL AND `$fieldName` != '' AND (`status` IS NULL OR `status` != 'Сдан') )";
                 $fixedConditions[]  = "( `$fieldName` IS NOT NULL AND `$fieldName` != '' AND `status` = 'Сдан' )";
@@ -549,54 +558,31 @@ class StatsController extends Controller
         }
 
         $defectWhere = '(' . implode(' OR ', $defectConditions) . ')';
-        $sqlDefects = "
-            SELECT DATE(record_date) AS d, COUNT(*) AS c
-            FROM `$table`
-            WHERE {$defectWhere} {$dateSql}
-            GROUP BY DATE(record_date)
-            ORDER BY d
-        ";
+        $sqlDefects = "SELECT DATE(record_date) AS d, COUNT(*) AS c FROM `$table`
+                       WHERE {$defectWhere} {$dateSql} GROUP BY DATE(record_date) ORDER BY d";
         $defectRows = DB::select($sqlDefects, array_merge($defectBindings, $dateBindings));
 
         $fixedCounts = [];
         if (!empty($fixedConditions)) {
             $fixedWhere = '(' . implode(' OR ', $fixedConditions) . ')';
-            $sqlFixed = "
-                SELECT DATE(record_date) AS d, COUNT(*) AS c
-                FROM `$table`
-                WHERE {$fixedWhere} {$dateSql}
-                GROUP BY DATE(record_date)
-                ORDER BY d
-            ";
+            $sqlFixed = "SELECT DATE(record_date) AS d, COUNT(*) AS c FROM `$table`
+                         WHERE {$fixedWhere} {$dateSql} GROUP BY DATE(record_date) ORDER BY d";
             $fixedRows = DB::select($sqlFixed, array_merge($fixedBindings, $dateBindings));
-            foreach ($fixedRows as $row) {
-                $key = substr((string) $row->d, 0, 10);
-                $fixedCounts[$key] = (int) $row->c;
-            }
+            foreach ($fixedRows as $row) $fixedCounts[substr((string) $row->d, 0, 10)] = (int) $row->c;
         }
 
         $defectCounts = [];
-        foreach ($defectRows as $row) {
-            $key = substr((string) $row->d, 0, 10);
-            $defectCounts[$key] = (int) $row->c;
-        }
+        foreach ($defectRows as $row) $defectCounts[substr((string) $row->d, 0, 10)] = (int) $row->c;
 
         $rangeFrom = $from ? Carbon::parse($from)->startOfDay() : null;
         $rangeTo   = $to   ? Carbon::parse($to)->endOfDay()     : now()->endOfDay();
 
         if (!$rangeFrom) {
             $allKeys = array_unique(array_merge(array_keys($defectCounts), array_keys($fixedCounts)));
-            if (!empty($allKeys)) {
-                $minDate   = collect($allKeys)->min();
-                $rangeFrom = Carbon::parse($minDate)->startOfDay();
-            } else {
-                $rangeFrom = $rangeTo->copy()->subDays(29)->startOfDay();
-            }
+            if (!empty($allKeys)) $rangeFrom = Carbon::parse(collect($allKeys)->min())->startOfDay();
+            else $rangeFrom = $rangeTo->copy()->subDays(29)->startOfDay();
         }
-
-        if ($rangeTo->lt($rangeFrom)) {
-            $rangeTo = $rangeFrom->copy()->endOfDay();
-        }
+        if ($rangeTo->lt($rangeFrom)) $rangeTo = $rangeFrom->copy()->endOfDay();
 
         $labels = []; $defectsSeries = []; $fixedSeries = [];
         $cursor = $rangeFrom->copy();
@@ -608,47 +594,45 @@ class StatsController extends Controller
             $cursor->addDay();
         }
 
-        return response()->json([
-            'labels'  => $labels,
-            'defects' => $defectsSeries,
-            'fixed'   => $fixedSeries,
-        ]);
+        return response()->json(['labels' => $labels, 'defects' => $defectsSeries, 'fixed' => $fixedSeries]);
     }
 
+    /**
+     * Зона 6 — видна всем. Защита от отсутствия fault_code.
+     */
     public function zone6(Request $r)
     {
         $from     = $r->input('from');
         $to       = $r->input('to');
         $category = $r->input('sheet');
-
         $cacheKey = "stats.zone6.{$from}_{$to}_{$category}";
 
         $data = Cache::remember($cacheKey, 120, function () use ($from, $to, $category) {
             $rows = [];
             $sheets = config('sheets.map', []);
-            if ($category && isset($sheets[$category])) {
-                $sheets = [$category => $sheets[$category]];
-            }
+            if ($category && isset($sheets[$category])) $sheets = [$category => $sheets[$category]];
 
             foreach ($sheets as $slug => $cfg) {
                 if (!isset($cfg['model']) || !isset($cfg['fields']['fault_code'])) continue;
-
                 $model = $cfg['model'];
                 $table = (new $model)->getTable();
 
+                if (!Schema::hasColumn($table, 'fault_code')) continue;
+
                 $where = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
                 $bindings = [];
-                if ($from) { $where .= " AND DATE(record_date) >= ?"; $bindings[] = $from; }
-                if ($to)   { $where .= " AND DATE(record_date) <= ?"; $bindings[] = $to; }
 
-                $sql = "
-                    SELECT `fault_code` AS code, COUNT(*) AS cnt,
-                           MIN(record_date) AS first_date, MAX(record_date) AS last_date
-                    FROM `$table`
-                    WHERE {$where}
-                    GROUP BY `fault_code`
-                ";
+                if (Schema::hasColumn($table, 'record_date')) {
+                    if ($from) { $where .= " AND DATE(record_date) >= ?"; $bindings[] = $from; }
+                    if ($to)   { $where .= " AND DATE(record_date) <= ?"; $bindings[] = $to; }
+                }
 
+                $selectDates = Schema::hasColumn($table, 'record_date')
+                    ? ", MIN(record_date) AS first_date, MAX(record_date) AS last_date"
+                    : ", NULL AS first_date, NULL AS last_date";
+
+                $sql = "SELECT `fault_code` AS code, COUNT(*) AS cnt {$selectDates}
+                        FROM `$table` WHERE {$where} GROUP BY `fault_code`";
                 $res = DB::select($sql, $bindings);
 
                 foreach ($res as $row) {
@@ -657,12 +641,11 @@ class StatsController extends Controller
                         'sheet'        => $slug,
                         'sheet_title'  => $cfg['title'] ?? $slug,
                         'count'        => (int) $row->cnt,
-                        'first_date'   => substr((string) $row->first_date, 0, 10),
-                        'last_date'    => substr((string) $row->last_date, 0, 10),
+                        'first_date'   => $row->first_date ? substr((string) $row->first_date, 0, 10) : null,
+                        'last_date'    => $row->last_date  ? substr((string) $row->last_date, 0, 10)  : null,
                     ];
                 }
             }
-
             usort($rows, fn($a, $b) => $b['count'] <=> $a['count']);
             return $rows;
         });

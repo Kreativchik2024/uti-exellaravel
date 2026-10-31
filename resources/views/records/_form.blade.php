@@ -9,11 +9,28 @@
     $workerDefaults = $defaults ?? [];
     $employeesList  = $employeesList ?? [];
     $lookups        = $lookups ?? [];
+    $formUnlocked   = $formUnlocked ?? (session('form_unlocked_until', 0) > now()->timestamp);
+    $unlockUntil    = (int) session('form_unlocked_until', 0);
 @endphp
 
 @if($hasWorkers)
     <div class="border rounded p-3 bg-gray-50">
-        <div class="text-sm font-semibold text-gray-700 mb-2">Исполнители (до 5, первый обязателен)</div>
+        <div class="flex justify-between items-center mb-2">
+            <div class="text-sm font-semibold text-gray-700">
+                Исполнители (подставлены из рабочего места)
+            </div>
+            @if($formUnlocked)
+                <span class="text-xs text-green-700">
+                    ✓ Разблокировано до {{ \Carbon\Carbon::createFromTimestamp($unlockUntil)->format('H:i') }}
+                </span>
+            @else
+                <button type="button" onclick="openPinUnlock()"
+                        class="text-xs text-blue-600 hover:underline">
+                    Изменить (нужен ваш ПИН)
+                </button>
+            @endif
+        </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
             @foreach($workerFields as $name)
                 @if(isset($cfg['fields'][$name]))
@@ -26,13 +43,23 @@
                         <label class="block text-xs text-gray-600 mb-1">
                             {{ $f['label'] }}@if($isReq)<span class="text-red-600">*</span>@endif
                         </label>
-                        <select name="{{ $name }}" @if($isReq) required @endif
-                                class="w-full border rounded px-2 py-1 text-sm">
-                            <option value="">— выберите —</option>
-                            @foreach($employeesList as $emp)
-                                <option value="{{ $emp }}" @selected($value === $emp)>{{ $emp }}</option>
-                            @endforeach
-                        </select>
+
+                        @if($formUnlocked)
+                            <select name="{{ $name }}" @if($isReq) required @endif
+                                    class="w-full border rounded px-2 py-1 text-sm">
+                                <option value="">— выберите —</option>
+                                @foreach($employeesList as $emp)
+                                    <option value="{{ $emp }}" @selected($value === $emp)>{{ $emp }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <select disabled
+                                    class="w-full border rounded px-2 py-1 text-sm bg-gray-100 text-gray-600 cursor-not-allowed">
+                                <option>{{ $value !== '' ? $value : '— не выбран —' }}</option>
+                            </select>
+                            <input type="hidden" name="{{ $name }}" value="{{ $value }}">
+                        @endif
+
                         @error($name)
                             <div class="text-red-600 text-xs mt-1">{{ $message }}</div>
                         @enderror
@@ -41,6 +68,104 @@
             @endforeach
         </div>
     </div>
+
+    {{-- Модалка: разблокировка своим ПИНом --}}
+    <div id="pinUnlockModal"
+         class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+         onclick="if(event.target===this)closePinUnlock()">
+        <div class="bg-white rounded-lg shadow-xl w-72 p-4 space-y-2">
+            <h3 class="font-semibold text-base text-gray-800">Изменить исполнителей</h3>
+            <p class="text-xs text-gray-600 leading-snug">
+                Введите <strong>ваш</strong> ПИН для разблокировки полей (действует 3 часа).
+            </p>
+            <div>
+                <label class="block text-[11px] text-gray-500 mb-1">ПИН (4–6 цифр)</label>
+                <input type="password" id="pinUnlockInput" inputmode="numeric" pattern="\d{4,6}"
+                       class="border rounded px-2 py-1.5 w-full text-sm"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();submitPinUnlock();}">
+            </div>
+            <div id="pinUnlockError" class="text-red-600 text-xs hidden"></div>
+            <div class="flex justify-end gap-2 pt-1">
+                <button type="button" onclick="closePinUnlock()"
+                        class="px-2.5 py-1 text-xs text-gray-600 hover:text-gray-900">Отмена</button>
+                <button type="button" id="pinUnlockBtn" onclick="submitPinUnlock()"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 text-xs rounded">
+                    Разблокировать
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        var unlockUrl = '{{ route('records.pinUnlock') }}';
+        var csrf = '{{ csrf_token() }}';
+
+        window.openPinUnlock = function () {
+            var m = document.getElementById('pinUnlockModal');
+            var e = document.getElementById('pinUnlockError');
+            var i = document.getElementById('pinUnlockInput');
+            m.classList.remove('hidden');
+            e.classList.add('hidden');
+            i.value = '';
+            setTimeout(function () { i.focus(); }, 50);
+        };
+
+        window.closePinUnlock = function () {
+            document.getElementById('pinUnlockModal').classList.add('hidden');
+        };
+
+        window.submitPinUnlock = async function () {
+            var input = document.getElementById('pinUnlockInput');
+            var err   = document.getElementById('pinUnlockError');
+            var btn   = document.getElementById('pinUnlockBtn');
+            var pin = (input.value || '').trim();
+
+            if (!/^\d{4,6}$/.test(pin)) {
+                err.textContent = 'ПИН — 4–6 цифр.';
+                err.classList.remove('hidden');
+                return;
+            }
+
+            err.classList.add('hidden');
+            btn.disabled = true;
+            btn.textContent = 'Проверка…';
+
+            try {
+                var body = new URLSearchParams();
+                body.set('_token', csrf);
+                body.set('pin', pin);
+
+                var res = await fetch(unlockUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: body.toString(),
+                    credentials: 'same-origin',
+                });
+
+                var data = await res.json().catch(function () { return {}; });
+
+                if (res.ok && data.ok) {
+                    window.location.reload();
+                } else {
+                    err.textContent = data.error || ('Ошибка ' + res.status);
+                    err.classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.textContent = 'Разблокировать';
+                }
+            } catch (e) {
+                err.textContent = 'Ошибка соединения.';
+                err.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Разблокировать';
+            }
+        };
+    })();
+    </script>
 @endif
 
 @foreach($cfg['fields'] as $name => $f)

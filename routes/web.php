@@ -18,6 +18,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/workstation/select', [WorkstationController::class, 'store'])->name('workstation.store');
     Route::post('/workstation/skip',   [WorkstationController::class, 'skip'])->name('workstation.skip');
     Route::post('/workstation/clear',  [WorkstationController::class, 'clear'])->name('workstation.clear');
+
+    // ПИН-проверки: доступны и до workers (на /workstation/select)
+    Route::post('/records-pin-check',  [RecordController::class, 'checkEmployeePin'])->name('records.pinCheck');
+    Route::post('/records-pin-unlock', [RecordController::class, 'checkCurrentUserPin'])->name('records.pinUnlock');
 });
 
 Route::get('/', [DashboardController::class, 'index'])
@@ -25,9 +29,10 @@ Route::get('/', [DashboardController::class, 'index'])
     ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
-    Route::get('/profile',    [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile',  [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/profile',      [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile',    [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/pin', [ProfileController::class, 'updatePin'])->name('profile.pin');
+    Route::delete('/profile',   [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
 Route::middleware(['auth', 'workers', 'role:admin'])->group(function () {

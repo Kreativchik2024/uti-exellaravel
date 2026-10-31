@@ -155,11 +155,6 @@ class StatsService
         return $out;
     }
 
-    /**
-     * Разбивка по категориям (листам) для конкретного исполнителя.
-     * Возвращает [slug => ['title','total','unit']] только по тем листам,
-     * где у исполнителя есть хотя бы одна запись в периоде.
-     */
     public function workerBySheet(string $worker, ?Carbon $from = null, ?Carbon $to = null): array
     {
         $key = $this->normalizeName($worker);
@@ -204,10 +199,6 @@ class StatsService
         return $out;
     }
 
-    /**
-     * Конкретные записи исполнителя в выбранной категории (листе).
-     * Возвращает универсальный набор полей (только те, что реально есть в таблице).
-     */
     public function workerRecords(
         string $worker,
         string $slug,
@@ -285,9 +276,6 @@ class StatsService
         return $out;
     }
 
-    /**
-     * Список для селекта «Исполнитель» — ТОЛЬКО активные сотрудники из employees.
-     */
     public function listWorkers(): array
     {
         return Employee::query()

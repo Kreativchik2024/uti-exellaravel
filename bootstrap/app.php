@@ -16,6 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'role'    => \App\Http\Middleware\RoleMiddleware::class,
             'workers' => \App\Http\Middleware\EnsureWorkersSelected::class,
         ]);
+
+        // Single session: применяется ко всем web-запросам.
+        // Внутри middleware — проверка: только для role=executor.
+        $middleware->web(append: [
+            \App\Http\Middleware\EnsureSingleSession::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
