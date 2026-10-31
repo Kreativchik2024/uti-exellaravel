@@ -51,13 +51,18 @@
 
                     {{-- Сетка карточек --}}
                     <div class="p-2">
-                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
+                        {{-- grid-auto-rows: 1fr выравнивает высоту карточек в одном ряду --}}
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; grid-auto-rows: 1fr;">
                             @foreach($perSheet as $slug => $data)
-                                <div class="bg-gray-50 rounded border border-gray-200 p-2 flex flex-col items-center justify-center text-center hover:bg-white hover:shadow-sm transition">
-                                    <div class="text-[11px] font-medium text-gray-600 mb-1 truncate w-full leading-tight" title="{{ $data['title'] }}">
+                                <div class="bg-gray-50 rounded border border-gray-200 p-2 flex flex-col justify-between text-center hover:bg-white hover:shadow-sm transition min-h-[64px]">
+                                    
+                                    {{-- Заголовок: ограничиваем 2 строками, чтобы не раздувал карточку --}}
+                                    <div class="text-[11px] font-medium text-gray-600 mb-2 w-full leading-tight line-clamp-2" title="{{ $data['title'] }}">
                                         {{ $data['title'] }}
                                     </div>
-                                    <div class="flex flex-col items-center justify-center">
+                                    
+                                    {{-- Цифра: всегда прижата к низу --}}
+                                    <div class="mt-auto">
                                         <span class="text-lg font-bold {{ $data['total'] > 0 ? 'text-blue-600' : 'text-gray-300' }} leading-none">
                                             {{ $data['total'] }}
                                         </span>
