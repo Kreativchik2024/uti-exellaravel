@@ -13,8 +13,9 @@ class PgpRecord extends Model
         'worker1', 'worker2', 'worker3', 'worker4', 'worker5',
         'work_start', 'work_end',
         'board_number', 'ip_address', 'fuselage_number',
-        'frame_serial',    // <-- ДОБАВЛЕНО
-        'bracket_serial',  // <-- ДОБАВЛЕНО
+        'frame_serial',      // № моторамы
+        'cross3_number',     // № Кросс 3  <-- ДОБАВЛЕНО
+        'bracket_serial',    // S/N кронштейна с камерой (№ камеры)
         'status', 'defect_reason', 'actions_taken',
         'created_by', 'updated_by',
         'fault_code',

@@ -55,7 +55,7 @@
                                     @elseif($col === 'created_by')
                                         Автор
                                     @elseif($col === 'health_indicator')
-                                        Статус
+                                        Проверка
                                     @else
                                         {{ $cfg['fields'][$col]['label'] ?? $col }}
                                     @endif
@@ -104,6 +104,9 @@
                                                 Нет
                                             </span>
                                         @endif
+                                    @elseif($col === 'status')
+                                        {{-- Обычный вывод статуса текстом --}}
+                                        {{ $record->status ?: '—' }}
                                     @elseif(in_array($col, ['record_date']))
                                         <span class="font-medium text-gray-900">
                                             {{ $record->$col ? \Carbon\Carbon::parse($record->$col)->format('d.m.Y') : '—' }}

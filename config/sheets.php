@@ -16,7 +16,7 @@ return [
     'map' => [
 
         // =====================================================
-        // ПГП (борта) — только Пост, добавлены Моторама и Кронштейн
+        // ПГП (борта)
         // =====================================================
         'pgp' => [
             'title'  => 'ПГП (борта)',
@@ -32,13 +32,24 @@ return [
                 'ip_address'      => ['label'=>'IP','type'=>'text','rules'=>'nullable|string|max:64'],
                 'fuselage_number' => ['label'=>'№ фюзеляжа','type'=>'text','rules'=>'nullable|string|max:64'],
                 'frame_serial'    => ['label'=>'№ моторамы','type'=>'text','rules'=>'nullable|string|max:120'],
-                'bracket_serial'  => ['label'=>'S/N кронштейна с камерой','type'=>'text','rules'=>'nullable|string|max:120'],
+                'cross3_number'   => ['label'=>'№ Кросс 3','type'=>'text','rules'=>'nullable|string|max:120'],
+                'bracket_serial'  => ['label'=>'Номер камеры','type'=>'text','rules'=>'nullable|string|max:120'],
                 'status'          => ['label'=>'Статус','type'=>'select','rules'=>'required',
                                        'options'=>['Сдан','Не сдан','В работе','Исправен','Неисправен','В ремонт']],
                 'defect_reason'   => ['label'=>'Причина','type'=>'textarea','rules'=>'nullable|string'],
                 'actions_taken'   => ['label'=>'Действия','type'=>'textarea','rules'=>'nullable|string'],
             ], $faultCode),
-            'list_columns' => ['record_date','post_number','board_number','status','fault_code'],
+            'health_fields'      => ['status'],
+            'health_good_values' => ['Сдан','Исправен'],
+            'list_columns' => [
+                'record_date',
+                'post_number',
+                'board_number',
+                //'frame_serial',
+                'cross3_number',
+                'bracket_serial',
+                'status',
+            ],
         ],
 
         // =====================================================
@@ -273,7 +284,6 @@ return [
 
         // =====================================================
         // Кронштейн с камерой
-        // fault_code и health_indicator добавляются в контроллере
         // =====================================================
         'camera_bracket' => [
             'title'  => 'Кронштейн с камерой',

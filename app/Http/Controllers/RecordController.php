@@ -106,12 +106,17 @@ class RecordController extends Controller
         return implode(', ', $names);
     }
 
-    private function computeHealth($record, array $fields): string
+    /**
+     * Индикатор «здоровья» записи.
+     * Зелёный — если ВСЕ поля из $fields заполнены и их значения ∈ $goodValues.
+     * Жёлтый — если хоть одно поле пустое или не входит в $goodValues.
+     */
+    private function computeHealth($record, array $fields, array $goodValues = ['Работает']): string
     {
         foreach ($fields as $field) {
             $val = $record->{$field} ?? null;
 
-            if ($val === null || $val === '' || $val !== 'Работает') {
+            if ($val === null || $val === '' || !in_array($val, $goodValues, true)) {
                 return 'yellow';
             }
         }
@@ -152,27 +157,25 @@ class RecordController extends Controller
 
         $records = $query->paginate(50)->withQueryString();
 
-        // === Формирование колонок ===
+        // Формирование колонок
         $listColumns = $cfg['list_columns'];
 
-        // 1. worker1 — всегда, если есть в fields
+        // worker1 — всегда
         if (array_key_exists('worker1', $cfg['fields']) && !in_array('worker1', $listColumns)) {
             $listColumns[] = 'worker1';
         }
 
-        // 2. created_by — всегда
+        // created_by — всегда
         if (!in_array('created_by', $listColumns)) {
             $listColumns[] = 'created_by';
         }
 
-        // 3. fault_code — если в fields есть, но в list_columns ещё нет
-        //    (например, camera_bracket: убран из конфига, добавляем перед health_indicator)
+        // fault_code — если есть в fields, но нет в list_columns (например, pgp, camera_bracket)
         if (array_key_exists('fault_code', $cfg['fields']) && !in_array('fault_code', $listColumns)) {
             $listColumns[] = 'fault_code';
         }
 
-        // 4. health_indicator — всегда последним
-        //    Сначала убираем, если случайно есть в config (защита от дубля)
+        // health_indicator — всегда в конец
         $listColumns = array_values(array_filter($listColumns, fn($col) => $col !== 'health_indicator'));
 
         if (!empty($cfg['health_fields'])) {
@@ -180,11 +183,13 @@ class RecordController extends Controller
         }
 
         // Обогащение записей
+        $goodValues = $cfg['health_good_values'] ?? ['Работает'];
+
         foreach ($records as $record) {
             $record->workers_list = $this->collectWorkers($record);
 
             if (!empty($cfg['health_fields'])) {
-                $record->health = $this->computeHealth($record, $cfg['health_fields']);
+                $record->health = $this->computeHealth($record, $cfg['health_fields'], $goodValues);
             }
         }
 
