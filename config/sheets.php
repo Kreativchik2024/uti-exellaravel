@@ -104,7 +104,7 @@ return [
         ],
 
         // =====================================================
-        // Кросс 3
+        // Кросс 3 — сюда переехал «Барометр» из camera_bracket
         // =====================================================
         'cross3' => [
             'title'  => 'Кросс 3',
@@ -116,6 +116,8 @@ return [
                 'pc_version'      => ['label'=>'ПК версия','type'=>'text','rules'=>'nullable|string|max:80'],
                 'ahrs'            => ['label'=>'AHRS','type'=>'text','rules'=>'nullable|string|max:20'],
                 'compass_version' => ['label'=>'Компас, версия','type'=>'text','rules'=>'nullable|string|max:80'],
+                'barometer_status'=> ['label'=>'Барометр','type'=>'select','rules'=>'nullable',
+                                      'options'=>['Работает','Не работает','Требует замены']],
             ], $workers, [
                 'notes'      => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
                 'defect'     => ['label'=>'Дефект','type'=>'textarea','rules'=>'nullable|string'],
@@ -307,7 +309,7 @@ return [
         ],
 
         // =====================================================
-        // Кронштейн с камерой
+        // Кронштейн с камерой — БЕЗ barometer_status (переехал в cross3)
         // =====================================================
         'camera_bracket' => [
             'title'  => 'Кронштейн с камерой',
@@ -322,8 +324,6 @@ return [
                                             'options'=>['Работает','Не работает','Требует ремонта']],
                 'speed_sensor_status' => ['label'=>'Датчик скорости','type'=>'select','rules'=>'nullable',
                                             'options'=>['Работает','Не работает','Требует замены']],
-                'barometer_status'    => ['label'=>'Барометр','type'=>'select','rules'=>'nullable',
-                                            'options'=>['Работает','Не работает','Требует замены']],
                 'suspension_status'   => ['label'=>'Подвес камеры','type'=>'select','rules'=>'nullable',
                                             'options'=>['Работает','Не работает','Требует ремонта']],
             ], $workers, [
@@ -334,7 +334,6 @@ return [
                 'camera_status',
                 'night_camera_status',
                 'speed_sensor_status',
-                'barometer_status',
                 'suspension_status',
             ],
             'list_columns' => ['record_date','serial_number'],

@@ -12,23 +12,20 @@ class CameraBracketRecord extends Model
         'camera_status',
         'night_camera_status',
         'speed_sensor_status',
-        'barometer_status',
-        'suspension_status', // <-- ДОБАВЛЕНО
-        'worker1',
-        'worker2',
-        'worker3',
-        'worker4',
-        'worker5',
+        // 'barometer_status',   // ← убрано, переехало в Cross3Record
+        'suspension_status',
         'notes',
         'comments',
-        'created_by',
-        'updated_by',
         'fault_code',
+        'worker1', 'worker2', 'worker3', 'worker4', 'worker5',
+        'created_by', 'updated_by',
     ];
 
     protected function casts(): array
     {
-        return ['record_date' => 'date'];
+        return [
+            'record_date' => 'date',
+        ];
     }
 
     public function creator()
