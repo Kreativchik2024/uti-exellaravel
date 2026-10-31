@@ -6,6 +6,7 @@ use App\Models\Employee;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class RecordController extends Controller
@@ -17,6 +18,37 @@ class RecordController extends Controller
         $cfg = config("sheets.map.$sheet");
         abort_unless($cfg, 404, "Вкладка {$sheet} не найдена");
         return $cfg;
+    }
+
+    private function lookupPrefix(string $fieldName, array $lookup): ?string
+    {
+        if (!empty($lookup['prefix'])) {
+            return $lookup['prefix'];
+        }
+        if (preg_match('/^(.+?)_(number|serial|code|id)$/', $fieldName, $m)) {
+            return $m[1];
+        }
+        return null;
+    }
+
+    /**
+     * Добавляет к $rules валидацию скрытых полей снимков.
+     * Без этого $r->validate() выкинет *_worker/*_health/... из $data,
+     * и клиентский снимок не сохранится.
+     */
+    private function withSnapshotRules(array $cfg, array $rules): array
+    {
+        foreach ($cfg['fields'] as $name => $f) {
+            if (empty($f['lookup'])) continue;
+            $prefix = $this->lookupPrefix($name, $f['lookup']);
+            if (!$prefix) continue;
+
+            $rules[$prefix.'_worker']      = 'nullable|string|max:500';
+            $rules[$prefix.'_record_date'] = 'nullable|date';
+            $rules[$prefix.'_health']      = 'nullable|string|max:20';
+            $rules[$prefix.'_status_text'] = 'nullable|string|max:500';
+        }
+        return $rules;
     }
 
     private function workerDefaults(): array
@@ -117,7 +149,8 @@ class RecordController extends Controller
     }
 
     /**
-     * Формирует health/status_text/worker1/record_date по связанной записи.
+     * Формирует health/status_text/workers/record_date по связанной записи.
+     * Возвращает и display-формат (d.m.Y), и ISO (Y-m-d) — для скрытых input.
      */
     private function buildLookupResult(array $targetCfg, $found): array
     {
@@ -148,36 +181,77 @@ class RecordController extends Controller
             }
         }
 
+        $workersAll = [];
+        foreach (self::WORKER_FIELDS as $wf) {
+            $v = $found->{$wf} ?? null;
+            if (!empty($v)) $workersAll[] = $v;
+        }
+
+        $recordDateDisplay = null;
+        $recordDateIso     = null;
+        if (!empty($found->record_date)) {
+            try {
+                $dt = $found->record_date instanceof \DateTimeInterface
+                    ? \Carbon\Carbon::instance($found->record_date)
+                    : \Carbon\Carbon::parse($found->record_date);
+                $recordDateDisplay = $dt->format('d.m.Y');
+                $recordDateIso     = $dt->toDateString();
+            } catch (\Throwable $e) {
+                // игнорируем — вернём null
+            }
+        }
+
         return [
-            'worker1'     => $found->worker1 ?? null,
-            'record_date' => $found->record_date?->format('d.m.Y'),
-            'health'      => $health,
-            'status_text' => $statusText,
+            'worker1'         => $workersAll[0] ?? null,
+            'workers'         => implode(', ', $workersAll),
+            'record_date'     => $recordDateDisplay,
+            'record_date_iso' => $recordDateIso,
+            'health'          => $health,
+            'status_text'     => $statusText,
         ];
     }
 
     /**
-     * Записывает снимок lookup в $data для сохранения в pgp_records.
-     * Вызывается в store() и update().
+     * Fallback: вычисляет снимки на сервере.
+     * НЕ перезаписывает непустые значения, пришедшие с клиента.
      */
     private function applyLookupSnapshots(array $cfg, array &$data): void
     {
         foreach ($cfg['fields'] as $name => $f) {
             if (empty($f['lookup'])) continue;
 
-            $prefix = $f['lookup']['prefix'] ?? null;
+            $prefix = $this->lookupPrefix($name, $f['lookup']);
             if (!$prefix) continue;
 
             $value = trim((string) ($data[$name] ?? ''));
 
-            // По умолчанию обнуляем снимок
-            $data[$prefix . '_worker']      = null;
-            $data[$prefix . '_record_date'] = null;
-            $data[$prefix . '_health']      = null;
-            $data[$prefix . '_status_text'] = null;
+            // Если поле пустое — снимок тоже пустой
+            if ($value === '') {
+                $data[$prefix.'_worker']      = null;
+                $data[$prefix.'_record_date'] = null;
+                $data[$prefix.'_health']      = null;
+                $data[$prefix.'_status_text'] = null;
+                continue;
+            }
 
-            if ($value === '') continue;
+            // Если с клиента уже пришёл полный снимок — доверяем ему
+            $incomingWorker = $data[$prefix.'_worker']      ?? null;
+            $incomingHealth = $data[$prefix.'_health']      ?? null;
+            $incomingDate   = $data[$prefix.'_record_date'] ?? null;
 
+            if (!empty($incomingWorker) && in_array($incomingHealth, ['green','red'], true)) {
+                // Нормализуем дату к Y-m-d (на случай, если клиент прислал не ISO)
+                if (!empty($incomingDate)) {
+                    try {
+                        $data[$prefix.'_record_date'] = \Carbon\Carbon::parse($incomingDate)->toDateString();
+                    } catch (\Throwable $e) {
+                        $data[$prefix.'_record_date'] = null;
+                    }
+                }
+                continue;
+            }
+
+            // Fallback: серверный lookup
             $targetCfg = config("sheets.map.{$f['lookup']['sheet']}");
             if (!$targetCfg) continue;
 
@@ -186,22 +260,28 @@ class RecordController extends Controller
                 ->orderByDesc('record_date')
                 ->first();
 
+            Log::info('[lookup snapshot]', [
+                'field'    => $name,
+                'prefix'   => $prefix,
+                'value'    => $value,
+                'match_by' => $f['lookup']['match_by'],
+                'sheet'    => $f['lookup']['sheet'],
+                'found_id' => $found ? $found->getKey() : null,
+                'incoming_worker' => $incomingWorker,
+                'incoming_health' => $incomingHealth,
+            ]);
+
             if (!$found) continue;
 
             $res = $this->buildLookupResult($targetCfg, $found);
 
-            $data[$prefix . '_worker']      = $res['worker1'];
-            $data[$prefix . '_record_date'] = $res['record_date']
-                ? \Carbon\Carbon::createFromFormat('d.m.Y', $res['record_date'])->toDateString()
-                : null;
-            $data[$prefix . '_health']      = $res['health'];
-            $data[$prefix . '_status_text'] = $res['status_text'];
+            $data[$prefix.'_worker']      = $res['workers'] ?: null;
+            $data[$prefix.'_record_date'] = $res['record_date_iso'] ?? null;
+            $data[$prefix.'_health']      = $res['health'];
+            $data[$prefix.'_status_text'] = $res['status_text'];
         }
     }
 
-    /**
-     * Для show()/edit(): читаем снимок из записи, а не live.
-     */
     private function buildLookupFromRecord(array $cfg, $record): array
     {
         $result = [];
@@ -209,7 +289,7 @@ class RecordController extends Controller
         foreach ($cfg['fields'] as $name => $f) {
             if (empty($f['lookup'])) continue;
 
-            $prefix = $f['lookup']['prefix'] ?? null;
+            $prefix = $this->lookupPrefix($name, $f['lookup']);
             if (!$prefix) continue;
 
             $worker = $record->{$prefix . '_worker'} ?? null;
@@ -218,11 +298,12 @@ class RecordController extends Controller
             $text   = $record->{$prefix . '_status_text'} ?? null;
 
             if ($worker === null && $date === null && $health === null) {
-                continue; // снимка нет — нечего показывать
+                continue;
             }
 
             $result[$name] = [
                 'worker1'     => $worker,
+                'workers'     => $worker,
                 'record_date' => $date ? \Carbon\Carbon::parse($date)->format('d.m.Y') : null,
                 'health'      => $health ?: 'green',
                 'status_text' => $text ?: 'Всё в порядке',
@@ -232,9 +313,6 @@ class RecordController extends Controller
         return $result;
     }
 
-    /**
-     * AJAX-lookup: возвращает live-данные (для подсказки при вводе).
-     */
     public function lookup(Request $r, string $sheet)
     {
         $cfg = $this->cfg($sheet);
@@ -361,6 +439,8 @@ class RecordController extends Controller
         }
 
         $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
+        $rules = $this->withSnapshotRules($cfg, $rules);   // ← добавили снимки в правила
+
         $data  = $r->validate($rules);
         $this->validateWorkers($data);
 
@@ -399,6 +479,8 @@ class RecordController extends Controller
         Gate::authorize('update', $record);
 
         $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
+        $rules = $this->withSnapshotRules($cfg, $rules);   // ← добавили снимки в правила
+
         $data  = $r->validate($rules);
         $this->validateWorkers($data);
 
