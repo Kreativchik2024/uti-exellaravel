@@ -3,8 +3,7 @@
         <div class="flex justify-between items-center gap-4">
             <div class="flex items-center gap-3 min-w-0">
                 <a href="{{ route('records.index', $sheet) }}"
-                   class="flex-shrink-0 w-9 h-9 inline-flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition active:scale-95"
-                   title="Назад к списку">
+                   class="flex-shrink-0 w-9 h-9 inline-flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition active:scale-95">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                     </svg>
@@ -26,7 +25,7 @@
                 @endcan
                 @can('delete', $record)
                     <form method="POST" action="{{ route('records.destroy', [$sheet, $record->id]) }}"
-                          onsubmit="return confirm('Вы уверены, что хотите удалить эту запись? Это действие нельзя отменить.')">
+                          onsubmit="return confirm('Удалить запись?')">
                         @csrf @method('DELETE')
                         <button type="submit"
                                 class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all duration-150 active:scale-95">
@@ -43,60 +42,64 @@
 
     <div class="py-8 max-w-4xl mx-auto sm:px-6 lg:px-8">
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            @php
+                $lookups = $lookups ?? [];
+                $renderField = function ($name, $record, $f) {
+                    $val = $record->$name;
+                    $displayVal = $val;
+                    $type = $f['type'] ?? 'text';
+
+                    if ($type === 'select' && is_array($f['options'] ?? null) && array_key_exists($val, $f['options'])) {
+                        $displayVal = $f['options'][$val];
+                    } elseif ($val instanceof \Carbon\Carbon) {
+                        $displayVal = $val->format('d.m.Y H:i');
+                    } elseif (is_bool($val)) {
+                        $displayVal = $val ? 'Да' : 'Нет';
+                    } elseif ($name === 'record_date' && $val) {
+                        $displayVal = \Carbon\Carbon::parse($val)->format('d.m.Y');
+                    } elseif ($name === 'post_number' && $val) {
+                        $displayVal = 'Пост ' . $val;
+                    }
+
+                    if ($displayVal === null || $displayVal === '') $displayVal = '—';
+                    return ['displayVal' => $displayVal, 'type' => $type];
+                };
+            @endphp
+
             <dl class="divide-y divide-gray-100">
                 @foreach($cfg['fields'] as $name => $f)
-                    @php
-                        $val = $record->$name;
-                        $displayVal = $val;
-                        $type = $f['type'] ?? 'text';
-
-                        if ($type === 'select' && is_array($f['options'] ?? null) && array_key_exists($val, $f['options'])) {
-                            $displayVal = $f['options'][$val];
-                        } elseif ($val instanceof \Carbon\Carbon) {
-                            $displayVal = $val->format('d.m.Y H:i');
-                        } elseif (is_bool($val)) {
-                            $displayVal = $val ? 'Да' : 'Нет';
-                        } elseif ($name === 'record_date' && $val) {
-                            $displayVal = \Carbon\Carbon::parse($val)->format('d.m.Y');
-                        }
-
-                        // Префиксы для отображения
-                        if ($name === 'post_number' && $val) {
-                            $displayVal = 'Пост ' . $val;
-                        } elseif ($name === 'peripheral_number' && $val) {
-                            $displayVal = 'Периферия ' . $val;
-                        }
-
-                        $show = fn($v) => ($v === null || $v === '') ? '—' : $v;
-                    @endphp
-
-                    <div class="px-6 py-4 {{ $type === 'textarea' ? '' : 'sm:flex sm:items-start sm:gap-6' }}">
-                        <dt class="text-sm font-medium text-gray-500 {{ $type === 'textarea' ? 'mb-2' : 'sm:w-1/3 flex-shrink-0' }}">
+                    @php $r = $renderField($name, $record, $f); @endphp
+                    <div class="px-6 py-4 {{ $r['type'] === 'textarea' ? '' : 'sm:flex sm:items-start sm:gap-6' }}">
+                        <dt class="text-sm font-medium text-gray-500 {{ $r['type'] === 'textarea' ? 'mb-2' : 'sm:w-1/3 flex-shrink-0' }}">
                             {{ $f['label'] }}
                         </dt>
-                        <dd class="text-gray-900 {{ $type === 'textarea' ? '' : 'sm:flex-1' }}">
-                            @if($type === 'textarea')
-                                <div class="whitespace-pre-line bg-gray-50 p-4 rounded-lg border border-gray-100 text-sm leading-relaxed">
-                                    {{ $show($displayVal) }}
-                                </div>
-                            @elseif($name === 'is_repaired')
-                                @if($val)
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
-                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                                        </svg>
-                                        Отремонтировано
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700">
-                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-                                        </svg>
-                                        Не отремонтировано
-                                    </span>
-                                @endif
+                        <dd class="text-gray-900 {{ $r['type'] === 'textarea' ? '' : 'sm:flex-1' }}">
+                            @if($r['type'] === 'textarea')
+                                <div class="whitespace-pre-line bg-gray-50 p-4 rounded-lg border border-gray-100 text-sm leading-relaxed">{{ $r['displayVal'] }}</div>
                             @else
-                                <span class="text-sm">{{ $show($displayVal) }}</span>
+                                <span class="text-sm">{{ $r['displayVal'] }}</span>
+                            @endif
+
+                            @if(!empty($f['lookup']))
+                                @php $ld = $lookups[$name] ?? null; @endphp
+                                @if($ld)
+                                    @php
+                                        $isGreen = ($ld['health'] ?? 'green') === 'green';
+                                        $cls = $isGreen ? 'bg-green-50 border-green-300 text-green-800' : 'bg-red-50 border-red-300 text-red-800';
+                                    @endphp
+                                    <div class="mt-1">
+                                        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border {{ $cls }} text-xs font-medium">
+                                            <span>{{ $isGreen ? '✓' : '✗' }}</span>
+                                            <span>{{ $ld['worker1'] ?? '—' }}</span>
+                                            <span class="opacity-50">·</span>
+                                            <span>{{ $ld['record_date'] ?? '—' }}</span>
+                                            <span class="opacity-50">·</span>
+                                            <span>{{ $ld['status_text'] ?? '' }}</span>
+                                        </div>
+                                    </div>
+                                @else
+                                    <div class="mt-1 text-xs text-gray-400">снимок отсутствует</div>
+                                @endif
                             @endif
                         </dd>
                     </div>

@@ -77,13 +77,10 @@ class RecordController extends Controller
             if (!array_key_exists($field, $data)) {
                 continue;
             }
-
             $value = $data[$field];
-
             if ($value === null || $value === '') {
                 continue;
             }
-
             if (!in_array($value, $allowed, true)) {
                 $errors[$field] = 'Выберите исполнителя из списка.';
             }
@@ -106,11 +103,6 @@ class RecordController extends Controller
         return implode(', ', $names);
     }
 
-    /**
-     * Индикатор «здоровья» записи.
-     * Зелёный — если ВСЕ поля из $fields заполнены и их значения ∈ $goodValues.
-     * Жёлтый — если хоть одно поле пустое или не входит в $goodValues.
-     */
     private function computeHealth($record, array $fields, array $goodValues = ['Работает']): string
     {
         foreach ($fields as $field) {
@@ -122,6 +114,156 @@ class RecordController extends Controller
         }
 
         return 'green';
+    }
+
+    /**
+     * Формирует health/status_text/worker1/record_date по связанной записи.
+     */
+    private function buildLookupResult(array $targetCfg, $found): array
+    {
+        $healthFields = $targetCfg['health_fields'] ?? [];
+        $goodValues   = $targetCfg['health_good_values'] ?? ['Работает'];
+
+        $health     = 'green';
+        $statusText = 'Всё в порядке';
+
+        if (!empty($healthFields)) {
+            $bad = [];
+            foreach ($healthFields as $f) {
+                $val = $found->{$f} ?? null;
+                if ($val === null || $val === '' || !in_array($val, $goodValues, true)) {
+                    $label = $targetCfg['fields'][$f]['label'] ?? $f;
+                    $bad[] = $label . ': ' . ($val ?: '—');
+                }
+            }
+            if (!empty($bad)) {
+                $health = 'red';
+                $statusText = implode(', ', array_unique($bad));
+            }
+        } else {
+            $fc = $found->fault_code ?? null;
+            if (!empty($fc)) {
+                $health = 'red';
+                $statusText = 'Неисправность: ' . $fc;
+            }
+        }
+
+        return [
+            'worker1'     => $found->worker1 ?? null,
+            'record_date' => $found->record_date?->format('d.m.Y'),
+            'health'      => $health,
+            'status_text' => $statusText,
+        ];
+    }
+
+    /**
+     * Записывает снимок lookup в $data для сохранения в pgp_records.
+     * Вызывается в store() и update().
+     */
+    private function applyLookupSnapshots(array $cfg, array &$data): void
+    {
+        foreach ($cfg['fields'] as $name => $f) {
+            if (empty($f['lookup'])) continue;
+
+            $prefix = $f['lookup']['prefix'] ?? null;
+            if (!$prefix) continue;
+
+            $value = trim((string) ($data[$name] ?? ''));
+
+            // По умолчанию обнуляем снимок
+            $data[$prefix . '_worker']      = null;
+            $data[$prefix . '_record_date'] = null;
+            $data[$prefix . '_health']      = null;
+            $data[$prefix . '_status_text'] = null;
+
+            if ($value === '') continue;
+
+            $targetCfg = config("sheets.map.{$f['lookup']['sheet']}");
+            if (!$targetCfg) continue;
+
+            $found = $targetCfg['model']::query()
+                ->where($f['lookup']['match_by'], $value)
+                ->orderByDesc('record_date')
+                ->first();
+
+            if (!$found) continue;
+
+            $res = $this->buildLookupResult($targetCfg, $found);
+
+            $data[$prefix . '_worker']      = $res['worker1'];
+            $data[$prefix . '_record_date'] = $res['record_date']
+                ? \Carbon\Carbon::createFromFormat('d.m.Y', $res['record_date'])->toDateString()
+                : null;
+            $data[$prefix . '_health']      = $res['health'];
+            $data[$prefix . '_status_text'] = $res['status_text'];
+        }
+    }
+
+    /**
+     * Для show()/edit(): читаем снимок из записи, а не live.
+     */
+    private function buildLookupFromRecord(array $cfg, $record): array
+    {
+        $result = [];
+
+        foreach ($cfg['fields'] as $name => $f) {
+            if (empty($f['lookup'])) continue;
+
+            $prefix = $f['lookup']['prefix'] ?? null;
+            if (!$prefix) continue;
+
+            $worker = $record->{$prefix . '_worker'} ?? null;
+            $date   = $record->{$prefix . '_record_date'} ?? null;
+            $health = $record->{$prefix . '_health'} ?? null;
+            $text   = $record->{$prefix . '_status_text'} ?? null;
+
+            if ($worker === null && $date === null && $health === null) {
+                continue; // снимка нет — нечего показывать
+            }
+
+            $result[$name] = [
+                'worker1'     => $worker,
+                'record_date' => $date ? \Carbon\Carbon::parse($date)->format('d.m.Y') : null,
+                'health'      => $health ?: 'green',
+                'status_text' => $text ?: 'Всё в порядке',
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * AJAX-lookup: возвращает live-данные (для подсказки при вводе).
+     */
+    public function lookup(Request $r, string $sheet)
+    {
+        $cfg = $this->cfg($sheet);
+        $field = (string) $r->query('field');
+        $value = trim((string) $r->query('value'));
+
+        if ($value === '' || empty($cfg['fields'][$field]['lookup'])) {
+            return response()->json(['found' => false]);
+        }
+
+        $lookup = $cfg['fields'][$field]['lookup'];
+        $targetCfg = config("sheets.map.{$lookup['sheet']}");
+        if (!$targetCfg) {
+            return response()->json(['found' => false]);
+        }
+
+        $found = $targetCfg['model']::query()
+            ->where($lookup['match_by'], $value)
+            ->orderByDesc('record_date')
+            ->first();
+
+        if (!$found) {
+            return response()->json(['found' => false]);
+        }
+
+        return response()->json(array_merge(
+            ['found' => true],
+            $this->buildLookupResult($targetCfg, $found)
+        ));
     }
 
     public function index(Request $request, string $sheet)
@@ -137,7 +279,6 @@ class RecordController extends Controller
                     $searchableFields[] = $fieldName;
                 }
             }
-
             if (!empty($searchableFields)) {
                 $query->where(function ($w) use ($searchableFields, $q) {
                     foreach ($searchableFields as $field) {
@@ -147,9 +288,7 @@ class RecordController extends Controller
             }
         }
 
-        $hasRecordDate = array_key_exists('record_date', $cfg['fields']);
-
-        if ($hasRecordDate) {
+        if (array_key_exists('record_date', $cfg['fields'])) {
             $query->orderByDesc('record_date')->orderByDesc('id');
         } else {
             $query->orderByDesc('id');
@@ -157,37 +296,27 @@ class RecordController extends Controller
 
         $records = $query->paginate(50)->withQueryString();
 
-        // Формирование колонок
         $listColumns = $cfg['list_columns'];
 
-        // worker1 — всегда
         if (array_key_exists('worker1', $cfg['fields']) && !in_array('worker1', $listColumns)) {
             $listColumns[] = 'worker1';
         }
-
-        // created_by — всегда
         if (!in_array('created_by', $listColumns)) {
             $listColumns[] = 'created_by';
         }
-
-        // fault_code — если есть в fields, но нет в list_columns (например, pgp, camera_bracket)
         if (array_key_exists('fault_code', $cfg['fields']) && !in_array('fault_code', $listColumns)) {
             $listColumns[] = 'fault_code';
         }
 
-        // health_indicator — всегда в конец
         $listColumns = array_values(array_filter($listColumns, fn($col) => $col !== 'health_indicator'));
-
         if (!empty($cfg['health_fields'])) {
             $listColumns[] = 'health_indicator';
         }
 
-        // Обогащение записей
         $goodValues = $cfg['health_good_values'] ?? ['Работает'];
 
         foreach ($records as $record) {
             $record->workers_list = $this->collectWorkers($record);
-
             if (!empty($cfg['health_fields'])) {
                 $record->health = $this->computeHealth($record, $cfg['health_fields'], $goodValues);
             }
@@ -198,11 +327,13 @@ class RecordController extends Controller
 
     public function show(string $sheet, int $id)
     {
-        $cfg = $this->cfg($sheet);
+        $cfg    = $this->cfg($sheet);
         $record = $cfg['model']::with('creator')->findOrFail($id);
         Gate::authorize('view', $record);
 
-        return view('records.show', compact('sheet', 'cfg', 'record'));
+        $lookups = $this->buildLookupFromRecord($cfg, $record);
+
+        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups'));
     }
 
     public function create(string $sheet)
@@ -212,8 +343,9 @@ class RecordController extends Controller
 
         $defaults      = $this->defaults($sheet, $cfg);
         $employeesList = $this->employeesList();
+        $lookups       = [];
 
-        return view('records.create', compact('sheet','cfg','defaults','employeesList'));
+        return view('records.create', compact('sheet','cfg','defaults','employeesList','lookups'));
     }
 
     public function store(Request $r, string $sheet)
@@ -234,6 +366,8 @@ class RecordController extends Controller
 
         $data['created_by'] = auth()->id();
 
+        $this->applyLookupSnapshots($cfg, $data);
+
         try {
             $cfg['model']::create($data);
         } catch (QueryException $e) {
@@ -253,8 +387,9 @@ class RecordController extends Controller
         Gate::authorize('update', $record);
 
         $employeesList = $this->employeesList();
+        $lookups       = $this->buildLookupFromRecord($cfg, $record);
 
-        return view('records.edit', compact('sheet','cfg','record','employeesList'));
+        return view('records.edit', compact('sheet','cfg','record','employeesList','lookups'));
     }
 
     public function update(Request $r, string $sheet, int $id)
@@ -268,6 +403,8 @@ class RecordController extends Controller
         $this->validateWorkers($data);
 
         $data['updated_by'] = auth()->id();
+
+        $this->applyLookupSnapshots($cfg, $data);
 
         try {
             $record->update($data);

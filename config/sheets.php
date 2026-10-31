@@ -16,7 +16,7 @@ return [
     'map' => [
 
         // =====================================================
-        // ПГП (борта)
+        // ПГП (борта) — Cross3 / Bracket / Manet (все с lookup)
         // =====================================================
         'pgp' => [
             'title'  => 'ПГП (борта)',
@@ -32,22 +32,41 @@ return [
                 'ip_address'      => ['label'=>'IP','type'=>'text','rules'=>'nullable|string|max:64'],
                 'fuselage_number' => ['label'=>'№ фюзеляжа','type'=>'text','rules'=>'nullable|string|max:64'],
                 'frame_serial'    => ['label'=>'№ моторамы','type'=>'text','rules'=>'nullable|string|max:120'],
-                'cross3_number'   => ['label'=>'№ Кросс 3','type'=>'text','rules'=>'nullable|string|max:120'],
-                'bracket_serial'  => ['label'=>'Номер камеры','type'=>'text','rules'=>'nullable|string|max:120'],
+
+                'cross3_number'   => [
+                    'label'=>'№ Кросс 3',
+                    'type'=>'text',
+                    'rules'=>'nullable|string|max:120',
+                    'lookup'=>['sheet'=>'cross3','match_by'=>'serial_number'],
+                ],
+                'bracket_serial'  => [
+                    'label'=>'Номер камеры',
+                    'type'=>'text',
+                    'rules'=>'nullable|string|max:120',
+                    'lookup'=>['sheet'=>'camera_bracket','match_by'=>'serial_number'],
+                ],
+                'manet_number'    => [
+                    'label'=>'№ Манета',
+                    'type'=>'text',
+                    'rules'=>'nullable|string|max:120',
+                    'lookup'=>['sheet'=>'comm_module','match_by'=>'serial_number'],
+                ],
+
                 'status'          => ['label'=>'Статус','type'=>'select','rules'=>'required',
                                        'options'=>['Сдан','Не сдан','В работе','Исправен','Неисправен','В ремонт']],
                 'defect_reason'   => ['label'=>'Причина','type'=>'textarea','rules'=>'nullable|string'],
                 'actions_taken'   => ['label'=>'Действия','type'=>'textarea','rules'=>'nullable|string'],
             ], $faultCode),
+
             'health_fields'      => ['status'],
             'health_good_values' => ['Сдан','Исправен'],
             'list_columns' => [
                 'record_date',
                 'post_number',
                 'board_number',
-                //'frame_serial',
                 'cross3_number',
                 'bracket_serial',
+                'manet_number',   // <-- ДОБАВЛЕНО (если не нужен в списке — уберите)
                 'status',
             ],
         ],
@@ -99,10 +118,16 @@ return [
                 'ahrs'            => ['label'=>'AHRS','type'=>'text','rules'=>'nullable|string|max:20'],
                 'compass_version' => ['label'=>'Компас, версия','type'=>'text','rules'=>'nullable|string|max:80'],
             ], $workers, [
-                'notes'  => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
-                'defect' => ['label'=>'Дефект','type'=>'textarea','rules'=>'nullable|string'],
+                'notes'      => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
+                'defect'     => ['label'=>'Дефект','type'=>'textarea','rules'=>'nullable|string'],
+                'status'     => ['label'=>'Статус проверки','type'=>'select','rules'=>'nullable',
+                                 'options'=>['Проверен','Требует ремонта','Брак','В работе']],
+                'is_working' => ['label'=>'Исправен','type'=>'select','rules'=>'required',
+                                 'options'=>['Исправен','Неисправен']],
             ], $faultCode),
-            'list_columns' => ['record_date','serial_number','pc_version','fault_code'],
+            'health_fields'      => ['is_working'],
+            'health_good_values' => ['Исправен'],
+            'list_columns' => ['record_date','serial_number','pc_version','is_working','fault_code'],
         ],
 
         // =====================================================

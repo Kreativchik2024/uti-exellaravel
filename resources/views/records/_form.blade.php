@@ -8,6 +8,7 @@
     $hasWorkers     = collect($workerFields)->contains(fn($f) => isset($cfg['fields'][$f]));
     $workerDefaults = $defaults ?? [];
     $employeesList  = $employeesList ?? [];
+    $lookups        = $lookups ?? [];
 @endphp
 
 @if($hasWorkers)
@@ -17,7 +18,7 @@
             @foreach($workerFields as $name)
                 @if(isset($cfg['fields'][$name]))
                     @php
-                        $f     = $cfg['fields'][$name];
+                        $f = $cfg['fields'][$name];
                         $value = old($name, $record->$name ?? ($workerDefaults[$name] ?? ''));
                         $isReq = !empty($f['required_mark']);
                     @endphp
@@ -25,8 +26,7 @@
                         <label class="block text-xs text-gray-600 mb-1">
                             {{ $f['label'] }}@if($isReq)<span class="text-red-600">*</span>@endif
                         </label>
-                        <select name="{{ $name }}"
-                                @if($isReq) required @endif
+                        <select name="{{ $name }}" @if($isReq) required @endif
                                 class="w-full border rounded px-2 py-1 text-sm">
                             <option value="">— выберите —</option>
                             @foreach($employeesList as $emp)
@@ -47,69 +47,121 @@
     @if(in_array($name, $workerFields)) @continue @endif
 
     @php
-        // ВАЖНО: теперь $defaults[$name] используется как fallback для ЛЮБОГО поля,
-        // а не только для worker1..5. Это чинит авто-подстановку post_number и peripheral_number.
-        $value = old(
-            $name,
-            $record->$name ?? ($defaults[$name] ?? ($f['default'] ?? null))
-        );
-        $isReq = str_contains($f['rules'], 'required') && !str_contains($f['rules'], 'nullable');
+        $value = old($name, $record->$name ?? ($defaults[$name] ?? ($f['default'] ?? null)));
+        $isReq = str_contains($f['rules'] ?? '', 'required') && !str_contains($f['rules'] ?? '', 'nullable');
+        $hasLookup = !empty($f['lookup']);
+        $lookupData = $lookups[$name] ?? null;
     @endphp
     <div>
         <label class="block text-sm text-gray-600 mb-1">
             {{ $f['label'] }}@if($isReq)<span class="text-red-600">*</span>@endif
         </label>
 
-        @if($f['type'] === 'textarea')
+        @if($hasLookup)
+            <div class="lookup-result mb-1">
+                @if($lookupData)
+                    @php
+                        $isGreen = ($lookupData['health'] ?? 'green') === 'green';
+                        $cls = $isGreen ? 'bg-green-50 border-green-300 text-green-800' : 'bg-red-50 border-red-300 text-red-800';
+                    @endphp
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border {{ $cls }} text-xs font-medium">
+                        <span>{{ $isGreen ? '✓' : '✗' }}</span>
+                        <span>{{ $lookupData['worker1'] ?? '—' }}</span>
+                        <span class="opacity-50">·</span>
+                        <span>{{ $lookupData['record_date'] ?? '—' }}</span>
+                        <span class="opacity-50">·</span>
+                        <span>{{ $lookupData['status_text'] ?? '' }}</span>
+                    </div>
+                @endif
+            </div>
+
+            <input type="text" name="{{ $name }}"
+                   value="{{ $value }}"
+                   @if($isReq) required @endif
+                   data-lookup-field="{{ $name }}"
+                   data-lookup-url="{{ route('records.lookup', $sheet) }}"
+                   class="lookup-input w-full border rounded px-3 py-2">
+        @elseif(($f['type'] ?? 'text') === 'textarea')
             <textarea name="{{ $name }}" rows="3" @if($isReq) required @endif
                       class="w-full border rounded px-3 py-2">{{ $value }}</textarea>
-
-        @elseif($f['type'] === 'select')
-            <select name="{{ $name }}" @if($isReq) required @endif
-                    class="w-full border rounded px-3 py-2">
+        @elseif(($f['type'] ?? 'text') === 'select')
+            <select name="{{ $name }}" @if($isReq) required @endif class="w-full border rounded px-3 py-2">
                 <option value="">— выберите —</option>
                 @foreach($f['options'] as $optKey => $optVal)
                     @php
                         $optValue = is_string($optKey) ? $optKey : $optVal;
                         $optLabel = is_string($optKey) ? $optVal : $optVal;
                     @endphp
-                    <option value="{{ $optValue }}" @selected((string)$value === (string)$optValue)>
-                        {{ $optLabel }}
-                    </option>
+                    <option value="{{ $optValue }}" @selected((string)$value === (string)$optValue)>{{ $optLabel }}</option>
                 @endforeach
             </select>
-
-        @elseif($f['type'] === 'date')
-            @php
-                $dateDefault = $value
-                    ? \Carbon\Carbon::parse($value)->format('Y-m-d')
-                    : \Illuminate\Support\Carbon::now()->format('Y-m-d');
-            @endphp
+        @elseif(($f['type'] ?? 'text') === 'date')
             <input type="date" name="{{ $name }}"
-                   value="{{ $dateDefault }}"
-                   @if($isReq) required @endif
-                   class="w-full border rounded px-3 py-2">
-
-        @elseif($f['type'] === 'time')
-            @php
-                $timeDefault = $value
-                    ? \Carbon\Carbon::parse($value)->format('H:i')
-                    : ($name === 'work_end' ? \Illuminate\Support\Carbon::now()->format('H:i') : '');
-            @endphp
+                   value="{{ $value ? \Carbon\Carbon::parse($value)->format('Y-m-d') : \Illuminate\Support\Carbon::now()->format('Y-m-d') }}"
+                   @if($isReq) required @endif class="w-full border rounded px-3 py-2">
+        @elseif(($f['type'] ?? 'text') === 'time')
             <input type="time" name="{{ $name }}"
-                   value="{{ $timeDefault }}"
-                   @if($isReq) required @endif
-                   class="w-full border rounded px-3 py-2">
-
-        @elseif($f['type'] === 'number')
+                   value="{{ $value ? \Carbon\Carbon::parse($value)->format('H:i') : '' }}"
+                   @if($isReq) required @endif class="w-full border rounded px-3 py-2">
+        @elseif(($f['type'] ?? 'text') === 'number')
             <input type="number" name="{{ $name }}" value="{{ $value }}"
-                   @if($isReq) required @endif
-                   class="w-full border rounded px-3 py-2">
-
+                   @if($isReq) required @endif class="w-full border rounded px-3 py-2">
         @else
             <input type="text" name="{{ $name }}" value="{{ $value }}"
-                   @if($isReq) required @endif
-                   class="w-full border rounded px-3 py-2">
+                   @if($isReq) required @endif class="w-full border rounded px-3 py-2">
         @endif
+
+        @error($name)
+            <div class="text-red-600 text-xs mt-1">{{ $message }}</div>
+        @enderror
     </div>
 @endforeach
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+        });
+    }
+
+    document.querySelectorAll('.lookup-input').forEach(function (input) {
+        var timer = null;
+        var resultEl = input.parentElement.querySelector('.lookup-result');
+
+        function render(data) {
+            if (!data || !data.found) {
+                resultEl.innerHTML = '<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-gray-50 border-gray-200 text-xs text-gray-500">Не найдено в таблице</div>';
+                return;
+            }
+            var isGreen = data.health === 'green';
+            var cls = isGreen ? 'bg-green-50 border-green-300 text-green-800' : 'bg-red-50 border-red-300 text-red-800';
+            var icon = isGreen ? '✓' : '✗';
+            resultEl.innerHTML =
+                '<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ' + cls + ' text-xs font-medium">'
+                + '<span>' + icon + '</span>'
+                + '<span>' + esc(data.worker1 || '—') + '</span>'
+                + '<span class="opacity-50">·</span>'
+                + '<span>' + esc(data.record_date || '—') + '</span>'
+                + '<span class="opacity-50">·</span>'
+                + '<span>' + esc(data.status_text || '') + '</span>'
+                + '</div>';
+        }
+
+        function doLookup() {
+            var val = input.value.trim();
+            if (val === '') { resultEl.innerHTML = ''; return; }
+            var url = input.dataset.lookupUrl + '?field=' + encodeURIComponent(input.dataset.lookupField) + '&value=' + encodeURIComponent(val);
+            fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) { render(data); })
+                .catch(function () { resultEl.innerHTML = ''; });
+        }
+
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            timer = setTimeout(doLookup, 400);
+        });
+    });
+});
+</script>
