@@ -9,12 +9,14 @@ class PgpRecord extends Model
     protected $fillable = [
         'record_date',
         'post_number',
-        'peripheral_number', // <-- ДОБАВЛЕНО
-        'worker1','worker2','worker3','worker4','worker5',
-        'work_start','work_end',
-        'board_number','ip_address','fuselage_number',
-        'status','defect_reason','actions_taken',
-        'created_by','updated_by',
+        'peripheral_number',
+        'worker1', 'worker2', 'worker3', 'worker4', 'worker5',
+        'work_start', 'work_end',
+        'board_number', 'ip_address', 'fuselage_number',
+        'frame_serial',    // <-- ДОБАВЛЕНО
+        'bracket_serial',  // <-- ДОБАВЛЕНО
+        'status', 'defect_reason', 'actions_taken',
+        'created_by', 'updated_by',
         'fault_code',
     ];
 
@@ -24,8 +26,8 @@ class PgpRecord extends Model
             'record_date'       => 'date',
             'work_start'        => 'datetime:H:i',
             'work_end'          => 'datetime:H:i',
-            'post_number'       => 'integer', // <-- ДОБАВЛЕНО
-            'peripheral_number' => 'integer', // <-- ДОБАВЛЕНО
+            'post_number'       => 'integer',
+            'peripheral_number' => 'integer',
         ];
     }
 

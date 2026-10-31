@@ -54,6 +54,8 @@
                                         Исполнитель
                                     @elseif($col === 'created_by')
                                         Автор
+                                    @elseif($col === 'health_indicator')
+                                        Статус
                                     @else
                                         {{ $cfg['fields'][$col]['label'] ?? $col }}
                                     @endif
@@ -71,8 +73,21 @@
                                     @if($col === 'created_by')
                                         {{ $record->creator?->name ?? '—' }}
                                     @elseif($col === 'worker1')
-                                        {{-- Все исполнители через запятую --}}
                                         {{ $record->workers_list ?: '—' }}
+                                    @elseif($col === 'health_indicator')
+                                        @if(($record->health ?? null) === 'green')
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                                Всё работает
+                                            </span>
+                                        @elseif(($record->health ?? null) === 'yellow')
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                                                Требует внимания
+                                            </span>
+                                        @else
+                                            —
+                                        @endif
                                     @elseif($col === 'post_number')
                                         {{ $record->post_number ? 'Пост ' . $record->post_number : '—' }}
                                     @elseif($col === 'peripheral_number')

@@ -15,20 +15,24 @@ $faultCode = [
 return [
     'map' => [
 
+        // =====================================================
+        // ПГП (борта) — только Пост, добавлены Моторама и Кронштейн
+        // =====================================================
         'pgp' => [
             'title'  => 'ПГП (борта)',
             'model'  => \App\Models\PgpRecord::class,
             'policy' => \App\Policies\RecordPolicy::class,
             'fields' => array_merge([
-                'record_date'       => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
-                'post_number'       => ['label'=>'Пост','type'=>'number','rules'=>'nullable|integer|min:1|max:30'],
-                'peripheral_number' => ['label'=>'Периферия','type'=>'number','rules'=>'nullable|integer|min:1|max:50'],
+                'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
+                'post_number' => ['label'=>'Пост','type'=>'number','rules'=>'nullable|integer|min:1|max:30'],
             ], $workers, [
                 'work_start'      => ['label'=>'Начало','type'=>'time','rules'=>'nullable'],
                 'work_end'        => ['label'=>'Окончание','type'=>'time','rules'=>'nullable'],
                 'board_number'    => ['label'=>'Номер борта','type'=>'text','rules'=>'nullable|string|max:80'],
                 'ip_address'      => ['label'=>'IP','type'=>'text','rules'=>'nullable|string|max:64'],
                 'fuselage_number' => ['label'=>'№ фюзеляжа','type'=>'text','rules'=>'nullable|string|max:64'],
+                'frame_serial'    => ['label'=>'№ моторамы','type'=>'text','rules'=>'nullable|string|max:120'],
+                'bracket_serial'  => ['label'=>'S/N кронштейна с камерой','type'=>'text','rules'=>'nullable|string|max:120'],
                 'status'          => ['label'=>'Статус','type'=>'select','rules'=>'required',
                                        'options'=>['Сдан','Не сдан','В работе','Исправен','Неисправен','В ремонт']],
                 'defect_reason'   => ['label'=>'Причина','type'=>'textarea','rules'=>'nullable|string'],
@@ -37,6 +41,9 @@ return [
             'list_columns' => ['record_date','post_number','board_number','status','fault_code'],
         ],
 
+        // =====================================================
+        // Модуль связи
+        // =====================================================
         'comm_module' => [
             'title'  => 'Модуль связи',
             'model'  => \App\Models\CommModuleRecord::class,
@@ -51,6 +58,9 @@ return [
             'list_columns' => ['record_date','serial_number','ip_address','fault_code'],
         ],
 
+        // =====================================================
+        // Кросс 1
+        // =====================================================
         'cross1' => [
             'title'  => 'Кросс 1',
             'model'  => \App\Models\Cross1Record::class,
@@ -64,6 +74,9 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
+        // =====================================================
+        // Кросс 3
+        // =====================================================
         'cross3' => [
             'title'  => 'Кросс 3',
             'model'  => \App\Models\Cross3Record::class,
@@ -81,6 +94,9 @@ return [
             'list_columns' => ['record_date','serial_number','pc_version','fault_code'],
         ],
 
+        // =====================================================
+        // Кросс 5
+        // =====================================================
         'cross5' => [
             'title'  => 'Кросс 5',
             'model'  => \App\Models\Cross5Record::class,
@@ -94,6 +110,9 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
+        // =====================================================
+        // Мини ПК
+        // =====================================================
         'mini_pc' => [
             'title'  => 'Мини ПК',
             'model'  => \App\Models\MiniPcRecord::class,
@@ -109,6 +128,9 @@ return [
             'list_columns' => ['record_date','qty','device_type','fault_code'],
         ],
 
+        // =====================================================
+        // Исследования
+        // =====================================================
         'research' => [
             'title'  => 'Исследования',
             'model'  => \App\Models\ResearchRecord::class,
@@ -132,6 +154,9 @@ return [
             'list_columns' => ['record_date','fuselage_no','frame_serial','bracket_serial','is_repaired'],
         ],
 
+        // =====================================================
+        // Проверка ПК
+        // =====================================================
         'pc_check' => [
             'title'  => 'Проверка ПК',
             'model'  => \App\Models\PcCheckRecord::class,
@@ -145,6 +170,9 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
+        // =====================================================
+        // Проверка Sophon
+        // =====================================================
         'sophon_check' => [
             'title'  => 'Проверка Sophon',
             'model'  => \App\Models\SophonCheckRecord::class,
@@ -163,6 +191,9 @@ return [
             'list_columns' => ['record_date','reported_defect','found_defect','status','fault_code'],
         ],
 
+        // =====================================================
+        // Установка ПО на борт
+        // =====================================================
         'software_install' => [
             'title'  => 'Установка ПО на борт',
             'model'  => \App\Models\SoftwareInstallRecord::class,
@@ -176,6 +207,9 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
+        // =====================================================
+        // Регулятор мотора
+        // =====================================================
         'motor_regulator' => [
             'title'  => 'Регулятор мотора',
             'model'  => \App\Models\MotorRegulatorRecord::class,
@@ -189,6 +223,9 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
+        // =====================================================
+        // Провода питания
+        // =====================================================
         'power_wires' => [
             'title'  => 'Провода питания',
             'model'  => \App\Models\PowerWiresRecord::class,
@@ -202,6 +239,9 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
+        // =====================================================
+        // Data 15
+        // =====================================================
         'data15' => [
             'title'  => 'Data 15',
             'model'  => \App\Models\Data15Record::class,
@@ -215,6 +255,9 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
+        // =====================================================
+        // Data 17
+        // =====================================================
         'data17' => [
             'title'  => 'Data 17',
             'model'  => \App\Models\Data17Record::class,
@@ -228,6 +271,10 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
+        // =====================================================
+        // Кронштейн с камерой
+        // fault_code и health_indicator добавляются в контроллере
+        // =====================================================
         'camera_bracket' => [
             'title'  => 'Кронштейн с камерой',
             'model'  => \App\Models\CameraBracketRecord::class,
@@ -243,13 +290,25 @@ return [
                                             'options'=>['Работает','Не работает','Требует замены']],
                 'barometer_status'    => ['label'=>'Барометр','type'=>'select','rules'=>'nullable',
                                             'options'=>['Работает','Не работает','Требует замены']],
+                'suspension_status'   => ['label'=>'Подвес камеры','type'=>'select','rules'=>'nullable',
+                                            'options'=>['Работает','Не работает','Требует ремонта']],
             ], $workers, [
                 'notes'    => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
                 'comments' => ['label'=>'Комментарии','type'=>'textarea','rules'=>'nullable|string'],
             ], $faultCode),
-            'list_columns' => ['record_date','serial_number','camera_status','night_camera_status','fault_code'],
+            'health_fields' => [
+                'camera_status',
+                'night_camera_status',
+                'speed_sensor_status',
+                'barometer_status',
+                'suspension_status',
+            ],
+            'list_columns' => ['record_date','serial_number'],
         ],
 
+        // =====================================================
+        // Ночная камера в сборе с дневной
+        // =====================================================
         'night_camera_assembly' => [
             'title'  => 'Ночная камера в сборе с дневной',
             'model'  => \App\Models\NightCameraAssemblyRecord::class,
@@ -263,6 +322,9 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
+        // =====================================================
+        // Прошивка роутеров
+        // =====================================================
         'router_firmware' => [
             'title'  => 'Прошивка роутеров',
             'model'  => \App\Models\RouterFirmwareRecord::class,
@@ -276,6 +338,9 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
+        // =====================================================
+        // Датчик скорости
+        // =====================================================
         'speed_sensor' => [
             'title'  => 'Датчик скорости',
             'model'  => \App\Models\SpeedSensorRecord::class,

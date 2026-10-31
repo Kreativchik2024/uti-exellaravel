@@ -94,9 +94,6 @@ class RecordController extends Controller
         }
     }
 
-    /**
-     * Собирает строку со всеми исполнителями (worker1..5) через запятую.
-     */
     private function collectWorkers($record): string
     {
         $names = [];
@@ -107,6 +104,19 @@ class RecordController extends Controller
             }
         }
         return implode(', ', $names);
+    }
+
+    private function computeHealth($record, array $fields): string
+    {
+        foreach ($fields as $field) {
+            $val = $record->{$field} ?? null;
+
+            if ($val === null || $val === '' || $val !== 'Работает') {
+                return 'yellow';
+            }
+        }
+
+        return 'green';
     }
 
     public function index(Request $request, string $sheet)
@@ -142,19 +152,40 @@ class RecordController extends Controller
 
         $records = $query->paginate(50)->withQueryString();
 
-        // Формируем колонки: гарантированно добавляем worker1 и created_by
+        // === Формирование колонок ===
         $listColumns = $cfg['list_columns'];
+
+        // 1. worker1 — всегда, если есть в fields
         if (array_key_exists('worker1', $cfg['fields']) && !in_array('worker1', $listColumns)) {
             $listColumns[] = 'worker1';
         }
+
+        // 2. created_by — всегда
         if (!in_array('created_by', $listColumns)) {
             $listColumns[] = 'created_by';
         }
 
-        // Прокидываем в каждую запись строку со всеми исполнителями
-        // (чтобы в шаблоне не считать implode по 5 полям)
+        // 3. fault_code — если в fields есть, но в list_columns ещё нет
+        //    (например, camera_bracket: убран из конфига, добавляем перед health_indicator)
+        if (array_key_exists('fault_code', $cfg['fields']) && !in_array('fault_code', $listColumns)) {
+            $listColumns[] = 'fault_code';
+        }
+
+        // 4. health_indicator — всегда последним
+        //    Сначала убираем, если случайно есть в config (защита от дубля)
+        $listColumns = array_values(array_filter($listColumns, fn($col) => $col !== 'health_indicator'));
+
+        if (!empty($cfg['health_fields'])) {
+            $listColumns[] = 'health_indicator';
+        }
+
+        // Обогащение записей
         foreach ($records as $record) {
             $record->workers_list = $this->collectWorkers($record);
+
+            if (!empty($cfg['health_fields'])) {
+                $record->health = $this->computeHealth($record, $cfg['health_fields']);
+            }
         }
 
         return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns'));
