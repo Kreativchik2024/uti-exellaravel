@@ -66,7 +66,7 @@ return [
                 'board_number',
                 'cross3_number',
                 'bracket_serial',
-                'manet_number',   // <-- ДОБАВЛЕНО (если не нужен в списке — уберите)
+                //'manet_number',   // <-- ДОБАВЛЕНО (если не нужен в списке — уберите)
                 'status',
             ],
         ],
