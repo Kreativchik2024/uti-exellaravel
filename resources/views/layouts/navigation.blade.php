@@ -2,6 +2,28 @@
     @php
         $currentWorkers = session('workstation_workers', []);
         $workersCount   = count($currentWorkers);
+
+        $recordTabs = [
+            'pgp'                   => 'ПГП (борта)',
+            'comm_module'           => 'Модуль связи',
+            'cross1'                => 'Кросс 1',
+            'cross3'                => 'Кросс 3',
+            'cross5'                => 'Кросс 5',
+            'mini_pc'               => 'Мини ПК',
+            'research'              => 'Исследования',
+            'pc_check'              => 'Проверка ПК',
+            'sophon_check'          => 'Проверка Sophon',
+            'software_install'      => 'Установка ПО',
+            'motor_regulator'       => 'Регулятор мотора',
+            'power_wires'           => 'Провода питания',
+            'data15'                => 'Data 15',
+            'data17'                => 'Data 17',
+            'camera_bracket'        => 'Кронштейн с камерой',
+            'night_camera_assembly' => 'Ночная камера в сборе с дневной',
+            'speed_sensor'          => 'Датчик скорости',
+            'router_firmware'       => 'Прошивка роутеров',
+            'screw_check'           => 'Проверка винтов',
+        ];
     @endphp
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -14,46 +36,43 @@
                 </div>
 
                 <div class="hidden space-x-4 sm:-my-px sm:ms-6 sm:flex items-center">
+
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Главная') }}
                     </x-nav-link>
 
-                    <x-dropdown align="left" width="64">
-                        <x-slot name="trigger">
-                            <button class="inline-flex items-center px-3 py-2 text-sm font-medium leading-4 rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('records.*') ? 'text-gray-900' : '' }}">
-                                <span>{{ __('Учёт') }}</span>
-                                <svg class="ms-1 fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                            </button>
-                        </x-slot>
-                        <x-slot name="content">
-                            @foreach([
-                                'pgp' => 'ПГП (борта)',
-                                'comm_module' => 'Модуль связи',
-                                'cross1' => 'Кросс 1',
-                                'cross3' => 'Кросс 3',
-                                'cross5' => 'Кросс 5',
-                                'mini_pc' => 'Мини ПК',
-                                'research' => 'Исследования',
-                                'pc_check' => 'Проверка ПК',
-                                'sophon_check' => 'Проверка Sophon',
-                                'software_install' => 'Установка ПО',
-                                'motor_regulator' => 'Регулятор мотора',
-                                'power_wires' => 'Провода питания',
-                                'data15' => 'Data 15',
-                                'data17' => 'Data 17',
-                                'camera_bracket' => 'Кронштейн с камерой',
-                                'night_camera_assembly' => 'Ночная камера в сборе с дневной',
-                                'speed_sensor' => 'Датчик скорости',
-                                'router_firmware' => 'Прошивка роутеров',
-                            ] as $slug => $label)
-                                <x-dropdown-link :href="route('records.index', $slug)" :class="request()->route('sheet') === $slug && $slug !== 'speed_sensor' ? 'font-semibold text-indigo-600' : ''">
-                                    {{ __($label) }}
-                                </x-dropdown-link>
-                            @endforeach
-                        </x-slot>
-                    </x-dropdown>
+                    {{-- УЧЁТ — раскрывается вбок --}}
+                    <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                        <button @click="open = !open" type="button"
+                                class="inline-flex items-center px-3 py-2 text-sm font-medium leading-4 rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('records.*') ? 'text-gray-900' : '' }}">
+                            <span>{{ __('Учёт') }}</span>
+                            <svg class="ms-1 fill-current h-4 w-4 transition-transform" :class="open ? 'rotate-90' : ''"
+                                 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+
+                        <div x-show="open"
+                             x-cloak
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 -translate-x-2"
+                             x-transition:enter-end="opacity-100 translate-x-0"
+                             x-transition:leave="transition ease-in duration-100"
+                             x-transition:leave-start="opacity-100 translate-x-0"
+                             x-transition:leave-end="opacity-0 -translate-x-2"
+                             class="absolute left-full top-0 ml-2 z-50 w-64 max-h-[80vh] overflow-y-auto rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+                             style="display:none;"
+                             @click="open = false">
+                            <div class="py-1">
+                                @foreach($recordTabs as $slug => $label)
+                                    <x-dropdown-link :href="route('records.index', $slug)"
+                                                     :class="request()->route('sheet') === $slug ? 'font-semibold text-indigo-600 bg-indigo-50' : ''">
+                                        {{ __($label) }}
+                                    </x-dropdown-link>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
 
                     <x-nav-link :href="route('workstation.show')" :active="request()->routeIs('workstation.*')">
                         {{ __('Исполнители') }}@if($workersCount > 0) ({{ $workersCount }})@endif
@@ -68,27 +87,41 @@
                     </x-nav-link>
 
                     @if(auth()->user()->isAdmin())
-                        <x-dropdown align="left" width="48">
-                            <x-slot name="trigger">
-                                <button class="inline-flex items-center px-3 py-2 text-sm font-medium leading-4 rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('users.*') || request()->routeIs('firmware.categories.*') || request()->routeIs('employees.*') ? 'text-gray-900' : '' }}">
-                                    <span>{{ __('Админ') }}</span>
-                                    <svg class="ms-1 fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                    </svg>
-                                </button>
-                            </x-slot>
-                            <x-slot name="content">
-                                <x-dropdown-link :href="route('users.index')" :class="request()->routeIs('users.*') ? 'font-semibold text-indigo-600' : ''">
-                                    {{ __('Пользователи') }}
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('employees.index')" :class="request()->routeIs('employees.*') ? 'font-semibold text-indigo-600' : ''">
-                                    {{ __('Сотрудники') }}
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('firmware.categories.index')" :class="request()->routeIs('firmware.categories.*') ? 'font-semibold text-indigo-600' : ''">
-                                    {{ __('Категории прошивок') }}
-                                </x-dropdown-link>
-                            </x-slot>
-                        </x-dropdown>
+                        {{-- АДМИН — раскрывается вбок --}}
+                        <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                            <button @click="open = !open" type="button"
+                                    class="inline-flex items-center px-3 py-2 text-sm font-medium leading-4 rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('users.*') || request()->routeIs('firmware.categories.*') || request()->routeIs('employees.*') ? 'text-gray-900' : '' }}">
+                                <span>{{ __('Админ') }}</span>
+                                <svg class="ms-1 fill-current h-4 w-4 transition-transform" :class="open ? 'rotate-90' : ''"
+                                     xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+
+                            <div x-show="open"
+                                 x-cloak
+                                 x-transition:enter="transition ease-out duration-150"
+                                 x-transition:enter-start="opacity-0 -translate-x-2"
+                                 x-transition:enter-end="opacity-100 translate-x-0"
+                                 x-transition:leave="transition ease-in duration-100"
+                                 x-transition:leave-start="opacity-100 translate-x-0"
+                                 x-transition:leave-end="opacity-0 -translate-x-2"
+                                 class="absolute left-full top-0 ml-2 z-50 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+                                 style="display:none;"
+                                 @click="open = false">
+                                <div class="py-1">
+                                    <x-dropdown-link :href="route('users.index')" :class="request()->routeIs('users.*') ? 'font-semibold text-indigo-600 bg-indigo-50' : ''">
+                                        {{ __('Пользователи') }}
+                                    </x-dropdown-link>
+                                    <x-dropdown-link :href="route('employees.index')" :class="request()->routeIs('employees.*') ? 'font-semibold text-indigo-600 bg-indigo-50' : ''">
+                                        {{ __('Сотрудники') }}
+                                    </x-dropdown-link>
+                                    <x-dropdown-link :href="route('firmware.categories.index')" :class="request()->routeIs('firmware.categories.*') ? 'font-semibold text-indigo-600 bg-indigo-50' : ''">
+                                        {{ __('Категории прошивок') }}
+                                    </x-dropdown-link>
+                                </div>
+                            </div>
+                        </div>
                     @endif
                 </div>
             </div>
@@ -130,6 +163,7 @@
         </div>
     </div>
 
+    {{-- Мобильное меню --}}
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1 max-h-[70vh] overflow-y-auto">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
@@ -144,27 +178,8 @@
                     </svg>
                 </button>
                 <div x-show="expanded" class="ps-4">
-                    @foreach([
-                        'pgp' => 'ПГП (борта)',
-                        'comm_module' => 'Модуль связи',
-                        'cross1' => 'Кросс 1',
-                        'cross3' => 'Кросс 3',
-                        'cross5' => 'Кросс 5',
-                        'mini_pc' => 'Мини ПК',
-                        'research' => 'Исследования',
-                        'pc_check' => 'Проверка ПК',
-                        'sophon_check' => 'Проверка Sophon',
-                        'software_install' => 'Установка ПО',
-                        'motor_regulator' => 'Регулятор мотора',
-                        'power_wires' => 'Провода питания',
-                        'data15' => 'Data 15',
-                        'data17' => 'Data 17',
-                        'camera_bracket' => 'Кронштейн с камерой',
-                        'night_camera_assembly' => 'Ночная камера в сборе с дневной',
-                        'speed_sensor' => 'Датчик скорости',
-                        'router_firmware' => 'Прошивка роутеров',
-                    ] as $slug => $label)
-                        <x-responsive-nav-link :href="route('records.index', $slug)" :active="request()->route('sheet') === $slug && $slug !== 'speed_sensor'">
+                    @foreach($recordTabs as $slug => $label)
+                        <x-responsive-nav-link :href="route('records.index', $slug)" :active="request()->route('sheet') === $slug">
                             {{ __($label) }}
                         </x-responsive-nav-link>
                     @endforeach
