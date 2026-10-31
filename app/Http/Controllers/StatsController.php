@@ -13,119 +13,103 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class StatsController extends Controller
 {
-    private const ALLOWED_PERIODS = [0, 1, 3, 7, 30];
-
     private const DEFECT_VALUES = [
         'Не сдан', 'Неисправен', 'В ремонт',
         'Не работает', 'Требует ремонта', 'Требует замены',
     ];
 
-    private function resolveFrom(int $period): ?Carbon
-    {
-        if ($period === 0) {
-            return null;
-        }
-
-        return now()->subDays($period - 1)->startOfDay();
-    }
-
+    /**
+     * Только для executor: режим «Моя / Общая».
+     * Для admin/master всегда null (общая).
+     */
     private function resolveTargetUser(Request $r): ?User
     {
         $user = auth()->user();
-
-        if ($user->isAdmin() || $user->isMaster()) {
-            if ($r->filled('user_id')) {
-                return User::find($r->user_id) ?? $user;
-            }
-
-            return null;
-        }
-
-        if ($r->input('mode') === 'all') {
-            return null;
-        }
-
+        if (!$user->isExecutor()) return null;
+        if ($r->input('mode') === 'all') return null;
         return $user;
+    }
+
+    private function resolveDateRange(Request $r): array
+    {
+        $from = $r->filled('from') ? Carbon::parse($r->input('from'))->startOfDay() : null;
+        $to   = $r->filled('to')   ? Carbon::parse($r->input('to'))->endOfDay()     : null;
+        if ($from && !$to) $to = now()->endOfDay();
+        return [$from, $to];
+    }
+
+    private function periodLabel(?Carbon $from, ?Carbon $to): string
+    {
+        if (!$from && !$to) return 'За всё время';
+        if ($from && $to && $from->isSameDay($to)) return 'За ' . $from->format('d.m.Y');
+        if ($from && $to) return 'С ' . $from->format('d.m.Y') . ' по ' . $to->format('d.m.Y');
+        if ($from) return 'С ' . $from->format('d.m.Y');
+        return 'По ' . $to->format('d.m.Y');
     }
 
     public function index(Request $r, StatsService $s)
     {
-        $period = (int) $r->input('period', 7);
-        if (! in_array($period, self::ALLOWED_PERIODS, true)) {
-            $period = 7;
-        }
+        [$from, $to] = $this->resolveDateRange($r);
+        $targetUser  = $this->resolveTargetUser($r);
 
-        $from = $this->resolveFrom($period);
+        $worker      = trim((string) $r->input('worker', ''));
+        $workersList = $s->listWorkers();
 
-        $targetUser = $this->resolveTargetUser($r);
-        $usersList  = collect();
-
-        if (auth()->user()->isAdmin() || auth()->user()->isMaster()) {
-            $usersList = User::whereIn('role', ['executor', 'master', 'admin'])
-                ->orderBy('name')
-                ->get();
-        }
-
-        $perSheet = $s->forPeriod($from, $targetUser);
+        $perSheet = $s->forPeriod($from, $to, $targetUser, $worker !== '' ? $worker : null);
         $totals   = $s->totals($perSheet);
-        $byPosts  = $s->byPosts($from, $targetUser);
+        $byPosts  = $s->byPosts($from, $to, $targetUser);
 
-        $worker         = trim((string) $r->input('worker', ''));
-        $workerDateFrom = $r->input('worker_date_from');
-        $workerDateTo   = $r->input('worker_date_to');
-
-        $workersList   = $s->listWorkers();
-        $workerSummary = [];
-
-        if ($worker !== '') {
-            if ($workerDateFrom || $workerDateTo) {
-                if ($workerDateFrom && !$workerDateTo) {
-                    $wFrom = Carbon::parse($workerDateFrom)->startOfDay();
-                    $wTo   = Carbon::parse($workerDateFrom)->endOfDay();
-                } else {
-                    $wFrom = $workerDateFrom ? Carbon::parse($workerDateFrom)->startOfDay() : null;
-                    $wTo   = $workerDateTo   ? Carbon::parse($workerDateTo)->endOfDay()     : null;
-                }
-            } else {
-                $wFrom = $from;
-                $wTo   = null;
-            }
-
-            $workerSummary = $s->workerSummary($worker, $wFrom, $wTo);
-        }
+        $periodLabel = $this->periodLabel($from, $to);
 
         return view('stats.index', compact(
-            'period',
-            'from',
-            'perSheet',
-            'totals',
-            'byPosts',
-            'usersList',
-            'targetUser',
-            'worker',
-            'workersList',
-            'workerSummary'
+            'from', 'to', 'periodLabel',
+            'perSheet', 'totals', 'byPosts',
+            'targetUser', 'worker', 'workersList'
         ));
     }
 
     public function export(Request $r, StatsService $s)
     {
-        $period = (int) $r->input('period', 7);
-        if (! in_array($period, self::ALLOWED_PERIODS, true)) {
-            $period = 7;
-        }
+        [$from, $to] = $this->resolveDateRange($r);
+        $targetUser  = $this->resolveTargetUser($r);
+        $worker      = trim((string) $r->input('worker', ''));
 
-        $from = $this->resolveFrom($period);
-
-        $targetUser = $this->resolveTargetUser($r);
-
-        $perSheet = $s->forPeriod($from, $targetUser);
+        $perSheet = $s->forPeriod($from, $to, $targetUser, $worker !== '' ? $worker : null);
         $totals   = $s->totals($perSheet);
 
-        $periodLabel = $period === 0 ? 'all' : "{$period}d";
-        $filename    = "uti-stats-{$periodLabel}-" . now()->format('Ymd-His') . ".xlsx";
+        $label = !$from && !$to
+            ? 'all'
+            : (($from && $to && $from->isSameDay($to))
+                ? $from->format('Ymd')
+                : ($from ? $from->format('Ymd') : 'start') . '-' . ($to ? $to->format('Ymd') : 'now'));
 
-        return Excel::download(new StatsExport($period, $from, $perSheet, $totals), $filename);
+        $filename = "uti-stats-{$label}-" . now()->format('Ymd-His') . ".xlsx";
+
+        return Excel::download(new StatsExport(0, $from, $perSheet, $totals), $filename);
+    }
+
+    // === ЗОНА 3 ===
+    public function zone2Worker(Request $r, StatsService $s)
+    {
+        $worker = trim((string) $r->input('executor', ''));
+        $slug   = trim((string) $r->input('sheet', ''));
+
+        if ($worker === '') {
+            return response()->json(['error' => 'executor is required'], 422);
+        }
+
+        $from = $r->filled('from') ? Carbon::parse($r->input('from'))->startOfDay() : null;
+        $to   = $r->filled('to')   ? Carbon::parse($r->input('to'))->endOfDay()     : null;
+
+        if ($slug !== '') {
+            return response()->json([
+                'records' => $s->workerRecords($worker, $slug, $from, $to),
+            ]);
+        }
+
+        return response()->json([
+            'categories' => $s->workerBySheet($worker, $from, $to),
+        ]);
     }
 
     public function zone1()
@@ -137,7 +121,6 @@ class StatsController extends Controller
                 if (!isset($cfg['model']) || !class_exists($cfg['model'])) {
                     continue;
                 }
-
                 $model = $cfg['model'];
 
                 $summary[] = [
@@ -179,7 +162,6 @@ class StatsController extends Controller
         }
 
         $unionBindings = array_merge($bindings, $bindings, $bindings, $bindings, $bindings);
-
         $cacheKey = "stats.zone2.$sheet.{$from}_{$to}";
 
         $result = Cache::remember($cacheKey, 120, function () use ($table, $whereSql, $bindings, $unionBindings) {
@@ -313,12 +295,8 @@ class StatsController extends Controller
         $query = $model::select('post_number', DB::raw('COUNT(*) AS cnt'))
             ->whereNotNull('post_number');
 
-        if ($from) {
-            $query->whereRaw('DATE(record_date) >= ?', [$from]);
-        }
-        if ($to) {
-            $query->whereRaw('DATE(record_date) <= ?', [$to]);
-        }
+        if ($from) $query->whereDate('record_date', '>=', $from);
+        if ($to)   $query->whereDate('record_date', '<=', $to);
 
         $rows = $query->groupBy('post_number')
             ->orderByDesc('cnt')
@@ -328,6 +306,10 @@ class StatsController extends Controller
         return response()->json($rows);
     }
 
+    /**
+     * Зона 4: график по постам.
+     * Исправлено: whereDate для корректного захвата последнего дня периода.
+     */
     public function zone4(Request $r)
     {
         $sheet = $r->input('sheet', 'pgp');
@@ -341,12 +323,8 @@ class StatsController extends Controller
         $query = $model::select('post_number', 'record_date', DB::raw('COUNT(*) AS cnt'))
             ->whereNotNull('post_number');
 
-        if ($from) {
-            $query->where('record_date', '>=', $from);
-        }
-        if ($to) {
-            $query->where('record_date', '<=', $to);
-        }
+        if ($from) $query->whereDate('record_date', '>=', $from);
+        if ($to)   $query->whereDate('record_date', '<=', $to);
 
         $rows = $query->groupBy('post_number', 'record_date')
             ->orderBy('record_date')
@@ -385,6 +363,39 @@ class StatsController extends Controller
         ]);
     }
 
+    /**
+     * Зона 4 — конкретные записи ПГП данного поста за конкретный день.
+     */
+    public function zone4Records(Request $r)
+    {
+        $sheet = $r->input('sheet', 'pgp');
+        $cfg   = config("sheets.map.$sheet");
+        abort_unless($cfg && isset($cfg['model'], $cfg['fields']['post_number']), 404);
+
+        $post = $r->input('post');
+        $date = $r->input('date');
+        abort_unless($post !== null && $date, 422);
+
+        $model = $cfg['model'];
+
+        $records = $model::query()
+            ->where('post_number', $post)
+            ->whereDate('record_date', $date)
+            ->orderByDesc('record_date')
+            ->get();
+
+        $out = [];
+        foreach ($records as $row) {
+            $arr = $row->toArray();
+            $arr['record_date'] = $row->record_date instanceof \DateTimeInterface
+                ? $row->record_date->format('Y-m-d')
+                : substr((string) $row->record_date, 0, 10);
+            $out[] = $arr;
+        }
+
+        return response()->json($out);
+    }
+
     public function zone5(Request $r)
     {
         $from = $r->input('from');
@@ -397,19 +408,11 @@ class StatsController extends Controller
 
             $dateSql = '';
             $dateBindings = [];
-            if ($from) {
-                $dateSql .= " AND DATE(record_date) >= ?";
-                $dateBindings[] = $from;
-            }
-            if ($to) {
-                $dateSql .= " AND DATE(record_date) <= ?";
-                $dateBindings[] = $to;
-            }
+            if ($from) { $dateSql .= " AND DATE(record_date) >= ?"; $dateBindings[] = $from; }
+            if ($to)   { $dateSql .= " AND DATE(record_date) <= ?"; $dateBindings[] = $to; }
 
             foreach (config('sheets.map', []) as $slug => $cfg) {
-                if (!isset($cfg['model']) || !class_exists($cfg['model'])) {
-                    continue;
-                }
+                if (!isset($cfg['model']) || !class_exists($cfg['model'])) continue;
 
                 $model = $cfg['model'];
                 $table = (new $model)->getTable();
@@ -417,57 +420,33 @@ class StatsController extends Controller
                 $hasRecordDate = isset($cfg['fields']['record_date']);
                 $hasStatus     = isset($cfg['fields']['status']);
 
-                $defectConditions = [];
-                $defectBindings   = [];
-                $fixedConditions  = [];
-                $fixedBindings    = [];
+                $defectConditions = []; $defectBindings = [];
+                $fixedConditions  = []; $fixedBindings  = [];
 
                 if (isset($cfg['fields']['fault_code'])) {
                     if ($hasStatus) {
-                        $defectConditions[] = "(
-                            `fault_code` IS NOT NULL AND `fault_code` != ''
-                            AND (`status` IS NULL OR `status` != 'Сдан')
-                        )";
-                        $fixedConditions[] = "(
-                            `fault_code` IS NOT NULL AND `fault_code` != ''
-                            AND `status` = 'Сдан'
-                        )";
+                        $defectConditions[] = "( `fault_code` IS NOT NULL AND `fault_code` != '' AND (`status` IS NULL OR `status` != 'Сдан') )";
+                        $fixedConditions[]  = "( `fault_code` IS NOT NULL AND `fault_code` != '' AND `status` = 'Сдан' )";
                     } else {
                         $defectConditions[] = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
                     }
                 }
 
                 foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
-                    if (($fieldCfg['type'] ?? '') !== 'select' || empty($fieldCfg['options'])) {
-                        continue;
-                    }
+                    if (($fieldCfg['type'] ?? '') !== 'select' || empty($fieldCfg['options'])) continue;
                     $matched = array_values(array_intersect($fieldCfg['options'], self::DEFECT_VALUES));
-                    if (empty($matched)) {
-                        continue;
-                    }
+                    if (empty($matched)) continue;
                     $placeholders = implode(',', array_fill(0, count($matched), '?'));
                     $defectConditions[] = "`$fieldName` IN ($placeholders)";
-                    foreach ($matched as $v) {
-                        $defectBindings[] = $v;
-                    }
+                    foreach ($matched as $v) $defectBindings[] = $v;
                 }
 
                 foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
-                    if (($fieldCfg['type'] ?? '') !== 'textarea') {
-                        continue;
-                    }
-                    if (!preg_match('/(defect|дефект|брак)/iu', $fieldName)) {
-                        continue;
-                    }
+                    if (($fieldCfg['type'] ?? '') !== 'textarea') continue;
+                    if (!preg_match('/(defect|дефект|брак)/iu', $fieldName)) continue;
                     if ($hasStatus) {
-                        $defectConditions[] = "(
-                            `$fieldName` IS NOT NULL AND `$fieldName` != ''
-                            AND (`status` IS NULL OR `status` != 'Сдан')
-                        )";
-                        $fixedConditions[] = "(
-                            `$fieldName` IS NOT NULL AND `$fieldName` != ''
-                            AND `status` = 'Сдан'
-                        )";
+                        $defectConditions[] = "( `$fieldName` IS NOT NULL AND `$fieldName` != '' AND (`status` IS NULL OR `status` != 'Сдан') )";
+                        $fixedConditions[]  = "( `$fieldName` IS NOT NULL AND `$fieldName` != '' AND `status` = 'Сдан' )";
                     } else {
                         $defectConditions[] = "(`$fieldName` IS NOT NULL AND `$fieldName` != '')";
                     }
@@ -485,10 +464,7 @@ class StatsController extends Controller
                     $where = '(' . implode(' OR ', $defectConditions) . ')';
                     $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$where}";
                     $bindings = $defectBindings;
-                    if ($hasRecordDate) {
-                        $sql .= " {$dateSql}";
-                        $bindings = array_merge($defectBindings, $dateBindings);
-                    }
+                    if ($hasRecordDate) { $sql .= " {$dateSql}"; $bindings = array_merge($defectBindings, $dateBindings); }
                     $defects = (int) (DB::select($sql, $bindings)[0]->c ?? 0);
                 }
 
@@ -497,10 +473,7 @@ class StatsController extends Controller
                     $where = '(' . implode(' OR ', $fixedConditions) . ')';
                     $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$where}";
                     $bindings = $fixedBindings;
-                    if ($hasRecordDate) {
-                        $sql .= " {$dateSql}";
-                        $bindings = array_merge($fixedBindings, $dateBindings);
-                    }
+                    if ($hasRecordDate) { $sql .= " {$dateSql}"; $bindings = array_merge($fixedBindings, $dateBindings); }
                     $fixed = (int) (DB::select($sql, $bindings)[0]->c ?? 0);
                 }
 
@@ -516,7 +489,6 @@ class StatsController extends Controller
             }
 
             usort($summary, fn($a, $b) => $b['percent'] <=> $a['percent']);
-
             return $summary;
         });
 
@@ -535,70 +507,38 @@ class StatsController extends Controller
         $model = $cfg['model'];
         $table = (new $model)->getTable();
 
-        $dateSql = '';
-        $dateBindings = [];
-        if ($from) {
-            $dateSql .= " AND DATE(record_date) >= ?";
-            $dateBindings[] = $from;
-        }
-        if ($to) {
-            $dateSql .= " AND DATE(record_date) <= ?";
-            $dateBindings[] = $to;
-        }
+        $dateSql = ''; $dateBindings = [];
+        if ($from) { $dateSql .= " AND DATE(record_date) >= ?"; $dateBindings[] = $from; }
+        if ($to)   { $dateSql .= " AND DATE(record_date) <= ?"; $dateBindings[] = $to; }
 
         $hasStatus = isset($cfg['fields']['status']);
-
-        $defectConditions = [];
-        $defectBindings   = [];
-        $fixedConditions  = [];
-        $fixedBindings    = [];
+        $defectConditions = []; $defectBindings = [];
+        $fixedConditions  = []; $fixedBindings  = [];
 
         if (isset($cfg['fields']['fault_code'])) {
             if ($hasStatus) {
-                $defectConditions[] = "(
-                    `fault_code` IS NOT NULL AND `fault_code` != ''
-                    AND (`status` IS NULL OR `status` != 'Сдан')
-                )";
-                $fixedConditions[] = "(
-                    `fault_code` IS NOT NULL AND `fault_code` != ''
-                    AND `status` = 'Сдан'
-                )";
+                $defectConditions[] = "( `fault_code` IS NOT NULL AND `fault_code` != '' AND (`status` IS NULL OR `status` != 'Сдан') )";
+                $fixedConditions[]  = "( `fault_code` IS NOT NULL AND `fault_code` != '' AND `status` = 'Сдан' )";
             } else {
                 $defectConditions[] = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
             }
         }
 
         foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
-            if (($fieldCfg['type'] ?? '') !== 'select' || empty($fieldCfg['options'])) {
-                continue;
-            }
+            if (($fieldCfg['type'] ?? '') !== 'select' || empty($fieldCfg['options'])) continue;
             $matched = array_values(array_intersect($fieldCfg['options'], self::DEFECT_VALUES));
-            if (empty($matched)) {
-                continue;
-            }
+            if (empty($matched)) continue;
             $placeholders = implode(',', array_fill(0, count($matched), '?'));
             $defectConditions[] = "`$fieldName` IN ($placeholders)";
-            foreach ($matched as $v) {
-                $defectBindings[] = $v;
-            }
+            foreach ($matched as $v) $defectBindings[] = $v;
         }
 
         foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
-            if (($fieldCfg['type'] ?? '') !== 'textarea') {
-                continue;
-            }
-            if (!preg_match('/(defect|дефект|брак)/iu', $fieldName)) {
-                continue;
-            }
+            if (($fieldCfg['type'] ?? '') !== 'textarea') continue;
+            if (!preg_match('/(defect|дефект|брак)/iu', $fieldName)) continue;
             if ($hasStatus) {
-                $defectConditions[] = "(
-                    `$fieldName` IS NOT NULL AND `$fieldName` != ''
-                    AND (`status` IS NULL OR `status` != 'Сдан')
-                )";
-                $fixedConditions[] = "(
-                    `$fieldName` IS NOT NULL AND `$fieldName` != ''
-                    AND `status` = 'Сдан'
-                )";
+                $defectConditions[] = "( `$fieldName` IS NOT NULL AND `$fieldName` != '' AND (`status` IS NULL OR `status` != 'Сдан') )";
+                $fixedConditions[]  = "( `$fieldName` IS NOT NULL AND `$fieldName` != '' AND `status` = 'Сдан' )";
             } else {
                 $defectConditions[] = "(`$fieldName` IS NOT NULL AND `$fieldName` != '')";
             }
@@ -658,9 +598,7 @@ class StatsController extends Controller
             $rangeTo = $rangeFrom->copy()->endOfDay();
         }
 
-        $labels = [];
-        $defectsSeries = [];
-        $fixedSeries = [];
+        $labels = []; $defectsSeries = []; $fixedSeries = [];
         $cursor = $rangeFrom->copy();
         while ($cursor->lte($rangeTo)) {
             $day = $cursor->format('Y-m-d');
@@ -677,14 +615,6 @@ class StatsController extends Controller
         ]);
     }
 
-    /**
-     * Зона 6: рейтинг кодов неисправностей.
-     * Собирает fault_code по всем вкладкам (где это поле есть),
-     * группирует по (код + вкладка), считает количество и даты первого/последнего появления.
-     * Сортировка по количеству (убывание).
-     *
-     * Параметры: from, to (даты), sheet (опционально — фильтр по категории).
-     */
     public function zone6(Request $r)
     {
         $from     = $r->input('from');
@@ -695,38 +625,25 @@ class StatsController extends Controller
 
         $data = Cache::remember($cacheKey, 120, function () use ($from, $to, $category) {
             $rows = [];
-
             $sheets = config('sheets.map', []);
             if ($category && isset($sheets[$category])) {
                 $sheets = [$category => $sheets[$category]];
             }
 
             foreach ($sheets as $slug => $cfg) {
-                if (!isset($cfg['model']) || !isset($cfg['fields']['fault_code'])) {
-                    continue;
-                }
+                if (!isset($cfg['model']) || !isset($cfg['fields']['fault_code'])) continue;
 
                 $model = $cfg['model'];
                 $table = (new $model)->getTable();
 
                 $where = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
                 $bindings = [];
-
-                if ($from) {
-                    $where .= " AND DATE(record_date) >= ?";
-                    $bindings[] = $from;
-                }
-                if ($to) {
-                    $where .= " AND DATE(record_date) <= ?";
-                    $bindings[] = $to;
-                }
+                if ($from) { $where .= " AND DATE(record_date) >= ?"; $bindings[] = $from; }
+                if ($to)   { $where .= " AND DATE(record_date) <= ?"; $bindings[] = $to; }
 
                 $sql = "
-                    SELECT
-                        `fault_code` AS code,
-                        COUNT(*) AS cnt,
-                        MIN(record_date) AS first_date,
-                        MAX(record_date) AS last_date
+                    SELECT `fault_code` AS code, COUNT(*) AS cnt,
+                           MIN(record_date) AS first_date, MAX(record_date) AS last_date
                     FROM `$table`
                     WHERE {$where}
                     GROUP BY `fault_code`
@@ -747,7 +664,6 @@ class StatsController extends Controller
             }
 
             usort($rows, fn($a, $b) => $b['count'] <=> $a['count']);
-
             return $rows;
         });
 
