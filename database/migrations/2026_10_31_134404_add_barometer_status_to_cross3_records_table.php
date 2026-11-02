@@ -6,23 +6,21 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::table('cross3_records', function (Blueprint $table) {
-            //
-        });
+        if (!Schema::hasColumn('cross3_records', 'barometer_status')) {
+            Schema::table('cross3_records', function (Blueprint $table) {
+                $table->string('barometer_status', 32)->nullable()->after('compass_version');
+            });
+        }
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::table('cross3_records', function (Blueprint $table) {
-            //
-        });
+        if (Schema::hasColumn('cross3_records', 'barometer_status')) {
+            Schema::table('cross3_records', function (Blueprint $table) {
+                $table->dropColumn('barometer_status');
+            });
+        }
     }
 };
