@@ -25,6 +25,15 @@
             </div>
         @endif
 
+        @if(session('error'))
+            <div class="flex items-center gap-3 bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg shadow-sm">
+                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                </svg>
+                {{ session('error') }}
+            </div>
+        @endif
+
         <form method="GET" class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex gap-2">
             <div class="relative flex-1">
                 <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,7 +114,6 @@
                                             </span>
                                         @endif
                                     @elseif($col === 'status')
-                                        {{-- Обычный вывод статуса текстом --}}
                                         {{ $record->status ?: '—' }}
                                     @elseif(in_array($col, ['record_date']))
                                         <span class="font-medium text-gray-900">
@@ -117,9 +125,17 @@
                                 </td>
                             @endforeach
                             <td class="px-4 py-3 text-right">
-                                <svg class="w-4 h-4 text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                </svg>
+                                @if($record->is_locked)
+                                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-400" title="Редактирование заблокировано (прошло 24 часа)">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                        </svg>
+                                    </span>
+                                @else
+                                    <svg class="w-4 h-4 text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all duration-150 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                @endif
                             </td>
                         </tr>
                     @empty

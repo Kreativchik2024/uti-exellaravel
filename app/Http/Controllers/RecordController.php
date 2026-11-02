@@ -20,6 +20,15 @@ class RecordController extends Controller
         return $cfg;
     }
 
+    private function isRecordLocked($record): bool
+    {
+        // Если записи нет или это новая запись (без created_at) — не блокируем
+        if (!$record || !$record->created_at) return false;
+        
+        // Блокируем, если с момента создания прошло 24 часа или больше
+        return $record->created_at->addHours(24)->isPast();
+    }
+
     private function canEditWorkers(): bool
     {
         return auth()->check() && auth()->user()->isAdmin();
@@ -60,8 +69,6 @@ class RecordController extends Controller
     {
         $workers = session('workstation_workers', []);
 
-        // Если сессия пуста (пользователь не заходил на /workstation/select),
-        // но к нему привязан Employee, подставляем его.
         if (empty($workers)) {
             $user = auth()->user();
             if ($user && $user->employee && $user->employee->short_name) {
@@ -333,6 +340,8 @@ class RecordController extends Controller
             if (!empty($cfg['health_fields'])) {
                 $record->health = $this->computeHealth($record, $cfg['health_fields'], $goodValues);
             }
+            // Передаем флаг блокировки в шаблон
+            $record->is_locked = $this->isRecordLocked($record);
         }
 
         return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns'));
@@ -344,7 +353,8 @@ class RecordController extends Controller
         $record = $cfg['model']::with('creator')->findOrFail($id);
         Gate::authorize('view', $record);
         $lookups = $this->buildLookupFromRecord($cfg, $record);
-        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups'));
+        $isTimeLocked = $this->isRecordLocked($record);
+        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups', 'isTimeLocked'));
     }
 
     public function create(Request $r, string $sheet)
@@ -356,9 +366,10 @@ class RecordController extends Controller
         $employeesList  = $this->employeesForSelect();
         $lookups        = [];
         $canEditWorkers = $this->canEditWorkers();
+        $isTimeLocked   = false; // Новая запись не может быть заблокирована
 
         return view('records.create', compact(
-            'sheet', 'cfg', 'defaults', 'employeesList', 'lookups', 'canEditWorkers'
+            'sheet', 'cfg', 'defaults', 'employeesList', 'lookups', 'canEditWorkers', 'isTimeLocked'
         ));
     }
 
@@ -413,9 +424,10 @@ class RecordController extends Controller
         $employeesList  = $this->employeesForSelect();
         $lookups        = $this->buildLookupFromRecord($cfg, $record);
         $canEditWorkers = $this->canEditWorkers();
+        $isTimeLocked   = $this->isRecordLocked($record);
 
         return view('records.edit', compact(
-            'sheet', 'cfg', 'record', 'employeesList', 'lookups', 'canEditWorkers'
+            'sheet', 'cfg', 'record', 'employeesList', 'lookups', 'canEditWorkers', 'isTimeLocked'
         ));
     }
 
@@ -424,6 +436,11 @@ class RecordController extends Controller
         $cfg    = $this->cfg($sheet);
         $record = $cfg['model']::findOrFail($id);
         Gate::authorize('update', $record);
+
+        // ЖЕСТКАЯ ПРОВЕРКА НА СЕРВЕРЕ
+        if ($this->isRecordLocked($record)) {
+            return back()->withErrors(['general' => 'Редактирование запрещено: прошло более 24 часов с момента создания записи.']);
+        }
 
         $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
         $rules = $this->withSnapshotRules($cfg, $rules);
@@ -460,6 +477,11 @@ class RecordController extends Controller
         $cfg    = $this->cfg($sheet);
         $record = $cfg['model']::findOrFail($id);
         Gate::authorize('delete', $record);
+        
+        if ($this->isRecordLocked($record)) {
+            return back()->withErrors(['general' => 'Удаление запрещено: прошло более 24 часов с момента создания записи.']);
+        }
+
         $record->delete();
         return redirect()->route('records.index', $sheet)->with('ok', 'Запись удалена');
     }

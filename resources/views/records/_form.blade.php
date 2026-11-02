@@ -9,17 +9,36 @@
     $workerDefaults = $defaults ?? [];
     $employeesList  = $employeesList ?? [];
     $lookups        = $lookups ?? [];
-    $formUnlocked   = $formUnlocked ?? (session('form_unlocked_until', 0) > now()->timestamp);
+    
+    // Флаг блокировки (24 часа). Если он true, то разблокировка ПИНом уже не поможет.
+    $isTimeLocked   = $isTimeLocked ?? false; 
+    
+    $formUnlocked   = ($formUnlocked ?? (session('form_unlocked_until', 0) > now()->timestamp)) && !$isTimeLocked;
     $unlockUntil    = (int) session('form_unlocked_until', 0);
 @endphp
 
+@if($isTimeLocked)
+    <div class="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-4 flex items-start gap-3">
+        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        <div>
+            <b class="block text-sm font-semibold">Редактирование заблокировано</b>
+            <span class="text-xs">С момента создания записи прошло более 24 часов. Данные доступны только для просмотра.</span>
+        </div>
+    </div>
+@endif
+
 @if($hasWorkers)
-    <div class="border rounded p-3 bg-gray-50">
+    <div class="border rounded p-3 bg-gray-50 {{ $isTimeLocked ? 'opacity-75' : '' }}">
         <div class="flex justify-between items-center mb-2">
             <div class="text-sm font-semibold text-gray-700">
                 Исполнители (подставлены из рабочего места)
             </div>
-            @if($formUnlocked)
+            @if($isTimeLocked)
+                <span class="text-xs text-gray-500 flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
+                    Заблокировано
+                </span>
+            @elseif($formUnlocked)
                 <span class="text-xs text-green-700">
                     ✓ Разблокировано до {{ \Carbon\Carbon::createFromTimestamp($unlockUntil)->format('H:i') }}
                 </span>
@@ -41,10 +60,10 @@
                     @endphp
                     <div>
                         <label class="block text-xs text-gray-600 mb-1">
-                            {{ $f['label'] }}@if($isReq)<span class="text-red-600">*</span>@endif
+                            {{ $f['label'] }}@if($isReq && !$isTimeLocked)<span class="text-red-600">*</span>@endif
                         </label>
 
-                        @if($formUnlocked)
+                        @if($formUnlocked && !$isTimeLocked)
                             <select name="{{ $name }}" @if($isReq) required @endif
                                     class="w-full border rounded px-2 py-1 text-sm">
                                 <option value="">— выберите —</option>
@@ -54,7 +73,7 @@
                             </select>
                         @else
                             <select disabled
-                                    class="w-full border rounded px-2 py-1 text-sm bg-gray-100 text-gray-600 cursor-not-allowed">
+                                    class="w-full border rounded px-2 py-1 text-sm bg-gray-200 text-gray-600 cursor-not-allowed border-gray-300">
                                 <option>{{ $value !== '' ? $value : '— не выбран —' }}</option>
                             </select>
                             <input type="hidden" name="{{ $name }}" value="{{ $value }}">
@@ -70,6 +89,7 @@
     </div>
 
     {{-- Модалка: разблокировка своим ПИНом --}}
+    @if(!$isTimeLocked)
     <div id="pinUnlockModal"
          class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
          onclick="if(event.target===this)closePinUnlock()">
@@ -166,6 +186,7 @@
         };
     })();
     </script>
+    @endif
 @endif
 
 @foreach($cfg['fields'] as $name => $f)
@@ -177,9 +198,9 @@
         $hasLookup = !empty($f['lookup']);
         $lookupData = $lookups[$name] ?? null;
     @endphp
-    <div>
+    <div class="{{ $isTimeLocked ? 'opacity-75' : '' }}">
         <label class="block text-sm text-gray-600 mb-1">
-            {{ $f['label'] }}@if($isReq)<span class="text-red-600">*</span>@endif
+            {{ $f['label'] }}@if($isReq && !$isTimeLocked)<span class="text-red-600">*</span>@endif
         </label>
 
         @if($hasLookup)
@@ -203,14 +224,15 @@
             <input type="text" name="{{ $name }}"
                    value="{{ $value }}"
                    @if($isReq) required @endif
+                   @if($isTimeLocked) disabled @endif
                    data-lookup-field="{{ $name }}"
                    data-lookup-url="{{ route('records.lookup', $sheet) }}"
-                   class="lookup-input w-full border rounded px-3 py-2">
+                   class="lookup-input w-full border rounded px-3 py-2 {{ $isTimeLocked ? 'bg-gray-100 cursor-not-allowed text-gray-600 border-gray-300' : '' }}">
         @elseif(($f['type'] ?? 'text') === 'textarea')
-            <textarea name="{{ $name }}" rows="3" @if($isReq) required @endif
-                      class="w-full border rounded px-3 py-2">{{ $value }}</textarea>
+            <textarea name="{{ $name }}" rows="3" @if($isReq) required @endif @if($isTimeLocked) disabled @endif
+                      class="w-full border rounded px-3 py-2 {{ $isTimeLocked ? 'bg-gray-100 cursor-not-allowed text-gray-600 border-gray-300' : '' }}">{{ $value }}</textarea>
         @elseif(($f['type'] ?? 'text') === 'select')
-            <select name="{{ $name }}" @if($isReq) required @endif class="w-full border rounded px-3 py-2">
+            <select name="{{ $name }}" @if($isReq) required @endif @if($isTimeLocked) disabled @endif class="w-full border rounded px-3 py-2 {{ $isTimeLocked ? 'bg-gray-100 cursor-not-allowed text-gray-600 border-gray-300' : '' }}">
                 <option value="">— выберите —</option>
                 @foreach($f['options'] as $optKey => $optVal)
                     @php
@@ -223,17 +245,17 @@
         @elseif(($f['type'] ?? 'text') === 'date')
             <input type="date" name="{{ $name }}"
                    value="{{ $value ? \Carbon\Carbon::parse($value)->format('Y-m-d') : \Illuminate\Support\Carbon::now()->format('Y-m-d') }}"
-                   @if($isReq) required @endif class="w-full border rounded px-3 py-2">
+                   @if($isReq) required @endif @if($isTimeLocked) disabled @endif class="w-full border rounded px-3 py-2 {{ $isTimeLocked ? 'bg-gray-100 cursor-not-allowed text-gray-600 border-gray-300' : '' }}">
         @elseif(($f['type'] ?? 'text') === 'time')
             <input type="time" name="{{ $name }}"
                    value="{{ $value ? \Carbon\Carbon::parse($value)->format('H:i') : '' }}"
-                   @if($isReq) required @endif class="w-full border rounded px-3 py-2">
+                   @if($isReq) required @endif @if($isTimeLocked) disabled @endif class="w-full border rounded px-3 py-2 {{ $isTimeLocked ? 'bg-gray-100 cursor-not-allowed text-gray-600 border-gray-300' : '' }}">
         @elseif(($f['type'] ?? 'text') === 'number')
             <input type="number" name="{{ $name }}" value="{{ $value }}"
-                   @if($isReq) required @endif class="w-full border rounded px-3 py-2">
+                   @if($isReq) required @endif @if($isTimeLocked) disabled @endif class="w-full border rounded px-3 py-2 {{ $isTimeLocked ? 'bg-gray-100 cursor-not-allowed text-gray-600 border-gray-300' : '' }}">
         @else
             <input type="text" name="{{ $name }}" value="{{ $value }}"
-                   @if($isReq) required @endif class="w-full border rounded px-3 py-2">
+                   @if($isReq) required @endif @if($isTimeLocked) disabled @endif class="w-full border rounded px-3 py-2 {{ $isTimeLocked ? 'bg-gray-100 cursor-not-allowed text-gray-600 border-gray-300' : '' }}">
         @endif
 
         @error($name)
@@ -241,6 +263,17 @@
         @enderror
     </div>
 @endforeach
+
+<div class="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
+    <a href="{{ route('records.index', $sheet) }}" class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition active:scale-95">
+        Назад
+    </a>
+    @if(!$isTimeLocked)
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg shadow-sm hover:shadow-md transition active:scale-95">
+            Сохранить
+        </button>
+    @endif
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -250,7 +283,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    document.querySelectorAll('.lookup-input').forEach(function (input) {
+    document.querySelectorAll('.lookup-input:not([disabled])').forEach(function (input) {
         var timer = null;
         var resultEl = input.parentElement.querySelector('.lookup-result');
 
