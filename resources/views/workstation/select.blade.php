@@ -37,7 +37,7 @@
                                         class="w-full border rounded px-2 py-1 text-sm">
                                     <option value="">— не выбран —</option>
                                     <template x-for="emp in availableFor({{ $i }})" :key="emp">
-                                        <option :value="emp" x-text="emp"></option>
+                                        <option :value="emp" x-text="emp" :selected="emp === selected[{{ $i }}]"></option>
                                     </template>
                                 </select>
                             </div>
@@ -133,8 +133,6 @@
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded">
                         Продолжить
                     </button>
-
-                    {{-- «Пропустить» — без JS, через formaction. Отправляет POST на workstation.skip --}}
                     <button type="submit"
                             formaction="{{ route('workstation.skip') }}"
                             formmethod="POST"
@@ -147,24 +145,27 @@
     </div>
 
     <script>
-        window.workstationWorkers = function() {
-            const all = @json($employeesList);
-            const pinUrl = '{{ route('records.pinCheck') }}';
-            const csrf = '{{ csrf_token() }}';
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('workstationWorkers', () => ({
+                all: @json($employeesList),
+                pinUrl: '{{ route('records.pinCheck') }}',
+                csrf: '{{ csrf_token() }}',
+                
+                selected: {
+                    0: '{{ $slots[0] ?? '' }}',
+                    1: '{{ $slots[1] ?? '' }}',
+                    2: '{{ $slots[2] ?? '' }}',
+                    3: '{{ $slots[3] ?? '' }}',
+                    4: '{{ $slots[4] ?? '' }}'
+                },
+                confirmed: {
+                    0: '{{ $slots[0] ?? '' }}',
+                    1: '{{ $slots[1] ?? '' }}',
+                    2: '{{ $slots[2] ?? '' }}',
+                    3: '{{ $slots[3] ?? '' }}',
+                    4: '{{ $slots[4] ?? '' }}'
+                },
 
-            const initial = {};
-            const confirmed = {};
-            for (let i = 0; i < 5; i++) {
-                const el = document.querySelector(`select[name="workers[${i}]"]`);
-                const v = el ? el.value : '';
-                initial[i] = v;
-                confirmed[i] = v;
-            }
-
-            return {
-                all,
-                selected: initial,
-                confirmed,
                 pinModalOpen: false,
                 pinValue: '',
                 pinTarget: '',
@@ -214,11 +215,11 @@
                     this.pinLoading = true;
                     try {
                         const body = new URLSearchParams();
-                        body.set('_token', csrf);
+                        body.set('_token', this.csrf);
                         body.set('short_name', this.pinTarget);
                         body.set('pin', pin);
 
-                        const res = await fetch(pinUrl, {
+                        const res = await fetch(this.pinUrl, {
                             method: 'POST',
                             headers: {
                                 'Accept': 'application/json',
@@ -247,9 +248,9 @@
                     this.pinModalOpen = false;
                     this.pinValue = '';
                     this.pinError = '';
-                },
-            };
-        };
+                }
+            }));
+        });
 
         (function () {
             var radios = document.querySelectorAll('input[name="type"]');

@@ -16,7 +16,10 @@ class EnsureWorkersSelected
             $request->routeIs('news.latest') ||
             $request->routeIs('logout') ||
             $request->routeIs('profile.*') ||
-            $request->routeIs('password.*')
+            $request->routeIs('password.*') ||
+            // Админские разделы должны быть доступны всегда
+            $request->routeIs('employees.*') ||
+            $request->routeIs('users.*')
         ) {
             return $next($request);
         }

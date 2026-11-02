@@ -59,6 +59,16 @@ class RecordController extends Controller
     private function workerDefaults(): array
     {
         $workers = session('workstation_workers', []);
+
+        // Если сессия пуста (пользователь не заходил на /workstation/select),
+        // но к нему привязан Employee, подставляем его.
+        if (empty($workers)) {
+            $user = auth()->user();
+            if ($user && $user->employee && $user->employee->short_name) {
+                $workers = [$user->employee->short_name];
+            }
+        }
+
         $allowed = $this->employeesForSelect();
 
         $defaults = [
@@ -461,9 +471,6 @@ class RecordController extends Controller
             || str_contains($e->getMessage(), 'Duplicate entry');
     }
 
-    /**
-     * AJAX: проверка ПИН сотрудника (используется на /workstation/select).
-     */
     public function checkEmployeePin(Request $r)
     {
         $shortName = trim((string) $r->input('short_name', ''));
@@ -498,9 +505,6 @@ class RecordController extends Controller
         ]);
     }
 
-    /**
-     * Отключено: разблокировки полей своим ПИНом больше нет.
-     */
     public function checkCurrentUserPin(Request $r)
     {
         return response()->json(['ok' => false, 'error' => 'Функция отключена.'], 410);

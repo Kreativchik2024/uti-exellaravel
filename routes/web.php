@@ -19,7 +19,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/workstation/skip',   [WorkstationController::class, 'skip'])->name('workstation.skip');
     Route::post('/workstation/clear',  [WorkstationController::class, 'clear'])->name('workstation.clear');
 
-    // ПИН-проверки: доступны и до workers (на /workstation/select)
+    // PIN-проверки: доступны и до workers (на /workstation/select)
     Route::post('/records-pin-check',  [RecordController::class, 'checkEmployeePin'])->name('records.pinCheck');
     Route::post('/records-pin-unlock', [RecordController::class, 'checkCurrentUserPin'])->name('records.pinUnlock');
 });
@@ -35,7 +35,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile',   [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::middleware(['auth', 'workers', 'role:admin'])->group(function () {
+// Админские разделы: убран 'workers', чтобы не блокировались при входе
+Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/users',                     [UserController::class, 'index'])->name('users.index');
     Route::patch('/users/{user}/role',       [UserController::class, 'updateRole'])->name('users.role');
     Route::patch('/users/{user}/approve',    [UserController::class, 'approve'])->name('users.approve');
@@ -54,6 +55,10 @@ Route::middleware(['auth', 'workers', 'role:admin'])->group(function () {
     Route::get('/employees/{employee}/edit', [EmployeeController::class, 'edit'])->name('employees.edit');
     Route::put('/employees/{employee}',      [EmployeeController::class, 'update'])->name('employees.update');
     Route::delete('/employees/{employee}',   [EmployeeController::class, 'destroy'])->name('employees.destroy');
+
+    Route::get('/firmware/categories',               [FirmwareCategoryController::class, 'index'])->name('firmware.categories.index');
+    Route::post('/firmware/categories',              [FirmwareCategoryController::class, 'store'])->name('firmware.categories.store');
+    Route::delete('/firmware/categories/{category}', [FirmwareCategoryController::class, 'destroy'])->name('firmware.categories.destroy');
 });
 
 Route::middleware('auth')->group(function () {
@@ -66,34 +71,25 @@ Route::get('/news/{news}', [NewsController::class, 'show'])
     ->name('news.show')
     ->whereNumber('news');
 
-Route::middleware(['auth', 'workers', 'role:admin,master'])->group(function () {
+// Мастер и Админ: убран 'workers' для действий с контентом
+Route::middleware(['auth', 'role:admin,master'])->group(function () {
     Route::get('/news/create',                   [NewsController::class, 'create'])->name('news.create');
     Route::post('/news',                         [NewsController::class, 'store'])->name('news.store');
     Route::get('/news/{news}/edit',              [NewsController::class, 'edit'])->name('news.edit');
     Route::put('/news/{news}',                   [NewsController::class, 'update'])->name('news.update');
     Route::delete('/news/{news}',                [NewsController::class, 'destroy'])->name('news.destroy');
     Route::delete('/news/{news}/images/{image}', [NewsController::class, 'destroyImage'])->name('news.images.destroy');
-});
 
-Route::middleware(['auth', 'workers'])->group(function () {
-    Route::get('/firmware',                    [FirmwareController::class, 'index'])->name('firmware.index');
-    Route::get('/firmware/{version}/download', [FirmwareController::class, 'download'])->name('firmware.download');
-});
-
-Route::middleware(['auth', 'workers', 'role:admin,master'])->group(function () {
     Route::get('/firmware/create',             [FirmwareController::class, 'create'])->name('firmware.create');
     Route::post('/firmware',                   [FirmwareController::class, 'store'])->name('firmware.store');
     Route::patch('/firmware/{version}/status', [FirmwareController::class, 'status'])->name('firmware.status');
     Route::delete('/firmware/{version}',       [FirmwareController::class, 'destroy'])->name('firmware.destroy');
 });
 
-Route::middleware(['auth', 'workers', 'role:admin'])->group(function () {
-    Route::get('/firmware/categories',               [FirmwareCategoryController::class, 'index'])->name('firmware.categories.index');
-    Route::post('/firmware/categories',              [FirmwareCategoryController::class, 'store'])->name('firmware.categories.store');
-    Route::delete('/firmware/categories/{category}', [FirmwareCategoryController::class, 'destroy'])->name('firmware.categories.destroy');
-});
-
 Route::middleware(['auth', 'workers'])->group(function () {
+    Route::get('/firmware',                    [FirmwareController::class, 'index'])->name('firmware.index');
+    Route::get('/firmware/{version}/download', [FirmwareController::class, 'download'])->name('firmware.download');
+
     Route::get('/records/{sheet}',           [RecordController::class, 'index'])->name('records.index');
     Route::get('/records/{sheet}/create',    [RecordController::class, 'create'])->name('records.create');
     Route::post('/records/{sheet}',          [RecordController::class, 'store'])->name('records.store');

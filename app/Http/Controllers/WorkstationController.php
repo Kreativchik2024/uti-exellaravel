@@ -24,6 +24,12 @@ class WorkstationController extends Controller
     {
         $workers       = $this->employeesForSelect();
         $selected      = session('workstation_workers', []);
+        
+        // Если пользователь зашел впервые (сессия пуста), подставляем его Employee
+        if (empty($selected) && auth()->user()->employee) {
+            $selected = [auth()->user()->employee->short_name];
+        }
+
         $intended      = $r->query('intended', route('dashboard'));
         $employeesList = $workers;
 
@@ -56,7 +62,7 @@ class WorkstationController extends Controller
             if (!$e) continue;
             $ts = $verified[$e->id] ?? null;
             if (!$ts || $ts < $now) {
-                $errors[] = "ведите  для «{$e->short_name}».";
+                $errors[] = "Введите ПИН для «{$e->short_name}».";
             }
         }
 
@@ -77,13 +83,13 @@ class WorkstationController extends Controller
             'peripheral' => ['nullable', 'integer', 'min:1', 'max:50'],
             'intended'   => ['nullable', 'string'],
         ], [
-            'workers.*.in' => 'ыберите исполнителя из списка (только привязанные к email).',
-            'post.integer' => 'ост должен быть числом.',
-            'post.min'     => 'ост от 1 до 30.',
-            'post.max'     => 'ост от 1 до 30.',
-            'peripheral.integer' => 'ериферия должна быть числом.',
-            'peripheral.min'     => 'ериферия от 1 до 50.',
-            'peripheral.max'     => 'ериферия от 1 до 50.',
+            'workers.*.in' => 'Выберите исполнителя из списка (только привязанные к email).',
+            'post.integer' => 'Пост должен быть числом.',
+            'post.min'     => 'Пост от 1 до 30.',
+            'post.max'     => 'Пост от 1 до 30.',
+            'peripheral.integer' => 'Периферия должна быть числом.',
+            'peripheral.min'     => 'Периферия от 1 до 50.',
+            'peripheral.max'     => 'Периферия от 1 до 50.',
         ]);
 
         $rawWorkers = $validated['workers'] ?? [];
@@ -97,7 +103,7 @@ class WorkstationController extends Controller
         foreach ($rawWorkers as $i => $w) {
             if ($w === null || $w === '') continue;
             if (isset($seen[$w])) {
-                $dupErrors["workers.$i"] = "«{$w}» уже выбран в поле сполнитель " . ($seen[$w] + 1) . '.';
+                $dupErrors["workers.$i"] = "«{$w}» уже выбран в поле Исполнитель " . ($seen[$w] + 1) . '.';
             } else {
                 $seen[$w] = $i;
             }

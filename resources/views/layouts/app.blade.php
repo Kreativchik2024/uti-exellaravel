@@ -7,7 +7,6 @@
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
-        {{-- Тема: применяем до рендера, чтобы не мигало --}}
         <script>
             (function () {
                 try {
@@ -23,8 +22,7 @@
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
-        
-        {{-- ВАЖНО: Сюда страницы могут пушить свои стили --}}
+
         @stack('styles')
     </head>
     <body class="font-sans antialiased">
@@ -63,13 +61,7 @@
             </svg>
         </button>
 
-        {{-- АНИМЕ-ДЕВОЧКА (если передумали, этот блок можно удалить) --}}
-        <div id="walking-anime-girl" style="position: fixed; bottom: 0; left: 0; width: 120px; height: 120px; z-index: 9998; pointer-events: none; display: none;">
-            <img id="anime-girl-img" src="{{ asset('images/girl.gif') }}" style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); transition: transform 0.1s;">
-        </div>
-
         <script>
-            // --- Логика смены темы ---
             (function () {
                 window.toggleDark = function () {
                     var html = document.documentElement;
@@ -85,43 +77,8 @@
                 }
                 document.addEventListener('DOMContentLoaded', syncIcons);
             })();
-
-            // --- Логика аниме-девочки ---
-            document.addEventListener('DOMContentLoaded', function() {
-                const girl = document.getElementById('walking-anime-girl');
-                const img = document.getElementById('anime-girl-img');
-                if (!girl || !img) return;
-                img.onerror = function() { girl.style.display = 'none'; };
-                img.onload = function() { girl.style.display = 'block'; };
-                let x = 0, direction = 1, speed = 1.5, isPaused = false, pauseTimeout;
-                function move() {
-                    if (!isPaused && girl.style.display !== 'none') {
-                        x += speed * direction;
-                        const maxX = window.innerWidth - girl.offsetWidth;
-                        if (x >= maxX) { direction = -1; img.style.transform = 'scaleX(-1)'; } 
-                        else if (x <= 0) { direction = 1; img.style.transform = 'scaleX(1)'; }
-                        girl.style.left = x + 'px';
-                    }
-                    requestAnimationFrame(move);
-                }
-                window.addEventListener('scroll', function() {
-                    isPaused = true;
-                    clearTimeout(pauseTimeout);
-                    pauseTimeout = setTimeout(function() { isPaused = false; }, 800);
-                });
-                document.addEventListener('click', function(e) {
-                    if (e.target.closest('a, button, input, select, textarea')) return;
-                    isPaused = true;
-                    girl.style.bottom = '20px';
-                    setTimeout(() => girl.style.bottom = '0px', 200);
-                    clearTimeout(pauseTimeout);
-                    pauseTimeout = setTimeout(() => isPaused = false, 400);
-                });
-                move();
-            });
         </script>
 
-        {{-- ВАЖНО: Сюда страницы пушат свои скрипты (например, графики статистики) --}}
         @stack('scripts')
     </body>
 </html>
