@@ -22,7 +22,7 @@
                 @endphp
 
                 {{-- Исполнители + PIN-модалка --}}
-                <div x-data="workstationWorkers()">
+                <div x-data="workstationWorkers()" x-init="init()" x-destroy="destroy()">
                     <div class="text-sm font-semibold text-gray-700 mb-2">Исполнители</div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
                         @for($i = 0; $i < 5; $i++)
@@ -37,9 +37,15 @@
                                         class="w-full border rounded px-2 py-1 text-sm">
                                     <option value="">— не выбран —</option>
                                     <template x-for="emp in availableFor({{ $i }})" :key="emp">
-                                        <option :value="emp" x-text="emp" :selected="emp === selected[{{ $i }}]"></option>
+                                        <option :value="emp" 
+                                                x-text="emp + (withoutPin.includes(emp) ? ' (нет ПИН)' : '')" 
+                                                :selected="emp === selected[{{ $i }}]"
+                                                :disabled="withoutPin.includes(emp) && !canManageWorkers"></option>
                                     </template>
                                 </select>
+                                
+                                {{-- Блок для таймера ПИН --}}
+                                <div class="mt-1 h-5" x-show="selected[{{ $i }}] && verifiedMap[selected[{{ $i }}]]" x-html="getTimerText(selected[{{ $i }}])"></div>
                             </div>
                         @endfor
                     </div>
@@ -148,6 +154,13 @@
         document.addEventListener('alpine:init', () => {
             Alpine.data('workstationWorkers', () => ({
                 all: @json($employeesList),
+                withoutPin: @json($employeesWithoutPin ?? []),
+                canManageWorkers: @json($canManageWorkers ?? false),
+                verifiedMap: @json($globalVerifiedWorkersMap ?? []),
+                serverNow: {{ now()->timestamp }},
+                clockOffsetMs: 0,
+                timerInterval: null,
+
                 pinUrl: '{{ route('records.pinCheck') }}',
                 csrf: '{{ csrf_token() }}',
                 
@@ -173,6 +186,47 @@
                 pinLoading: false,
                 pinError: '',
 
+                init() {
+                    // Вычисляем разницу между часами сервера и браузера
+                    this.clockOffsetMs = (this.serverNow * 1000) - Date.now();
+                    
+                    // Запускаем таймер для обновления Alpine.js каждую секунду
+                    this.timerInterval = setInterval(() => {
+                        this.$forceUpdate();
+                    }, 1000);
+
+                    // Инициализируем подтвержденные ПИН-коды
+                    for (let i = 0; i < 5; i++) {
+                        if (this.selected[i] && this.verifiedMap[this.selected[i]]) {
+                            this.confirmed[i] = this.selected[i];
+                        }
+                    }
+                },
+
+                destroy() {
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                },
+
+                nowSeconds() {
+                    return (Date.now() + this.clockOffsetMs) / 1000;
+                },
+
+                getTimerText(name) {
+                    var expires = this.verifiedMap[name];
+                    if (!expires) return '';
+                    
+                    var rem = Math.floor(expires - this.nowSeconds());
+                    if (rem <= 0) return '<span class="text-[11px] text-red-600 font-medium">Истёк</span>';
+                    
+                    var h = Math.floor(rem / 3600);
+                    var m = Math.floor((rem % 3600) / 60);
+                    var s = rem % 60;
+                    function p(n){return n<10?'0'+n:String(n);}
+                    
+                    var cls = rem <= 15 * 60 ? 'text-amber-600' : 'text-emerald-600';
+                    return '<span class="text-[11px] font-medium ' + cls + ' font-mono tabular-nums">🔒 ' + p(h)+':'+p(m)+':'+p(s) + '</span>';
+                },
+
                 availableFor(index) {
                     const used = Object.entries(this.selected)
                         .filter(([i, v]) => Number(i) !== index && v)
@@ -188,6 +242,14 @@
                         return;
                     }
 
+                    // Если выбран сотрудник без ПИН (и мы не админ)
+                    if (this.withoutPin.includes(newVal) && !this.canManageWorkers) {
+                        this.selected[index] = this.confirmed[index] || '';
+                        alert('У сотрудника нет ПИН-кода. Выберите другого.');
+                        return;
+                    }
+
+                    // Убираем дубликаты в других полях
                     for (let i = 0; i < 5; i++) {
                         if (i !== index && this.selected[i] === newVal) {
                             this.selected[i] = '';
@@ -197,6 +259,13 @@
 
                     if (this.confirmed[index] === newVal) return;
 
+                    // Если ПИН уже подтвержден и не истек
+                    if (this.verifiedMap[newVal] && this.verifiedMap[newVal] > this.nowSeconds()) {
+                        this.confirmed[index] = newVal;
+                        return;
+                    }
+
+                    // Иначе спрашиваем ПИН
                     this.pinTarget = newVal;
                     this.pinTargetIndex = index;
                     this.pinValue = '';
@@ -232,6 +301,9 @@
                         const data = await res.json().catch(() => ({}));
                         if (res.ok && data.ok) {
                             this.confirmed[this.pinTargetIndex] = this.pinTarget;
+                            if (data.expires_at) {
+                                this.verifiedMap[this.pinTarget] = parseInt(data.expires_at, 10);
+                            }
                             this.pinModalOpen = false;
                             this.pinValue = '';
                         } else {

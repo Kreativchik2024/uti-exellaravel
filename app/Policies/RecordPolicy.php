@@ -8,6 +8,7 @@ class RecordPolicy
 {
     /**
      * Единый признак «может управлять чужими записями».
+     * Админ, мастер или пользователь с правом canManageContent.
      */
     private function canManage(User $u): bool
     {
@@ -23,16 +24,15 @@ class RecordPolicy
 
     public function update(User $u, $record): bool
     {
-        // ── Вариант А (буквально «только админ и мастер»): ──
-        // return $this->canManage($u);
-
-        // ── Вариант Б (текущий: админ/мастер ИЛИ создатель): ──
         if ($this->canManage($u)) return true;
         return (int) $record->created_by === (int) $u->id;
     }
 
     public function delete(User $u, $record): bool
     {
-        return $this->update($u, $record);
+        // Удалять могут только админ и мастер.
+        // Если создатель тоже должен мочь удалять, замените на:
+        // return $this->update($u, $record);
+        return $this->canManage($u);
     }
 }

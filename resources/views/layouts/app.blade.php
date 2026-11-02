@@ -37,7 +37,7 @@
                 </header>
             @endisset
 
-            <main>
+            <main class="pb-16">
                 {{ $slot }}
             </main>
         </div>
@@ -79,8 +79,43 @@
             })();
         </script>
 
-        {{-- Панель онлайн --}}
-        @includeIf('partials.online-footer')
+        {{-- ПАНЕЛЬ ОНЛАЙН --}}
+        @include('partials.online-footer')
+
+        {{-- ГЛОБАЛЬНЫЙ ТАЙМЕР ПИН --}}
+        <script>
+            window.GLOBAL_PIN_MAP = @json($globalVerifiedWorkersMap ?? []);
+            
+            function startGlobalPinTimers() {
+                document.querySelectorAll('[data-pin-timer]').forEach(function(el) {
+                    var name = el.getAttribute('data-pin-timer');
+                    var expires = window.GLOBAL_PIN_MAP[name];
+                    
+                    if (!expires) {
+                        el.innerHTML = '<span class="text-[11px] text-gray-400">Нет ПИН</span>';
+                        return;
+                    }
+                    
+                    function tick() {
+                        var rem = Math.floor(expires - (Date.now() / 1000));
+                        if (rem <= 0) {
+                            el.innerHTML = '<span class="text-[11px] text-red-500 font-medium">Истёк</span>';
+                            return;
+                        }
+                        var h = Math.floor(rem / 3600);
+                        var m = Math.floor((rem % 3600) / 60);
+                        var s = rem % 60;
+                        function p(n){return n<10?'0'+n:String(n);}
+                        
+                        var cls = rem <= 15 * 60 ? 'text-amber-500' : 'text-emerald-500';
+                        el.innerHTML = '<span class="text-[11px] font-medium ' + cls + ' font-mono tabular-nums">🔒 ' + p(h)+':'+p(m)+':'+p(s) + '</span>';
+                        setTimeout(tick, 1000);
+                    }
+                    tick();
+                });
+            }
+            document.addEventListener('DOMContentLoaded', startGlobalPinTimers);
+        </script>
 
         @stack('scripts')
     </body>

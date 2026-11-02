@@ -33,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\View; // <--- ДОБАВЛЕНО
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 
@@ -66,7 +67,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(NightCameraAssemblyRecord::class, RecordPolicy::class);
         Gate::policy(RouterFirmwareRecord::class,  RecordPolicy::class);
         Gate::policy(SpeedSensorRecord::class,     RecordPolicy::class);
-        Gate::policy(ScrewCheckRecord::class,      RecordPolicy::class); // <-- ДОБАВЛЕНО
+        Gate::policy(ScrewCheckRecord::class,      RecordPolicy::class);
 
         FirmwareVersion::observe(FirmwareVersionObserver::class);
 
@@ -89,7 +90,7 @@ class AppServiceProvider extends ServiceProvider
             'night_camera_assembly' => NightCameraAssemblyRecord::class,
             'router_firmware'       => RouterFirmwareRecord::class,
             'speed_sensor'          => SpeedSensorRecord::class,
-            'screw_check'           => ScrewCheckRecord::class, // <-- ДОБАВЛЕНО
+            'screw_check'           => ScrewCheckRecord::class,
         ]);
 
         foreach (config('sheets.map', []) as $cfg) {
@@ -103,6 +104,29 @@ class AppServiceProvider extends ServiceProvider
                     ->orderBy('record_employee.position');
             });
         }
+
+        // --- ГЛОБАЛЬНАЯ ПЕРЕДАЧА ПИН-КОДОВ ВО ВСЕ ШАБЛОНЫ ---
+        View::composer('*', function ($view) {
+            $verified = session('verified_workers', []);
+            $now = now()->timestamp;
+            $ids = [];
+            
+            foreach ($verified as $id => $expires) {
+                if ((int) $expires > $now) {
+                    $ids[(int) $id] = (int) $expires;
+                }
+            }
+            
+            $map = [];
+            if (!empty($ids)) {
+                $employees = Employee::whereIn('id', array_keys($ids))->get(['id', 'short_name']);
+                foreach ($employees as $e) {
+                    $map[$e->short_name] = $ids[$e->id];
+                }
+            }
+            
+            $view->with('globalVerifiedWorkersMap', $map);
+        });
 
         $this->configureRateLimiting();
     }

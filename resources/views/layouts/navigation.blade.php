@@ -2,6 +2,7 @@
     @php
         $currentWorkers = session('workstation_workers', []);
         $workersCount   = count($currentWorkers);
+        $activePins     = $globalVerifiedWorkersMap ?? [];
 
         $recordTabs = [
             'pgp'                   => 'ПГП (борта)',
@@ -74,8 +75,19 @@
                         </div>
                     </div>
 
+                    {{-- ИСПОЛНИТЕЛИ + ТАЙМЕРЫ --}}
                     <x-nav-link :href="route('workstation.show')" :active="request()->routeIs('workstation.*')">
-                        {{ __('Исполнители') }}@if($workersCount > 0) ({{ $workersCount }})@endif
+                        <div class="flex items-center gap-2">
+                            <span>{{ __('Исполнители') }}@if($workersCount > 0) ({{ $workersCount }})@endif</span>
+                            
+                            @if(!empty($activePins))
+                                <div class="flex gap-1.5 ml-1">
+                                    @foreach($activePins as $name => $expires)
+                                        <span data-pin-timer="{{ $name }}" class="text-[10px] bg-gray-100 border border-gray-200 rounded px-1"></span>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
                     </x-nav-link>
 
                     <x-nav-link :href="route('firmware.index')" :active="request()->routeIs('firmware.*')">
@@ -153,6 +165,19 @@
                         </button>
                     </x-slot>
                     <x-slot name="content">
+                        {{-- ВЫВОД ТАЙМЕРОВ ПИН В МЕНЮ ПРОФИЛЯ --}}
+                        @if(!empty($activePins))
+                            <div class="px-4 py-2 border-b border-gray-100">
+                                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Активные ПИН</div>
+                                @foreach($activePins as $name => $expires)
+                                    <div class="flex items-center justify-between py-1">
+                                        <span class="text-sm text-gray-700">{{ $name }}</span>
+                                        <div data-pin-timer="{{ $name }}"></div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+
                         <x-dropdown-link :href="route('profile.edit')">
                             {{ __('Профиль') }}
                         </x-dropdown-link>
@@ -201,7 +226,16 @@
             </div>
 
             <x-responsive-nav-link :href="route('workstation.show')" :active="request()->routeIs('workstation.*')">
-                {{ __('Исполнители') }}@if($workersCount > 0) ({{ $workersCount }})@endif
+                <div class="flex items-center gap-2">
+                    <span>{{ __('Исполнители') }}@if($workersCount > 0) ({{ $workersCount }})@endif</span>
+                    @if(!empty($activePins))
+                        <div class="flex gap-1">
+                            @foreach($activePins as $name => $expires)
+                                <span data-pin-timer="{{ $name }}" class="text-[10px] bg-gray-100 rounded px-1"></span>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
             </x-responsive-nav-link>
 
             <x-responsive-nav-link :href="route('firmware.index')" :active="request()->routeIs('firmware.*')">
@@ -240,6 +274,20 @@
                 <div class="font-medium text-base text-gray-800">{{ Auth::user()->name }}</div>
                 <div class="font-medium text-sm text-gray-500">{{ Auth::user()->email }}</div>
             </div>
+
+            {{-- ВЫВОД ТАЙМЕРОВ ПИН В МОБИЛЬНОМ МЕНЮ --}}
+            @if(!empty($activePins))
+                <div class="px-4 py-2 border-t border-gray-100 mt-2">
+                    <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Активные ПИН</div>
+                    @foreach($activePins as $name => $expires)
+                        <div class="flex items-center justify-between py-1">
+                            <span class="text-sm text-gray-700">{{ $name }}</span>
+                            <div data-pin-timer="{{ $name }}"></div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
             <div class="mt-3 space-y-1">
                 <x-responsive-nav-link :href="route('profile.edit')">
                     {{ __('Профиль') }}
