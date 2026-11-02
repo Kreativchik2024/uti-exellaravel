@@ -79,6 +79,9 @@
             })();
         </script>
 
+        {{-- Панель онлайн --}}
+        @includeIf('partials.online-footer')
+
         @stack('scripts')
     </body>
 </html>

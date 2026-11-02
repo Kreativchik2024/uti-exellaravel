@@ -10,6 +10,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecordController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WorkerSessionController;
 use App\Http\Controllers\WorkstationController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +23,13 @@ Route::middleware('auth')->group(function () {
     // PIN-проверки: доступны и до workers (на /workstation/select)
     Route::post('/records-pin-check',  [RecordController::class, 'checkEmployeePin'])->name('records.pinCheck');
     Route::post('/records-pin-unlock', [RecordController::class, 'checkCurrentUserPin'])->name('records.pinUnlock');
+
+    // Онлайн-присутствие исполнителей
+    Route::post('/worker-sessions/heartbeat', [WorkerSessionController::class, 'heartbeat'])->name('worker-sessions.heartbeat');
+    Route::get('/worker-sessions/online',     [WorkerSessionController::class, 'online'])->name('worker-sessions.online');
+    Route::get('/worker-sessions/occupied',   [WorkerSessionController::class, 'occupied'])->name('worker-sessions.occupied');
+    Route::post('/worker-sessions/claim',     [WorkerSessionController::class, 'claim'])->name('worker-sessions.claim');
+    Route::post('/worker-sessions/release',   [WorkerSessionController::class, 'release'])->name('worker-sessions.release');
 });
 
 Route::get('/', [DashboardController::class, 'index'])
