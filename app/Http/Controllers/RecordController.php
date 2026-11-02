@@ -22,16 +22,78 @@ class RecordController extends Controller
 
     private function isRecordLocked($record): bool
     {
-        // Если записи нет или это новая запись (без created_at) — не блокируем
         if (!$record || !$record->created_at) return false;
-        
-        // Блокируем, если с момента создания прошло 24 часа или больше
-        return $record->created_at->addHours(24)->isPast();
+        $user = auth()->user();
+        if ($user && $user->canManageContent()) return false;
+        return $record->created_at->copy()->addHours(24)->isPast();
     }
 
-    private function canEditWorkers(): bool
+    private function canManageWorkersWithoutPin(): bool
     {
-        return auth()->check() && auth()->user()->isAdmin();
+        return auth()->check() && auth()->user()->canManageContent();
+    }
+
+    private function currentEmployeeName(): ?string
+    {
+        $user = auth()->user();
+        if (!$user || !$user->employee) return null;
+        return $user->employee->short_name ?: null;
+    }
+
+    private function employeesRequiringPin(): array
+    {
+        $list = Employee::query()->active()->with('user')->get();
+        $result = [];
+        foreach ($list as $e) {
+            if ($e->user && method_exists($e->user, 'hasPin') && $e->user->hasPin()) {
+                $result[] = $e->short_name;
+            }
+        }
+        return $result;
+    }
+
+    /** Список сотрудников, у которых НЕТ ПИН (чтобы заблокировать их в селекте) */
+    private function employeesWithoutPin(): array
+    {
+        $list = Employee::query()->active()->with('user')->get();
+        $result = [];
+        foreach ($list as $e) {
+            if (!$e->user || !method_exists($e->user, 'hasPin') || !$e->user->hasPin()) {
+                $result[] = $e->short_name;
+            }
+        }
+        return $result;
+    }
+
+    /** @return array<string,int> short_name => expires_timestamp */
+    private function verifiedWorkersMap(): array
+    {
+        $verified = session('verified_workers', []);
+        $now = now()->timestamp;
+
+        $ids = [];
+        foreach ($verified as $id => $expires) {
+            if ((int) $expires > $now) $ids[(int) $id] = (int) $expires;
+        }
+        if (empty($ids)) return [];
+
+        $employees = Employee::whereIn('id', array_keys($ids))->get(['id', 'short_name']);
+        $map = [];
+        foreach ($employees as $e) {
+            $map[$e->short_name] = $ids[$e->id];
+        }
+        return $map;
+    }
+
+    private function recordWorkerValues($record, array $cfg): array
+    {
+        $result = [];
+        foreach (self::WORKER_FIELDS as $wf) {
+            if (array_key_exists($wf, $cfg['fields'])) {
+                $result[$wf] = $record->{$wf} ?? '';
+            }
+        }
+        return $result;
     }
 
     private function lookupPrefix(string $fieldName, array $lookup): ?string
@@ -68,16 +130,13 @@ class RecordController extends Controller
     private function workerDefaults(): array
     {
         $workers = session('workstation_workers', []);
-
         if (empty($workers)) {
             $user = auth()->user();
             if ($user && $user->employee && $user->employee->short_name) {
                 $workers = [$user->employee->short_name];
             }
         }
-
         $allowed = $this->employeesForSelect();
-
         $defaults = [
             'worker1' => $workers[0] ?? '',
             'worker2' => $workers[1] ?? '',
@@ -85,11 +144,7 @@ class RecordController extends Controller
             'worker4' => $workers[3] ?? '',
             'worker5' => $workers[4] ?? '',
         ];
-
-        return array_map(
-            fn ($v) => in_array($v, $allowed, true) ? $v : '',
-            $defaults
-        );
+        return array_map(fn ($v) => in_array($v, $allowed, true) ? $v : '', $defaults);
     }
 
     private function defaults(string $sheet, array $cfg): array
@@ -106,11 +161,16 @@ class RecordController extends Controller
         return $defaults;
     }
 
-    private function validateWorkers(array $data): void
+    private function validateWorkers(array $data, array $exemptValues = []): void
     {
         $allActive = $this->employeesForSelect();
         $errors    = [];
         $seen      = [];
+
+        $verified  = session('verified_workers', []);
+        $now       = now()->timestamp;
+        $canManage = $this->canManageWorkersWithoutPin();
+        $currentName = $this->currentEmployeeName();
 
         foreach (self::WORKER_FIELDS as $field) {
             if (!array_key_exists($field, $data)) continue;
@@ -125,6 +185,26 @@ class RecordController extends Controller
 
             if (!in_array($value, $allActive, true)) {
                 $errors[$field] = 'Сотрудник неактивен или не привязан к учётной записи (email).';
+                continue;
+            }
+
+            if ($canManage) continue;
+            if ($currentName && $value === $currentName) continue;
+            if (isset($exemptValues[$field]) && (string) $exemptValues[$field] === (string) $value) continue;
+
+            $employee = Employee::where('short_name', $value)->active()->with('user')->first();
+            if (!$employee) continue;
+
+            // ЗАПРЕЩАЕМ выбирать сотрудников без ПИН
+            if (!$employee->user
+                || !method_exists($employee->user, 'hasPin')
+                || !$employee->user->hasPin()) {
+                $errors[$field] = "У сотрудника «{$value}» не установлен ПИН-код. Выберите другого.";
+                continue;
+            }
+
+            if (!isset($verified[$employee->id]) || (int) $verified[$employee->id] < $now) {
+                $errors[$field] = "Подтвердите ПИН сотрудника «{$value}».";
             }
         }
 
@@ -154,7 +234,6 @@ class RecordController extends Controller
     {
         $healthFields = $targetCfg['health_fields'] ?? [];
         $goodValues   = $targetCfg['health_good_values'] ?? ['Работает'];
-
         $health = 'green'; $statusText = 'Всё в порядке';
 
         if (!empty($healthFields)) {
@@ -234,11 +313,6 @@ class RecordController extends Controller
             $found = $targetCfg['model']::query()
                 ->where($f['lookup']['match_by'], $value)
                 ->orderByDesc('record_date')->first();
-
-            Log::info('[lookup snapshot]', [
-                'field' => $name, 'prefix' => $prefix, 'value' => $value,
-                'found_id' => $found ? $found->getKey() : null,
-            ]);
 
             if (!$found) continue;
 
@@ -340,8 +414,6 @@ class RecordController extends Controller
             if (!empty($cfg['health_fields'])) {
                 $record->health = $this->computeHealth($record, $cfg['health_fields'], $goodValues);
             }
-            // Передаем флаг блокировки в шаблон
-            $record->is_locked = $this->isRecordLocked($record);
         }
 
         return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns'));
@@ -351,7 +423,12 @@ class RecordController extends Controller
     {
         $cfg    = $this->cfg($sheet);
         $record = $cfg['model']::with('creator')->findOrFail($id);
-        Gate::authorize('view', $record);
+
+        if (Gate::denies('view', $record)) {
+            return redirect()->route('records.index', $sheet)
+                ->withErrors(['general' => 'Просмотр этой записи недоступен.']);
+        }
+
         $lookups = $this->buildLookupFromRecord($cfg, $record);
         $isTimeLocked = $this->isRecordLocked($record);
         return view('records.show', compact('sheet', 'cfg', 'record', 'lookups', 'isTimeLocked'));
@@ -362,14 +439,24 @@ class RecordController extends Controller
         $cfg = $this->cfg($sheet);
         Gate::authorize('create', $cfg['model']);
 
-        $defaults       = $this->defaults($sheet, $cfg);
-        $employeesList  = $this->employeesForSelect();
-        $lookups        = [];
-        $canEditWorkers = $this->canEditWorkers();
-        $isTimeLocked   = false; // Новая запись не может быть заблокирована
+        $defaults              = $this->defaults($sheet, $cfg);
+        $employeesList         = $this->employeesForSelect();
+        $lookups               = [];
+        $canManageWorkers      = $this->canManageWorkersWithoutPin();
+        $verifiedWorkersMap    = $this->verifiedWorkersMap();
+        $currentEmployeeName   = $this->currentEmployeeName();
+        $employeesRequiringPin = $this->employeesRequiringPin();
+        $employeesWithoutPin   = $this->employeesWithoutPin();
+        $originalWorkers       = array_filter(
+            array_intersect_key($defaults, array_flip(self::WORKER_FIELDS)),
+            fn($v) => $v !== '' && $v !== null
+        );
+        $isTimeLocked = false;
 
         return view('records.create', compact(
-            'sheet', 'cfg', 'defaults', 'employeesList', 'lookups', 'canEditWorkers', 'isTimeLocked'
+            'sheet', 'cfg', 'defaults', 'employeesList', 'lookups',
+            'canManageWorkers', 'verifiedWorkersMap', 'currentEmployeeName',
+            'employeesRequiringPin', 'employeesWithoutPin', 'originalWorkers', 'isTimeLocked'
         ));
     }
 
@@ -390,15 +477,11 @@ class RecordController extends Controller
 
         $data = $r->validate($rules);
 
-        if (!$this->canEditWorkers()) {
-            foreach (self::WORKER_FIELDS as $wf) {
-                if (array_key_exists($wf, $cfg['fields'])) {
-                    $data[$wf] = $defaults[$wf] ?? null;
-                }
-            }
-        }
-
-        $this->validateWorkers($data);
+        $exempt = array_filter(
+            array_intersect_key($defaults, array_flip(self::WORKER_FIELDS)),
+            fn($v) => $v !== '' && $v !== null
+        );
+        $this->validateWorkers($data, $exempt);
 
         $data['created_by'] = auth()->id();
         $this->applyLookupSnapshots($cfg, $data);
@@ -419,15 +502,29 @@ class RecordController extends Controller
     {
         $cfg    = $this->cfg($sheet);
         $record = $cfg['model']::findOrFail($id);
-        Gate::authorize('update', $record);
 
-        $employeesList  = $this->employeesForSelect();
-        $lookups        = $this->buildLookupFromRecord($cfg, $record);
-        $canEditWorkers = $this->canEditWorkers();
-        $isTimeLocked   = $this->isRecordLocked($record);
+        if (Gate::denies('update', $record)) {
+            return redirect()->route('records.index', $sheet)
+                ->withErrors(['general' => 'У вас нет прав на редактирование этой записи.']);
+        }
+
+        $employeesList         = $this->employeesForSelect();
+        $lookups               = $this->buildLookupFromRecord($cfg, $record);
+        $canManageWorkers      = $this->canManageWorkersWithoutPin();
+        $verifiedWorkersMap    = $this->verifiedWorkersMap();
+        $currentEmployeeName   = $this->currentEmployeeName();
+        $employeesRequiringPin = $this->employeesRequiringPin();
+        $employeesWithoutPin   = $this->employeesWithoutPin();
+        $originalWorkers       = array_filter(
+            $this->recordWorkerValues($record, $cfg),
+            fn($v) => $v !== '' && $v !== null
+        );
+        $isTimeLocked = $this->isRecordLocked($record);
 
         return view('records.edit', compact(
-            'sheet', 'cfg', 'record', 'employeesList', 'lookups', 'canEditWorkers', 'isTimeLocked'
+            'sheet', 'cfg', 'record', 'employeesList', 'lookups',
+            'canManageWorkers', 'verifiedWorkersMap', 'currentEmployeeName',
+            'employeesRequiringPin', 'employeesWithoutPin', 'originalWorkers', 'isTimeLocked'
         ));
     }
 
@@ -435,9 +532,12 @@ class RecordController extends Controller
     {
         $cfg    = $this->cfg($sheet);
         $record = $cfg['model']::findOrFail($id);
-        Gate::authorize('update', $record);
 
-        // ЖЕСТКАЯ ПРОВЕРКА НА СЕРВЕРЕ
+        if (Gate::denies('update', $record)) {
+            return redirect()->route('records.index', $sheet)
+                ->withErrors(['general' => 'У вас нет прав на редактирование этой записи.']);
+        }
+
         if ($this->isRecordLocked($record)) {
             return back()->withErrors(['general' => 'Редактирование запрещено: прошло более 24 часов с момента создания записи.']);
         }
@@ -447,15 +547,8 @@ class RecordController extends Controller
 
         $data = $r->validate($rules);
 
-        if (!$this->canEditWorkers()) {
-            foreach (self::WORKER_FIELDS as $wf) {
-                if (array_key_exists($wf, $cfg['fields'])) {
-                    $data[$wf] = $record->{$wf};
-                }
-            }
-        }
-
-        $this->validateWorkers($data);
+        $existing = $this->recordWorkerValues($record, $cfg);
+        $this->validateWorkers($data, $existing);
 
         $data['updated_by'] = auth()->id();
         $this->applyLookupSnapshots($cfg, $data);
@@ -476,10 +569,15 @@ class RecordController extends Controller
     {
         $cfg    = $this->cfg($sheet);
         $record = $cfg['model']::findOrFail($id);
-        Gate::authorize('delete', $record);
-        
+
+        if (Gate::denies('delete', $record)) {
+            return redirect()->route('records.index', $sheet)
+                ->withErrors(['general' => 'У вас нет прав на удаление этой записи.']);
+        }
+
         if ($this->isRecordLocked($record)) {
-            return back()->withErrors(['general' => 'Удаление запрещено: прошло более 24 часов с момента создания записи.']);
+            return redirect()->route('records.index', $sheet)
+                ->withErrors(['general' => 'Удаление запрещено: прошло более 24 часов с момента создания записи.']);
         }
 
         $record->delete();
@@ -516,14 +614,17 @@ class RecordController extends Controller
         if (!$employee->user->hasPin())       return response()->json(['ok' => false, 'error' => 'У сотрудника не установлен ПИН.'], 422);
         if (!$employee->user->checkPin($pin)) return response()->json(['ok' => false, 'error' => 'Неверный ПИН.'], 422);
 
+        $expiresAt = now()->addHours(3)->timestamp;
+
         $verified = $r->session()->get('verified_workers', []);
-        $verified[$employee->id] = now()->addHours(3)->timestamp;
+        $verified[$employee->id] = $expiresAt;
         $r->session()->put('verified_workers', $verified);
 
         return response()->json([
             'ok'            => true,
             'employee_id'   => $employee->id,
             'employee_name' => $employee->short_name,
+            'expires_at'    => $expiresAt,
         ]);
     }
 

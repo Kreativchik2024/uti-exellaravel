@@ -16,7 +16,7 @@ return [
     'map' => [
 
         // =====================================================
-        // ПГП (борта) — Cross3 / Bracket / Manet (все с lookup)
+        // ПГП (борта)
         // =====================================================
         'pgp' => [
             'title'  => 'ПГП (борта)',
@@ -53,19 +53,17 @@ return [
                 ],
 
                 'status'          => ['label'=>'Статус','type'=>'select','rules'=>'required',
-                                       'options'=>['Сдан','Не сдан','В работе','Исправен','Неисправен','В ремонт']],
+                                       'options'=>['Сдан','Не сдан']],
                 'defect_reason'   => ['label'=>'Причина','type'=>'textarea','rules'=>'nullable|string'],
                 'actions_taken'   => ['label'=>'Действия','type'=>'textarea','rules'=>'nullable|string'],
             ], $faultCode),
 
             'health_fields'      => ['status'],
-            'health_good_values' => ['Сдан','Исправен'],
+            'health_good_values' => ['Сдан'],
             'list_columns' => [
                 'record_date',
                 'post_number',
                 'board_number',
-                'cross3_number',
-                'bracket_serial',
                 'status',
             ],
         ],
@@ -104,7 +102,7 @@ return [
         ],
 
         // =====================================================
-        // Кросс 3 — сюда переехал «Барометр» из camera_bracket
+        // Кросс 3
         // =====================================================
         'cross3' => [
             'title'  => 'Кросс 3',
@@ -309,7 +307,7 @@ return [
         ],
 
         // =====================================================
-        // Кронштейн с камерой — БЕЗ barometer_status (переехал в cross3)
+        // Кронштейн с камерой
         // =====================================================
         'camera_bracket' => [
             'title'  => 'Кронштейн с камерой',
