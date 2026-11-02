@@ -32,7 +32,7 @@ class ImportCameraBracket extends Command
         $dry  = (bool) $this->option('dry');
         $userId = (int) $this->option('user') ?: null;
         $allowUnknown    = (bool) $this->option('allow-unknown');
-        $placeholder     = (string) $this->option('placeholder'); // «Уволен У У»
+        $placeholder     = (string) $this->option('placeholder');
         $allowDuplicates = (bool) $this->option('allow-duplicates');
 
         if (!file_exists($path)) {
@@ -65,8 +65,6 @@ class ImportCameraBracket extends Command
             if ($cnt > 1) $surnameMap[$s] = null;
         }
 
-        // Если «Уволен У У» нет в справочнике — добавим его «виртуально»,
-        // чтобы валидация его пропустила (сам сотрудник должен быть в БД!).
         if (!in_array($placeholder, $allowedWorkers, true)) {
             $this->warn("⚠️  «{$placeholder}» не найден в справочнике активных сотрудников.");
             $this->warn("   Добавьте его в /employees/create (галочка «Активен»).");
@@ -108,6 +106,10 @@ class ImportCameraBracket extends Command
                 $bar->advance();
                 continue;
             }
+
+            // [0]ПП [1]Кол-во [2]Дата [3]№ [4]Время нач [5]Время окон [6]Номер моторамы
+            // [7]camera [8]Ночная камера [9]Датчик скорости [10]Барометр [11]Примечания
+            // [12]ФИО 1 [13]ФИО 2 [14]ФИО 3 [15]Комментарии
 
             $dateRaw     = trim((string) ($line[2]  ?? ''));
             $frameSerial = trim((string) ($line[6]  ?? ''));
@@ -179,10 +181,8 @@ class ImportCameraBracket extends Command
             $w4 = $allWorkers[3] ?? null;
             $w5 = $allWorkers[4] ?? null;
 
-            // Неизвестных (Симонов/Шестера/Бочкарев и др.) → заменяем на placeholder,
-            // ЕСЛИ не указан --allow-unknown
+            // Неизвестные ФИО → placeholder (если не указан --allow-unknown)
             if (!$allowUnknown) {
-                $fields = ['w1', 'w2', 'w3', 'w4', 'w5'];
                 $values = [$w1, $w2, $w3, $w4, $w5];
                 foreach ($values as $i => $v) {
                     if ($v !== null && !in_array($v, $allowedWorkers, true)) {
@@ -275,6 +275,9 @@ class ImportCameraBracket extends Command
         return self::SUCCESS;
     }
 
+    /**
+     * Читает файл. Для Excel — только до последней заполненной строки.
+     */
     private function readRows(string $path): array
     {
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
@@ -309,6 +312,9 @@ class ImportCameraBracket extends Command
         }
     }
 
+    /**
+     * Универсальный парсер даты: Excel serial + стандартные форматы.
+     */
     private function parseDate(string $value): ?string
     {
         $value = trim($value);
@@ -317,7 +323,9 @@ class ImportCameraBracket extends Command
         if (is_numeric($value)) {
             $num = (float) $value;
             if ($num > 1 && $num < 80000) {
-                try { return Carbon::create(1899, 12, 30)->addDays((int) $num)->format('Y-m-d'); } catch (\Throwable $e) {}
+                try {
+                    return Carbon::create(1899, 12, 30)->addDays((int) $num)->format('Y-m-d');
+                } catch (\Throwable $e) {}
             }
         }
 
@@ -331,19 +339,41 @@ class ImportCameraBracket extends Command
             } catch (\Throwable $e) {}
         }
 
-        try { return Carbon::parse($value)->format('Y-m-d'); } catch (\Throwable $e) { return null; }
+        try {
+            return Carbon::parse($value)->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
+    /**
+     * Ключ уникальности: record_date + (frame_serial ИЛИ serial_number).
+     * Ищем в ОБОИХ полях, потому что:
+     *   - старые записи хранят номер в serial_number
+     *   - новые записи пишут в frame_serial
+     * Без этого дубли не находятся.
+     */
     private function isDuplicate(array $data): bool
     {
-        $q = CameraBracketRecord::query()->where('record_date', $data['record_date']);
-        if (!empty($data['frame_serial'])) {
-            $q->where('frame_serial', $data['frame_serial']);
-        } elseif (!empty($data['serial_number'])) {
-            $q->where('serial_number', $data['serial_number']);
-        } else {
+        $q = CameraBracketRecord::query()
+            ->where('record_date', $data['record_date']);
+
+        // Ключ: сначала frame_serial (новые записи),
+        // если пусто — serial_number (старые)
+        $key = !empty($data['frame_serial'])
+            ? $data['frame_serial']
+            : (!empty($data['serial_number']) ? $data['serial_number'] : null);
+
+        if ($key === null) {
             return false;
         }
+
+        // Ищем ключ в ОБОИХ полях — вдруг в БД он лежит в другом
+        $q->where(function ($w) use ($key) {
+            $w->where('frame_serial', $key)
+              ->orWhere('serial_number', $key);
+        });
+
         return $q->exists();
     }
 
