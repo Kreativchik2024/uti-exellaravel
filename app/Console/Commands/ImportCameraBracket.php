@@ -96,7 +96,6 @@ class ImportCameraBracket extends Command
             $row++;
             if ($row === 1) { $bar->advance(); continue; }
 
-            // Пропускаем пустые строки
             $isEmpty = true;
             foreach ($line as $cell) {
                 if (trim((string) $cell) !== '') { $isEmpty = false; break; }
@@ -169,7 +168,6 @@ class ImportCameraBracket extends Command
             }
             $allWorkers = array_slice($allWorkers, 0, 5);
 
-            // Пустое ФИО 1 → placeholder
             if (empty($allWorkers)) {
                 $allWorkers = [$placeholder];
                 $statPlaceholder++;
@@ -181,7 +179,6 @@ class ImportCameraBracket extends Command
             $w4 = $allWorkers[3] ?? null;
             $w5 = $allWorkers[4] ?? null;
 
-            // Неизвестные ФИО → placeholder (если не указан --allow-unknown)
             if (!$allowUnknown) {
                 $values = [$w1, $w2, $w3, $w4, $w5];
                 foreach ($values as $i => $v) {
@@ -275,9 +272,6 @@ class ImportCameraBracket extends Command
         return self::SUCCESS;
     }
 
-    /**
-     * Читает файл. Для Excel — только до последней заполненной строки.
-     */
     private function readRows(string $path): array
     {
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
@@ -312,9 +306,6 @@ class ImportCameraBracket extends Command
         }
     }
 
-    /**
-     * Универсальный парсер даты: Excel serial + стандартные форматы.
-     */
     private function parseDate(string $value): ?string
     {
         $value = trim($value);
@@ -347,19 +338,18 @@ class ImportCameraBracket extends Command
     }
 
     /**
-     * Ключ уникальности: record_date + (frame_serial ИЛИ serial_number).
+     * Ключ уникальности: record_date (только дата, без времени) + (frame_serial ИЛИ serial_number).
      * Ищем в ОБОИХ полях, потому что:
      *   - старые записи хранят номер в serial_number
      *   - новые записи пишут в frame_serial
-     * Без этого дубли не находятся.
+     * Используем whereDate, потому что в БД record_date хранится с временем (2026-10-26 21:00:00),
+     * а в файле дата = 2026-10-27.
      */
     private function isDuplicate(array $data): bool
     {
         $q = CameraBracketRecord::query()
-            ->where('record_date', $data['record_date']);
+            ->whereDate('record_date', $data['record_date']);
 
-        // Ключ: сначала frame_serial (новые записи),
-        // если пусто — serial_number (старые)
         $key = !empty($data['frame_serial'])
             ? $data['frame_serial']
             : (!empty($data['serial_number']) ? $data['serial_number'] : null);
@@ -368,7 +358,6 @@ class ImportCameraBracket extends Command
             return false;
         }
 
-        // Ищем ключ в ОБОИХ полях — вдруг в БД он лежит в другом
         $q->where(function ($w) use ($key) {
             $w->where('frame_serial', $key)
               ->orWhere('serial_number', $key);
