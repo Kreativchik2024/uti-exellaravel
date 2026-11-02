@@ -33,25 +33,19 @@ class RecordController extends Controller
         return auth()->check() && auth()->user()->canManageContent();
     }
 
-    /**
-     * Получить имя текущего сотрудника, привязанного к пользователю.
-     * Работает даже если Eloquent-связь $user->employee не настроена.
-     */
     private function currentEmployeeName(): ?string
     {
         $user = auth()->user();
         if (!$user) return null;
 
-        // 1. Пробуем через Eloquent-связь (если она настроена)
         if (!empty($user->employee) && !empty($user->employee->short_name)) {
-            return $user->employee->short_name;
+            return trim($user->employee->short_name);
         }
 
-        // 2. Если связи нет, ищем по employee_id напрямую
         if (isset($user->employee_id)) {
             $emp = Employee::find($user->employee_id);
             if ($emp && !empty($emp->short_name)) {
-                return $emp->short_name;
+                return trim($emp->short_name);
             }
         }
 
@@ -64,7 +58,7 @@ class RecordController extends Controller
         $result = [];
         foreach ($list as $e) {
             if ($e->user && method_exists($e->user, 'hasPin') && $e->user->hasPin()) {
-                $result[] = $e->short_name;
+                $result[] = trim($e->short_name);
             }
         }
         return $result;
@@ -76,13 +70,12 @@ class RecordController extends Controller
         $result = [];
         foreach ($list as $e) {
             if (!$e->user || !method_exists($e->user, 'hasPin') || !$e->user->hasPin()) {
-                $result[] = $e->short_name;
+                $result[] = trim($e->short_name);
             }
         }
         return $result;
     }
 
-    /** @return array<string,int> short_name => expires_timestamp */
     private function verifiedWorkersMap(): array
     {
         $verified = session('verified_workers', []);
@@ -97,7 +90,7 @@ class RecordController extends Controller
         $employees = Employee::whereIn('id', array_keys($ids))->get(['id', 'short_name']);
         $map = [];
         foreach ($employees as $e) {
-            $map[$e->short_name] = $ids[$e->id];
+            $map[trim($e->short_name)] = $ids[$e->id];
         }
         return $map;
     }
@@ -141,6 +134,7 @@ class RecordController extends Controller
             ->whereHas('user', fn($q) => $q->whereNotNull('email')->where('email', '!=', ''))
             ->orderBy('short_name')
             ->pluck('short_name')
+            ->map(fn($name) => trim($name))
             ->all();
     }
 
@@ -155,11 +149,11 @@ class RecordController extends Controller
         }
         $allowed = $this->employeesForSelect();
         $defaults = [
-            'worker1' => $workers[0] ?? '',
-            'worker2' => $workers[1] ?? '',
-            'worker3' => $workers[2] ?? '',
-            'worker4' => $workers[3] ?? '',
-            'worker5' => $workers[4] ?? '',
+            'worker1' => trim($workers[0] ?? ''),
+            'worker2' => trim($workers[1] ?? ''),
+            'worker3' => trim($workers[2] ?? ''),
+            'worker4' => trim($workers[3] ?? ''),
+            'worker5' => trim($workers[4] ?? ''),
         ];
         return array_map(fn ($v) => in_array($v, $allowed, true) ? $v : '', $defaults);
     }
@@ -191,8 +185,8 @@ class RecordController extends Controller
 
         foreach (self::WORKER_FIELDS as $field) {
             if (!array_key_exists($field, $data)) continue;
-            $value = $data[$field];
-            if ($value === null || $value === '') continue;
+            $value = trim($data[$field]);
+            if ($value === '') continue;
 
             if (isset($seen[$value])) {
                 $errors[$field] = "Этот исполнитель уже указан в поле «{$seen[$value]}».";
@@ -207,12 +201,11 @@ class RecordController extends Controller
 
             if ($canManage) continue;
             if ($currentName && $value === $currentName) continue;
-            if (isset($exemptValues[$field]) && (string) $exemptValues[$field] === (string) $value) continue;
+            if (isset($exemptValues[$field]) && trim($exemptValues[$field]) === $value) continue;
 
             $employee = Employee::where('short_name', $value)->active()->with('user')->first();
             if (!$employee) continue;
 
-            // ЗАПРЕЩАЕМ выбирать сотрудников без ПИН
             if (!$employee->user
                 || !method_exists($employee->user, 'hasPin')
                 || !$employee->user->hasPin()) {
@@ -469,11 +462,13 @@ class RecordController extends Controller
             fn($v) => $v !== '' && $v !== null
         );
         $isTimeLocked = false;
+        $serverNow    = now()->timestamp;
 
         return view('records.create', compact(
             'sheet', 'cfg', 'defaults', 'employeesList', 'lookups',
             'canManageWorkers', 'verifiedWorkersMap', 'currentEmployeeName',
-            'employeesRequiringPin', 'employeesWithoutPin', 'originalWorkers', 'isTimeLocked'
+            'employeesRequiringPin', 'employeesWithoutPin', 'originalWorkers',
+            'isTimeLocked', 'serverNow'
         ));
     }
 
@@ -537,11 +532,13 @@ class RecordController extends Controller
             fn($v) => $v !== '' && $v !== null
         );
         $isTimeLocked = $this->isRecordLocked($record);
+        $serverNow    = now()->timestamp;
 
         return view('records.edit', compact(
             'sheet', 'cfg', 'record', 'employeesList', 'lookups',
             'canManageWorkers', 'verifiedWorkersMap', 'currentEmployeeName',
-            'employeesRequiringPin', 'employeesWithoutPin', 'originalWorkers', 'isTimeLocked'
+            'employeesRequiringPin', 'employeesWithoutPin', 'originalWorkers',
+            'isTimeLocked', 'serverNow'
         ));
     }
 
@@ -642,6 +639,7 @@ class RecordController extends Controller
             'employee_id'   => $employee->id,
             'employee_name' => $employee->short_name,
             'expires_at'    => $expiresAt,
+            'server_now'    => now()->timestamp,
         ]);
     }
 

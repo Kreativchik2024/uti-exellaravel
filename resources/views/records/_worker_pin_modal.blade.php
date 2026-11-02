@@ -13,11 +13,12 @@
     $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_TAG;
 @endphp
 
+{{-- Убрали @if(!$canManageWorkers), чтобы скрипт работал и для админов --}}
 <div id="workerPinConfig"
      class="hidden"
      data-pin-check-url="{{ route('records.pinCheck') }}"
      data-csrf="{{ csrf_token() }}"
-     data-current-employee="{{ $currentEmployeeName ?? '' }}"
+     data-current-employee="{{ trim($currentEmployeeName ?? '') }}"
      data-requiring="{{ json_encode($employeesRequiringPin, $jsonFlags) }}"
      data-without-pin="{{ json_encode($employeesWithoutPin, $jsonFlags) }}"
      data-verified="{{ json_encode($verifiedWorkersMap, $jsonFlags) }}"
@@ -50,7 +51,7 @@
 
     var pinCheckUrl = cfgEl.dataset.pinCheckUrl || '';
     var csrf        = cfgEl.dataset.csrf || '';
-    var currentEmployee = cfgEl.dataset.currentEmployee || null;
+    var currentEmployee = (cfgEl.dataset.currentEmployee || '').trim();
     var canManageWorkers = cfgEl.dataset.canManage === '1';
 
     var requiringArr = [];
@@ -81,12 +82,13 @@
     var approved = {};
     Object.keys(initialMap || {}).forEach(function (name) {
         var v = parseInt(initialMap[name], 10);
-        if (!isNaN(v)) approved[name] = v;
+        if (!isNaN(v)) approved[name.trim()] = v;
     });
 
-    var requiringSet = new Set(Array.isArray(requiringArr) ? requiringArr : []);
-    var withoutPinSet = new Set(Array.isArray(withoutPinArr) ? withoutPinArr : []);
-    var selfNames    = new Set();
+    var requiringSet = new Set((Array.isArray(requiringArr) ? requiringArr : []).map(function(s){ return s.trim(); }));
+    var withoutPinSet = new Set((Array.isArray(withoutPinArr) ? withoutPinArr : []).map(function(s){ return s.trim(); }));
+    
+    var selfNames = new Set();
     if (currentEmployee) selfNames.add(currentEmployee);
 
     var pendingEmployee = null;
@@ -94,8 +96,9 @@
 
     function requiresPinStrict(name) {
         if (!name) return false;
-        if (selfNames.has(name)) return false;
-        return requiringSet.has(name);
+        var n = name.trim();
+        if (selfNames.has(n)) return false;
+        return requiringSet.has(n);
     }
 
     function esc(s) {
@@ -125,14 +128,15 @@
         var badge = cell.querySelector('.worker-pin-badge');
         if (!badge) return;
 
-        var value = select.value;
+        var value = (select.value || '').trim();
         if (!value) { badge.innerHTML = ''; return; }
 
+        // Владелец записи (текущий пользователь)
         if (selfNames.has(value)) {
             badge.innerHTML = '<span class="text-[11px] text-emerald-600 font-medium">✓ вы — ПИН не нужен</span>';
             return;
         }
-        if (withoutPinSet.has(value)) {
+        if (withoutPinSet.has(value) && !canManageWorkers) {
             badge.innerHTML = '<span class="text-[11px] text-red-600 font-medium">✗ нет ПИН</span>';
             return;
         }
@@ -227,7 +231,7 @@
         }).then(function (res) {
             if (res.ok && res.data && res.data.ok) {
                 if (res.data.employee_name && res.data.expires_at) {
-                    approved[res.data.employee_name] = parseInt(res.data.expires_at, 10);
+                    approved[res.data.employee_name.trim()] = parseInt(res.data.expires_at, 10);
                 }
                 syncClockFromServer(res.data.server_now);
                 closePinModal({ ok: true });
@@ -296,7 +300,7 @@
                 return;
             }
 
-            if (withoutPinSet.has(value) && !canManageWorkers) {
+            if (withoutPinSet.has(value.trim()) && !canManageWorkers) {
                 select.value = select.dataset.lastApproved || '';
                 renderBadge(select);
                 var cell  = select.closest('.worker-cell');
@@ -322,7 +326,7 @@
                 return;
             }
 
-            if (canManageWorkers || !requiresPinStrict(value)) {
+            if (canManageWorkers || selfNames.has(value.trim()) || !requiresPinStrict(value)) {
                 select.dataset.lastApproved = value;
                 renderBadge(select);
                 claimWorker(value);
@@ -344,10 +348,10 @@
 
             openPinModal(value).then(function (result) {
                 if (result && result.ok) {
-                    select.value = value;
-                    select.dataset.lastApproved = value;
-                    renderBadge(select);
-                    claimWorker(value);
+                select.value = value;
+                select.dataset.lastApproved = value;
+                renderBadge(select);
+                claimWorker(value);
                 }
             });
         });
