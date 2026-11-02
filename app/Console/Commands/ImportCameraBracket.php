@@ -106,10 +106,6 @@ class ImportCameraBracket extends Command
                 continue;
             }
 
-            // [0]ПП [1]Кол-во [2]Дата [3]№ [4]Время нач [5]Время окон [6]Номер моторамы
-            // [7]camera [8]Ночная камера [9]Датчик скорости [10]Барометр [11]Примечания
-            // [12]ФИО 1 [13]ФИО 2 [14]ФИО 3 [15]Комментарии
-
             $dateRaw     = trim((string) ($line[2]  ?? ''));
             $frameSerial = trim((string) ($line[6]  ?? ''));
             $cam         = trim((string) ($line[7]  ?? ''));
@@ -338,23 +334,29 @@ class ImportCameraBracket extends Command
     }
 
     /**
-     * Ключ уникальности: record_date (только дата, без времени) + (frame_serial ИЛИ serial_number).
-     * Ищем в ОБОИХ полях, потому что:
-     *   - старые записи хранят номер в serial_number
-     *   - новые записи пишут в frame_serial
-     * Используем whereDate, потому что в БД record_date хранится с временем (2026-10-26 21:00:00),
-     * а в файле дата = 2026-10-27.
+     * Ключ уникальности: дата (±1 день для учёта UTC) + (frame_serial ИЛИ serial_number).
+     * Ищем в ОБОИХ полях, потому что старые записи хранят номер в serial_number,
+     * а новые — в frame_serial.
      */
     private function isDuplicate(array $data): bool
     {
+        $date     = $data['record_date'];
+        $prevDate = \Carbon\Carbon::parse($date)->subDay()->toDateString();
+        $nextDate = \Carbon\Carbon::parse($date)->addDay()->toDateString();
+
         $q = CameraBracketRecord::query()
-            ->whereDate('record_date', $data['record_date']);
+            ->where(function ($w) use ($date, $prevDate, $nextDate) {
+                $w->whereDate('record_date', $date)
+                  ->orWhereDate('record_date', $prevDate)
+                  ->orWhereDate('record_date', $nextDate);
+            });
 
         $key = !empty($data['frame_serial'])
             ? $data['frame_serial']
             : (!empty($data['serial_number']) ? $data['serial_number'] : null);
 
-        if ($key === null) {
+        // Игнорируем «Б/Н», «—», «-» — это не настоящие серийники
+        if ($key === null || in_array(mb_strtoupper(trim($key)), ['Б/Н', 'БН', '—', '-', ''], true)) {
             return false;
         }
 
