@@ -12,7 +12,7 @@
     $isTimeLocked          = $isTimeLocked ?? false;
     $canManageWorkers      = $canManageWorkers ?? false;
     $originalWorkers       = $originalWorkers ?? [];
-    $employeesWithoutPin   = $employeesWithoutPin ?? []; // <--- ДОБАВЛЕНО
+    $employeesWithoutPin   = $employeesWithoutPin ?? [];
 
     $groupDefinitions = [
         'main' => [
@@ -348,7 +348,7 @@
     </div>
 </div>
 
-{{-- Lookup-скрипт --}}
+{{-- Скрипты --}}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     function esc(s) {
@@ -394,6 +394,40 @@ document.addEventListener('DOMContentLoaded', function () {
         input.addEventListener('input', function () {
             clearTimeout(timer);
             timer = setTimeout(doLookup, 400);
+        });
+    });
+
+    // --- ПРОВЕРКА НА ДУБЛИКАТЫ (для всех пользователей) ---
+    var workerSelects = document.querySelectorAll('select[data-worker-field]');
+    workerSelects.forEach(function (select) {
+        select.dataset.prevValue = select.value;
+        select.addEventListener('change', function () {
+            var val = select.value;
+            if (!val) {
+                select.dataset.prevValue = '';
+                return;
+            }
+            
+            var isDup = false;
+            workerSelects.forEach(function (other) {
+                if (other !== select && other.value === val) {
+                    isDup = true;
+                }
+            });
+
+            if (isDup) {
+                select.value = select.dataset.prevValue || '';
+                var cell = select.closest('.worker-cell');
+                var badge = cell ? cell.querySelector('.worker-pin-badge') : null;
+                if (badge) {
+                    badge.innerHTML = '<span class="text-[11px] text-red-600 font-medium">✗ Уже выбран</span>';
+                    setTimeout(function(){ badge.innerHTML = ''; }, 2500);
+                } else {
+                    alert('Этот исполнитель уже выбран в другом поле.');
+                }
+            } else {
+                select.dataset.prevValue = val;
+            }
         });
     });
 });
