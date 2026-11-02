@@ -160,6 +160,7 @@
                 serverNow: {{ now()->timestamp }},
                 clockOffsetMs: 0,
                 timerInterval: null,
+                tick: 0,
 
                 pinUrl: '{{ route('records.pinCheck') }}',
                 csrf: '{{ csrf_token() }}',
@@ -187,15 +188,13 @@
                 pinError: '',
 
                 init() {
-                    // Вычисляем разницу между часами сервера и браузера
                     this.clockOffsetMs = (this.serverNow * 1000) - Date.now();
                     
-                    // Запускаем таймер для обновления Alpine.js каждую секунду
+                    // Каждую секунду увеличиваем tick → Alpine перерисует x-html у таймеров
                     this.timerInterval = setInterval(() => {
-                        this.$forceUpdate();
+                        this.tick++;
                     }, 1000);
 
-                    // Инициализируем подтвержденные ПИН-коды
                     for (let i = 0; i < 5; i++) {
                         if (this.selected[i] && this.verifiedMap[this.selected[i]]) {
                             this.confirmed[i] = this.selected[i];
@@ -212,6 +211,9 @@
                 },
 
                 getTimerText(name) {
+                    // Доступ к this.tick делает метод зависимым от реактивного свойства
+                    const _tick = this.tick;
+                    
                     var expires = this.verifiedMap[name];
                     if (!expires) return '';
                     
@@ -242,14 +244,12 @@
                         return;
                     }
 
-                    // Если выбран сотрудник без ПИН (и мы не админ)
                     if (this.withoutPin.includes(newVal) && !this.canManageWorkers) {
                         this.selected[index] = this.confirmed[index] || '';
                         alert('У сотрудника нет ПИН-кода. Выберите другого.');
                         return;
                     }
 
-                    // Убираем дубликаты в других полях
                     for (let i = 0; i < 5; i++) {
                         if (i !== index && this.selected[i] === newVal) {
                             this.selected[i] = '';
@@ -259,13 +259,11 @@
 
                     if (this.confirmed[index] === newVal) return;
 
-                    // Если ПИН уже подтвержден и не истек
                     if (this.verifiedMap[newVal] && this.verifiedMap[newVal] > this.nowSeconds()) {
                         this.confirmed[index] = newVal;
                         return;
                     }
 
-                    // Иначе спрашиваем ПИН
                     this.pinTarget = newVal;
                     this.pinTargetIndex = index;
                     this.pinValue = '';
