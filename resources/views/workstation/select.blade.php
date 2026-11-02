@@ -21,12 +21,10 @@
                     $type  = old('type', $workplaceType);
                 @endphp
 
-                {{-- Исполнители + PIN-модалка --}}
                 <div x-data="workstationWorkers()" x-init="init()" x-destroy="destroy()">
                     <div class="text-sm font-semibold text-gray-700 mb-2">Исполнители</div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
                         @for($i = 0; $i < 5; $i++)
-                            @php $current = $slots[$i] ?? ''; @endphp
                             <div>
                                 <label class="block text-xs text-gray-600 mb-1">
                                     Исполнитель {{ $i + 1 }}
@@ -37,15 +35,23 @@
                                         class="w-full border rounded px-2 py-1 text-sm">
                                     <option value="">— не выбран —</option>
                                     <template x-for="emp in availableFor({{ $i }})" :key="emp">
-                                        <option :value="emp" 
-                                                x-text="emp + (withoutPin.includes(emp) ? ' (нет ПИН)' : '')" 
+                                        <option :value="emp"
+                                                x-text="emp + (withoutPin.includes(emp) && !canManageWorkers && emp !== currentEmployee ? ' (нет ПИН)' : '')"
                                                 :selected="emp === selected[{{ $i }}]"
-                                                :disabled="withoutPin.includes(emp) && !canManageWorkers"></option>
+                                                :disabled="!canManageWorkers && emp !== currentEmployee && withoutPin.includes(emp)"></option>
                                     </template>
                                 </select>
-                                
-                                {{-- Блок для таймера ПИН --}}
-                                <div class="mt-1 h-5" x-show="selected[{{ $i }}] && verifiedMap[selected[{{ $i }}]]" x-html="getTimerText(selected[{{ $i }}])"></div>
+
+                                <div class="mt-1 min-h-[20px]">
+                                    <div x-show="selected[{{ $i }}] && selected[{{ $i }}] === currentEmployee"
+                                         class="text-[11px] text-emerald-600 font-medium">✓ вы — ПИН не нужен</div>
+                                    <div x-show="selected[{{ $i }}] && selected[{{ $i }}] !== currentEmployee && verifiedMap[selected[{{ $i }}]]"
+                                         x-html="getTimerText(selected[{{ $i }}])"></div>
+                                    <div x-show="selected[{{ $i }}] && selected[{{ $i }}] !== currentEmployee && !verifiedMap[selected[{{ $i }}]] && !withoutPin.includes(selected[{{ $i }}])"
+                                         class="text-[11px] text-amber-600 font-medium">Требуется ПИН</div>
+                                    <div x-show="selected[{{ $i }}] && selected[{{ $i }}] !== currentEmployee && !verifiedMap[selected[{{ $i }}]] && withoutPin.includes(selected[{{ $i }}]) && !canManageWorkers"
+                                         class="text-[11px] text-red-600 font-medium">✗ нет ПИН</div>
+                                </div>
                             </div>
                         @endfor
                     </div>
@@ -56,7 +62,6 @@
                         </div>
                     @endif
 
-                    {{-- PIN-модалка --}}
                     <div x-show="pinModalOpen" x-cloak
                          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
                          @click.self="cancelPin()">
@@ -87,7 +92,6 @@
                     </div>
                 </div>
 
-                {{-- Тип рабочего места --}}
                 <div class="text-sm font-semibold text-gray-700 mt-6 mb-2">Рабочее место</div>
 
                 <div class="flex items-center gap-6 mb-4">
@@ -156,7 +160,8 @@
                 all: @json($employeesList),
                 withoutPin: @json($employeesWithoutPin ?? []),
                 canManageWorkers: @json($canManageWorkers ?? false),
-                verifiedMap: @json($globalVerifiedWorkersMap ?? []),
+                verifiedMap: @json($verifiedMap ?? []),
+                currentEmployee: @json($currentEmployeeName ?? ''),
                 serverNow: {{ now()->timestamp }},
                 clockOffsetMs: 0,
                 timerInterval: null,
@@ -164,7 +169,7 @@
 
                 pinUrl: '{{ route('records.pinCheck') }}',
                 csrf: '{{ csrf_token() }}',
-                
+
                 selected: {
                     0: '{{ $slots[0] ?? '' }}',
                     1: '{{ $slots[1] ?? '' }}',
@@ -189,17 +194,7 @@
 
                 init() {
                     this.clockOffsetMs = (this.serverNow * 1000) - Date.now();
-                    
-                    // Каждую секунду увеличиваем tick → Alpine перерисует x-html у таймеров
-                    this.timerInterval = setInterval(() => {
-                        this.tick++;
-                    }, 1000);
-
-                    for (let i = 0; i < 5; i++) {
-                        if (this.selected[i] && this.verifiedMap[this.selected[i]]) {
-                            this.confirmed[i] = this.selected[i];
-                        }
-                    }
+                    this.timerInterval = setInterval(() => { this.tick++; }, 1000);
                 },
 
                 destroy() {
@@ -211,20 +206,15 @@
                 },
 
                 getTimerText(name) {
-                    // Доступ к this.tick делает метод зависимым от реактивного свойства
                     const _tick = this.tick;
-                    
                     var expires = this.verifiedMap[name];
                     if (!expires) return '';
-                    
                     var rem = Math.floor(expires - this.nowSeconds());
                     if (rem <= 0) return '<span class="text-[11px] text-red-600 font-medium">Истёк</span>';
-                    
                     var h = Math.floor(rem / 3600);
                     var m = Math.floor((rem % 3600) / 60);
                     var s = rem % 60;
                     function p(n){return n<10?'0'+n:String(n);}
-                    
                     var cls = rem <= 15 * 60 ? 'text-amber-600' : 'text-emerald-600';
                     return '<span class="text-[11px] font-medium ' + cls + ' font-mono tabular-nums">🔒 ' + p(h)+':'+p(m)+':'+p(s) + '</span>';
                 },
@@ -244,12 +234,7 @@
                         return;
                     }
 
-                    if (this.withoutPin.includes(newVal) && !this.canManageWorkers) {
-                        this.selected[index] = this.confirmed[index] || '';
-                        alert('У сотрудника нет ПИН-кода. Выберите другого.');
-                        return;
-                    }
-
+                    // Убираем дубликаты в других полях
                     for (let i = 0; i < 5; i++) {
                         if (i !== index && this.selected[i] === newVal) {
                             this.selected[i] = '';
@@ -257,13 +242,33 @@
                         }
                     }
 
-                    if (this.confirmed[index] === newVal) return;
+                    // Админ/мастер — ПИН не нужен
+                    if (this.canManageWorkers) {
+                        this.confirmed[index] = newVal;
+                        return;
+                    }
 
+                    // Владелец записи (текущий пользователь) — ПИН не нужен
+                    if (newVal === this.currentEmployee) {
+                        this.confirmed[index] = newVal;
+                        return;
+                    }
+
+                    // Сотрудник без ПИН — запрет для обычных пользователей
+                    if (this.withoutPin.includes(newVal)) {
+                        this.selected[index] = this.confirmed[index] || '';
+                        alert('У сотрудника нет ПИН-кода. Выберите другого.');
+                        return;
+                    }
+
+                    // Уже подтверждён и не истёк
+                    if (this.confirmed[index] === newVal) return;
                     if (this.verifiedMap[newVal] && this.verifiedMap[newVal] > this.nowSeconds()) {
                         this.confirmed[index] = newVal;
                         return;
                     }
 
+                    // Спрашиваем ПИН
                     this.pinTarget = newVal;
                     this.pinTargetIndex = index;
                     this.pinValue = '';

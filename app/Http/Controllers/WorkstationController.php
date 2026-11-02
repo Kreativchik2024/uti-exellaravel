@@ -3,169 +3,132 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
-use App\Services\StatsService;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class WorkstationController extends Controller
 {
-    private function employeesForSelect(): array
+    public function show(Request $request)
     {
-        return Employee::query()
+        $intended = (string) $request->query('intended', route('dashboard'));
+        $selected = session('workstation_workers', []);
+        $workplaceType = session('workstation_type', 'post');
+        $selectedPost = session('workstation_post');
+        $selectedPeripheral = session('workstation_peripheral');
+        $posts = range(1, 30);
+        $peripherals = range(1, 50);
+
+        $employeesList = Employee::query()
             ->active()
             ->whereHas('user', fn($q) => $q->whereNotNull('email')->where('email', '!=', ''))
             ->orderBy('short_name')
             ->pluck('short_name')
+            ->map(fn($n) => trim((string) $n))
+            ->filter()
+            ->unique()
+            ->values()
             ->all();
-    }
 
-    public function show(Request $r, StatsService $s)
-    {
-        $workers       = $this->employeesForSelect();
-        $selected      = session('workstation_workers', []);
-        
-        // Если пользователь зашел впервые (сессия пуста), подставляем его Employee
-        if (empty($selected) && auth()->user()->employee) {
-            $selected = [auth()->user()->employee->short_name];
+        // ПИН-коды, подтверждённые в сессии
+        $verified = session('verified_workers', []);
+        $now = now()->timestamp;
+        $verifiedMap = [];
+        foreach ($verified as $id => $expires) {
+            if ((int) $expires > $now) {
+                $emp = Employee::find($id);
+                if ($emp && !empty($emp->short_name)) {
+                    $verifiedMap[trim($emp->short_name)] = (int) $expires;
+                }
+            }
         }
 
-        $intended      = $r->query('intended', route('dashboard'));
-        $employeesList = $workers;
+        // Сотрудники без ПИН
+        $employeesWithoutPin = Employee::query()->active()->with('user')->get()
+            ->filter(fn($e) => !$e->user || !method_exists($e->user, 'hasPin') || !$e->user->hasPin())
+            ->pluck('short_name')
+            ->map(fn($n) => trim((string) $n))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
 
-        $posts       = range(1, 30);
-        $peripherals = range(1, 50);
+        $canManageWorkers = auth()->check() && auth()->user()->canManageContent();
 
-        $workplaceType      = session('workstation_type');
-        $selectedPost       = session('workstation_post');
-        $selectedPeripheral = session('workstation_peripheral');
+        // Имя текущего пользователя (владелец записи) — ВЫЧИСЛЯЕМ ДО fallback
+        $currentEmployeeName = null;
+        if (auth()->check()) {
+            $user = auth()->user();
+            if ($user->employee && !empty($user->employee->short_name)) {
+                $currentEmployeeName = trim((string) $user->employee->short_name);
+            } elseif (isset($user->employee_id)) {
+                $emp = Employee::find($user->employee_id);
+                if ($emp && !empty($emp->short_name)) {
+                    $currentEmployeeName = trim((string) $emp->short_name);
+                }
+            }
+        }
+
+        // АВТО-ПОДСТАНОВКА: если сессия пуста, но есть текущий пользователь — ставим его первым
+        $selected = array_values(array_filter((array) $selected, fn($v) => is_string($v) && trim($v) !== ''));
+        $selected = array_map('trim', $selected);
+
+        if (empty($selected) && $currentEmployeeName && in_array($currentEmployeeName, $employeesList, true)) {
+            $selected = [$currentEmployeeName];
+        }
 
         return view('workstation.select', compact(
-            'workers', 'selected', 'intended', 'employeesList',
-            'posts', 'peripherals', 'workplaceType', 'selectedPost', 'selectedPeripheral'
+            'intended', 'selected', 'workplaceType', 'selectedPost', 'selectedPeripheral',
+            'posts', 'peripherals', 'employeesList',
+            'verifiedMap', 'employeesWithoutPin', 'canManageWorkers', 'currentEmployeeName'
         ));
     }
 
-    private function validatePins(array $workerNames, Request $r): void
+    public function store(Request $request)
     {
-        if (empty($workerNames)) return;
-
-        $verified = $r->session()->get('verified_workers', []);
-        $now      = now()->timestamp;
-        $errors   = [];
-
-        $employees = Employee::whereIn('short_name', $workerNames)->get(['id', 'short_name']);
-        $byName    = $employees->keyBy('short_name');
-
-        foreach ($workerNames as $name) {
-            $e = $byName->get($name);
-            if (!$e) continue;
-            $ts = $verified[$e->id] ?? null;
-            if (!$ts || $ts < $now) {
-                $errors[] = "Введите ПИН для «{$e->short_name}».";
-            }
-        }
-
-        if ($errors) {
-            throw ValidationException::withMessages(['workers' => $errors]);
-        }
-    }
-
-    public function store(Request $r)
-    {
-        $allowed = $this->employeesForSelect();
-
-        $validated = $r->validate([
-            'workers'    => ['array', 'max:5'],
-            'workers.*'  => ['nullable', 'string', Rule::in($allowed)],
-            'type'       => ['nullable', Rule::in(['post', 'peripheral'])],
-            'post'       => ['nullable', 'integer', 'min:1', 'max:30'],
-            'peripheral' => ['nullable', 'integer', 'min:1', 'max:50'],
-            'intended'   => ['nullable', 'string'],
-        ], [
-            'workers.*.in' => 'Выберите исполнителя из списка (только привязанные к email).',
-            'post.integer' => 'Пост должен быть числом.',
-            'post.min'     => 'Пост от 1 до 30.',
-            'post.max'     => 'Пост от 1 до 30.',
-            'peripheral.integer' => 'Периферия должна быть числом.',
-            'peripheral.min'     => 'Периферия от 1 до 50.',
-            'peripheral.max'     => 'Периферия от 1 до 50.',
+        $request->validate([
+            'workers' => 'array',
+            'workers.*' => 'nullable|string|max:120',
+            'type' => 'nullable|in:post,peripheral',
+            'post' => 'nullable|integer|min:1|max:30',
+            'peripheral' => 'nullable|integer|min:1|max:50',
         ]);
 
-        $rawWorkers = $validated['workers'] ?? [];
         $workers = array_values(array_filter(
-            $rawWorkers,
-            fn ($w) => $w !== null && $w !== ''
+            (array) $request->input('workers', []),
+            fn($v) => is_string($v) && trim($v) !== ''
         ));
+        $workers = array_map('trim', $workers);
 
-        $seen = [];
-        $dupErrors = [];
-        foreach ($rawWorkers as $i => $w) {
-            if ($w === null || $w === '') continue;
-            if (isset($seen[$w])) {
-                $dupErrors["workers.$i"] = "«{$w}» уже выбран в поле Исполнитель " . ($seen[$w] + 1) . '.';
-            } else {
-                $seen[$w] = $i;
-            }
-        }
-        if (!empty($dupErrors)) throw ValidationException::withMessages($dupErrors);
+        session([
+            'workstation_workers' => $workers,
+            'workstation_type' => $request->input('type', 'post'),
+            'workstation_post' => $request->input('post'),
+            'workstation_peripheral' => $request->input('peripheral'),
+        ]);
 
-        $this->validatePins($workers, $r);
-
-        session(['workstation_workers' => $workers]);
-
-        if (empty($workers)) {
-            session(['workstation_skipped' => true]);
-        } else {
-            session()->forget('workstation_skipped');
-        }
-
-        $type = $validated['type'] ?? null;
-
-        if ($type === 'post' && !empty($validated['post'])) {
-            session([
-                'workstation_type' => 'post',
-                'workstation_post' => (int) $validated['post'],
-            ]);
-            session()->forget('workstation_peripheral');
-        } elseif ($type === 'peripheral' && !empty($validated['peripheral'])) {
-            session([
-                'workstation_type'       => 'peripheral',
-                'workstation_peripheral' => (int) $validated['peripheral'],
-            ]);
-            session()->forget('workstation_post');
-        } else {
-            session()->forget(['workstation_type', 'workstation_post', 'workstation_peripheral']);
-        }
-
-        return redirect($validated['intended'] ?? route('dashboard'));
+        return redirect((string) $request->input('intended', route('dashboard')));
     }
 
-    public function skip(Request $r)
+    public function skip(Request $request)
     {
         session([
             'workstation_workers' => [],
-            'workstation_skipped' => true,
+            'workstation_type' => 'post',
+            'workstation_post' => null,
+            'workstation_peripheral' => null,
         ]);
 
-        session()->forget([
-            'workstation_type',
-            'workstation_post',
-            'workstation_peripheral',
-        ]);
-
-        return redirect($r->input('intended', route('dashboard')));
+        return redirect((string) $request->input('intended', route('dashboard')));
     }
 
     public function clear()
     {
         session()->forget([
             'workstation_workers',
-            'workstation_skipped',
             'workstation_type',
             'workstation_post',
             'workstation_peripheral',
         ]);
+
         return redirect()->route('workstation.show');
     }
 }
