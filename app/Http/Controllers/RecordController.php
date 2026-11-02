@@ -33,11 +33,29 @@ class RecordController extends Controller
         return auth()->check() && auth()->user()->canManageContent();
     }
 
+    /**
+     * Получить имя текущего сотрудника, привязанного к пользователю.
+     * Работает даже если Eloquent-связь $user->employee не настроена.
+     */
     private function currentEmployeeName(): ?string
     {
         $user = auth()->user();
-        if (!$user || !$user->employee) return null;
-        return $user->employee->short_name ?: null;
+        if (!$user) return null;
+
+        // 1. Пробуем через Eloquent-связь (если она настроена)
+        if (!empty($user->employee) && !empty($user->employee->short_name)) {
+            return $user->employee->short_name;
+        }
+
+        // 2. Если связи нет, ищем по employee_id напрямую
+        if (isset($user->employee_id)) {
+            $emp = Employee::find($user->employee_id);
+            if ($emp && !empty($emp->short_name)) {
+                return $emp->short_name;
+            }
+        }
+
+        return null;
     }
 
     private function employeesRequiringPin(): array
@@ -52,7 +70,6 @@ class RecordController extends Controller
         return $result;
     }
 
-    /** Список сотрудников, у которых НЕТ ПИН (чтобы заблокировать их в селекте) */
     private function employeesWithoutPin(): array
     {
         $list = Employee::query()->active()->with('user')->get();
@@ -131,9 +148,9 @@ class RecordController extends Controller
     {
         $workers = session('workstation_workers', []);
         if (empty($workers)) {
-            $user = auth()->user();
-            if ($user && $user->employee && $user->employee->short_name) {
-                $workers = [$user->employee->short_name];
+            $currentName = $this->currentEmployeeName();
+            if ($currentName) {
+                $workers = [$currentName];
             }
         }
         $allowed = $this->employeesForSelect();
