@@ -36,19 +36,19 @@ return [
                 'cross3_number'   => [
                     'label'=>'S/N Кросс 3',
                     'type'=>'text',
-                    'rules'=>'required|string|max:120',
+                    'rules'=>'nullable|string|max:120',
                     'lookup'=>['sheet'=>'cross3','match_by'=>'serial_number','prefix'=>'cross3'],
                 ],
                 'bracket_serial'  => [
                     'label'=>'S/N камеры',
                     'type'=>'text',
-                    'rules'=>'required|string|max:120',
+                    'rules'=>'nullable|string|max:120',
                     'lookup'=>['sheet'=>'camera_bracket','match_by'=>'serial_number','prefix'=>'bracket'],
                 ],
                 'manet_number'    => [
                     'label'=>'S/N модуля связи',
                     'type'=>'text',
-                    'rules'=>'required|string|max:120',
+                    'rules'=>'nullable|string|max:120',
                     'lookup'=>['sheet'=>'comm_module','match_by'=>'serial_number','prefix'=>'manet'],
                 ],
 
