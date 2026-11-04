@@ -45,6 +45,35 @@ class StatsController extends Controller
     }
 
     /**
+     * Диапазон по «сырому» полю даты — без DATE(column), чтобы использовался индекс.
+     */
+    private function applyDateRange($query, ?string $from, ?string $to, string $field = 'record_date'): void
+    {
+        if ($from) $query->where($field, '>=', Carbon::parse($from)->startOfDay());
+        if ($to)   $query->where($field, '<', Carbon::parse($to)->addDay()->startOfDay());
+    }
+
+    /**
+     * Тот же диапазон для сырого SQL: [фрагмент с ведущим AND, bindings].
+     *
+     * @return array{0: string, 1: array}
+     */
+    private function sqlDateRange(?string $from, ?string $to, string $column = 'record_date'): array
+    {
+        $sql = '';
+        $bindings = [];
+        if ($from) {
+            $sql .= " AND `$column` >= ?";
+            $bindings[] = Carbon::parse($from)->toDateString() . ' 00:00:00';
+        }
+        if ($to) {
+            $sql .= " AND `$column` < ?";
+            $bindings[] = Carbon::parse($to)->addDay()->toDateString() . ' 00:00:00';
+        }
+        return [$sql, $bindings];
+    }
+
+    /**
      * Список активных сотрудников (short_name).
      */
     private function activeWorkerNames(): array
@@ -76,9 +105,17 @@ class StatsController extends Controller
         $worker      = $canSeeWorkersStats ? trim((string) $r->input('worker', '')) : '';
         $workersList = $canSeeWorkersStats ? $s->listWorkers() : [];
 
-        $perSheet = $s->forPeriod($from, $to, $targetUser, $worker !== '' ? $worker : null);
-        $totals   = $s->totals($perSheet);
-        $byPosts  = $s->byPosts($from, $to, $targetUser);
+        // Кеш на минуту: расчёт по 19 таблицам — самая дорогая часть страницы
+        $cacheKey = 'stats.index.' . md5(json_encode([
+            $from?->toDateString(), $to?->toDateString(), $targetUser?->id, $worker,
+        ]));
+
+        [$perSheet, $byPosts] = Cache::remember($cacheKey, 60, function () use ($s, $from, $to, $targetUser, $worker) {
+            $perSheet = $s->forPeriod($from, $to, $targetUser, $worker !== '' ? $worker : null);
+            return [$perSheet, $s->byPosts($from, $to, $targetUser)];
+        });
+
+        $totals = $s->totals($perSheet);
 
         $periodLabel = $this->periodLabel($from, $to);
 
@@ -182,10 +219,7 @@ class StatsController extends Controller
         $model = $cfg['model'];
         $table = (new $model)->getTable();
 
-        $whereSql = '';
-        $bindings = [];
-        if ($from) { $whereSql .= " AND DATE(record_date) >= ?"; $bindings[] = $from; }
-        if ($to)   { $whereSql .= " AND DATE(record_date) <= ?"; $bindings[] = $to; }
+        [$whereSql, $bindings] = $this->sqlDateRange($from, $to);
 
         $unionBindings = array_merge($bindings, $bindings, $bindings, $bindings, $bindings);
         $cacheKey = "stats.zone2.$sheet.{$from}_{$to}";
@@ -200,7 +234,12 @@ class StatsController extends Controller
                     UNION ALL SELECT worker5 FROM `$table` WHERE worker5 IS NOT NULL AND worker5 != '' {$whereSql}
                 ) w GROUP BY name ORDER BY cnt DESC
             ";
-            $rows = DB::select($sql, $unionBindings);
+            // В кеш кладём массивы, а не stdClass: Laravel 13 десериализует
+            // кеш с ограничением allowed_classes, и объекты стали бы «incomplete».
+            $rows = array_map(
+                fn ($row) => ['name' => $row->name, 'cnt' => (int) $row->cnt],
+                DB::select($sql, $unionBindings)
+            );
 
             $totalSql = "
                 SELECT COUNT(*) AS total FROM `$table`
@@ -219,7 +258,7 @@ class StatsController extends Controller
         // Фильтруем rows: только активные сотрудники из справочника
         $activeSet = array_flip($this->activeWorkerNames());
         $result['rows'] = array_values(array_filter($result['rows'], function ($row) use ($activeSet) {
-            return isset($activeSet[$row->name]);
+            return isset($activeSet[$row['name']]);
         }));
 
         return response()->json($result);
@@ -247,10 +286,7 @@ class StatsController extends Controller
         $model = $cfg['model'];
         $table = (new $model)->getTable();
 
-        $whereSql = '';
-        $bindings = [];
-        if ($from) { $whereSql .= " AND DATE(record_date) >= ?"; $bindings[] = $from; }
-        if ($to)   { $whereSql .= " AND DATE(record_date) <= ?"; $bindings[] = $to; }
+        [$whereSql, $bindings] = $this->sqlDateRange($from, $to);
 
         if ($executor) {
             $sql = "
@@ -298,7 +334,7 @@ class StatsController extends Controller
         return response()->json(['labels' => $labels, 'values' => $values]);
     }
 
-    public function zone3(Request $r)
+    public function zone3(Request $r, StatsService $s)
     {
         $sheet = $r->input('sheet', 'pgp');
         $from  = $r->input('from');
@@ -311,8 +347,12 @@ class StatsController extends Controller
 
         $query = $model::select('post_number', DB::raw('COUNT(*) AS cnt'))
             ->whereNotNull('post_number');
-        if ($from) $query->whereDate('record_date', '>=', $from);
-        if ($to)   $query->whereDate('record_date', '<=', $to);
+
+        $targetUser = $this->resolveTargetUser($r);
+        if ($targetUser && $targetUser->isExecutor()) {
+            $s->applyUserScope($query, $cfg, $targetUser);
+        }
+        $this->applyDateRange($query, $from, $to);
 
         return response()->json(
             $query->groupBy('post_number')->orderByDesc('cnt')->orderBy('post_number')->get()
@@ -333,8 +373,7 @@ class StatsController extends Controller
 
         $query = $model::select('post_number', 'record_date', DB::raw('COUNT(*) AS cnt'))
             ->whereNotNull('post_number');
-        if ($from) $query->whereDate('record_date', '>=', $from);
-        if ($to)   $query->whereDate('record_date', '<=', $to);
+        $this->applyDateRange($query, $from, $to);
 
         $rows = $query->groupBy('post_number', 'record_date')->orderBy('record_date')->get();
 
@@ -378,7 +417,8 @@ class StatsController extends Controller
 
         $records = $cfg['model']::query()
             ->where('post_number', $post)
-            ->whereDate('record_date', $date)
+            ->where('record_date', '>=', Carbon::parse($date)->startOfDay())
+            ->where('record_date', '<', Carbon::parse($date)->addDay()->startOfDay())
             ->orderByDesc('record_date')
             ->get();
 
@@ -393,22 +433,23 @@ class StatsController extends Controller
         return response()->json($out);
     }
 
-    public function zone5(Request $r)
+    public function zone5(Request $r, StatsService $s)
     {
         $from = $r->input('from');
         $to   = $r->input('to');
-        $cacheKey = "stats.zone5.{$from}_{$to}";
+        $targetUser = $this->resolveTargetUser($r);
+        $scopeKey   = $targetUser?->id ?? 'all';
+        $cacheKey = "stats.zone5.{$from}_{$to}.{$scopeKey}";
 
-        $data = Cache::remember($cacheKey, 120, function () use ($from, $to) {
+        $data = Cache::remember($cacheKey, 120, function () use ($from, $to, $targetUser, $s) {
             $summary = [];
-            $dateSql = ''; $dateBindings = [];
-            if ($from) { $dateSql .= " AND DATE(record_date) >= ?"; $dateBindings[] = $from; }
-            if ($to)   { $dateSql .= " AND DATE(record_date) <= ?"; $dateBindings[] = $to; }
+            [$dateSql, $dateBindings] = $this->sqlDateRange($from, $to);
 
             foreach (config('sheets.map', []) as $slug => $cfg) {
                 if (!isset($cfg['model']) || !class_exists($cfg['model'])) continue;
                 $model = $cfg['model'];
                 $table = (new $model)->getTable();
+                $scope = $s->workerScopeSql($cfg, $targetUser);
 
                 $hasRecordDate = isset($cfg['fields']['record_date']);
                 $hasStatus     = isset($cfg['fields']['status']);
@@ -445,28 +486,32 @@ class StatsController extends Controller
                     }
                 }
 
+                $scopeSql      = $scope['sql'];
+                $scopeBindings = $scope['bindings'];
+
                 if ($hasRecordDate) {
-                    $totalSql = "SELECT COUNT(*) AS c FROM `$table` WHERE 1=1 {$dateSql}";
-                    $total = (int) (DB::select($totalSql, $dateBindings)[0]->c ?? 0);
+                    $totalSql = "SELECT COUNT(*) AS c FROM `$table` WHERE 1=1 {$scopeSql} {$dateSql}";
+                    $total = (int) (DB::select($totalSql, array_merge($scopeBindings, $dateBindings))[0]->c ?? 0);
                 } else {
-                    $total = $model::count();
+                    $totalSql = "SELECT COUNT(*) AS c FROM `$table` WHERE 1=1 {$scopeSql}";
+                    $total = (int) (DB::select($totalSql, $scopeBindings)[0]->c ?? 0);
                 }
 
                 $defects = 0;
                 if (!empty($defectConditions) && $total > 0) {
                     $where = '(' . implode(' OR ', $defectConditions) . ')';
-                    $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$where}";
-                    $bindings = $defectBindings;
-                    if ($hasRecordDate) { $sql .= " {$dateSql}"; $bindings = array_merge($defectBindings, $dateBindings); }
+                    $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$where} {$scopeSql}";
+                    $bindings = array_merge($defectBindings, $scopeBindings);
+                    if ($hasRecordDate) { $sql .= " {$dateSql}"; $bindings = array_merge($bindings, $dateBindings); }
                     $defects = (int) (DB::select($sql, $bindings)[0]->c ?? 0);
                 }
 
                 $fixed = 0;
                 if (!empty($fixedConditions) && $total > 0) {
                     $where = '(' . implode(' OR ', $fixedConditions) . ')';
-                    $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$where}";
-                    $bindings = $fixedBindings;
-                    if ($hasRecordDate) { $sql .= " {$dateSql}"; $bindings = array_merge($fixedBindings, $dateBindings); }
+                    $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$where} {$scopeSql}";
+                    $bindings = array_merge($fixedBindings, $scopeBindings);
+                    if ($hasRecordDate) { $sql .= " {$dateSql}"; $bindings = array_merge($bindings, $dateBindings); }
                     $fixed = (int) (DB::select($sql, $bindings)[0]->c ?? 0);
                 }
 
@@ -487,7 +532,7 @@ class StatsController extends Controller
         return response()->json($data);
     }
 
-    public function zone5Chart(Request $r)
+    public function zone5Chart(Request $r, StatsService $s)
     {
         $sheet = $r->input('sheet', 'pgp');
         $from  = $r->input('from');
@@ -499,9 +544,12 @@ class StatsController extends Controller
         $model = $cfg['model'];
         $table = (new $model)->getTable();
 
-        $dateSql = ''; $dateBindings = [];
-        if ($from) { $dateSql .= " AND DATE(record_date) >= ?"; $dateBindings[] = $from; }
-        if ($to)   { $dateSql .= " AND DATE(record_date) <= ?"; $dateBindings[] = $to; }
+        $targetUser = $this->resolveTargetUser($r);
+        $scope      = $s->workerScopeSql($cfg, $targetUser);
+        $scopeSql   = $scope['sql'];
+        $scopeBindings = $scope['bindings'];
+
+        [$dateSql, $dateBindings] = $this->sqlDateRange($from, $to);
 
         $hasStatus = isset($cfg['fields']['status']);
         $defectConditions = []; $defectBindings = [];
@@ -542,15 +590,15 @@ class StatsController extends Controller
 
         $defectWhere = '(' . implode(' OR ', $defectConditions) . ')';
         $sqlDefects = "SELECT DATE(record_date) AS d, COUNT(*) AS c FROM `$table`
-                       WHERE {$defectWhere} {$dateSql} GROUP BY DATE(record_date) ORDER BY d";
-        $defectRows = DB::select($sqlDefects, array_merge($defectBindings, $dateBindings));
+                       WHERE {$defectWhere} {$scopeSql} {$dateSql} GROUP BY DATE(record_date) ORDER BY d";
+        $defectRows = DB::select($sqlDefects, array_merge($defectBindings, $scopeBindings, $dateBindings));
 
         $fixedCounts = [];
         if (!empty($fixedConditions)) {
             $fixedWhere = '(' . implode(' OR ', $fixedConditions) . ')';
             $sqlFixed = "SELECT DATE(record_date) AS d, COUNT(*) AS c FROM `$table`
-                         WHERE {$fixedWhere} {$dateSql} GROUP BY DATE(record_date) ORDER BY d";
-            $fixedRows = DB::select($sqlFixed, array_merge($fixedBindings, $dateBindings));
+                         WHERE {$fixedWhere} {$scopeSql} {$dateSql} GROUP BY DATE(record_date) ORDER BY d";
+            $fixedRows = DB::select($sqlFixed, array_merge($fixedBindings, $scopeBindings, $dateBindings));
             foreach ($fixedRows as $row) $fixedCounts[substr((string) $row->d, 0, 10)] = (int) $row->c;
         }
 
@@ -580,14 +628,16 @@ class StatsController extends Controller
         return response()->json(['labels' => $labels, 'defects' => $defectsSeries, 'fixed' => $fixedSeries]);
     }
 
-    public function zone6(Request $r)
+    public function zone6(Request $r, StatsService $s)
     {
         $from     = $r->input('from');
         $to       = $r->input('to');
         $category = $r->input('sheet');
-        $cacheKey = "stats.zone6.{$from}_{$to}_{$category}";
+        $targetUser = $this->resolveTargetUser($r);
+        $scopeKey   = $targetUser?->id ?? 'all';
+        $cacheKey = "stats.zone6.{$from}_{$to}_{$category}.{$scopeKey}";
 
-        $data = Cache::remember($cacheKey, 120, function () use ($from, $to, $category) {
+        $data = Cache::remember($cacheKey, 120, function () use ($from, $to, $category, $targetUser, $s) {
             $rows = [];
             $sheets = config('sheets.map', []);
             if ($category && isset($sheets[$category])) $sheets = [$category => $sheets[$category]];
@@ -596,11 +646,12 @@ class StatsController extends Controller
                 if (!isset($cfg['model']) || !isset($cfg['fields']['fault_code'])) continue;
                 $model = $cfg['model'];
                 $table = (new $model)->getTable();
+                $scope = $s->workerScopeSql($cfg, $targetUser);
 
-                $where = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
-                $bindings = [];
-                if ($from) { $where .= " AND DATE(record_date) >= ?"; $bindings[] = $from; }
-                if ($to)   { $where .= " AND DATE(record_date) <= ?"; $bindings[] = $to; }
+                [$dateSql, $dateBindings] = $this->sqlDateRange($from, $to);
+
+                $where = "(`fault_code` IS NOT NULL AND `fault_code` != '')" . $scope['sql'] . $dateSql;
+                $bindings = array_merge($scope['bindings'], $dateBindings);
 
                 $sql = "SELECT `fault_code` AS code, COUNT(*) AS cnt,
                                MIN(record_date) AS first_date, MAX(record_date) AS last_date

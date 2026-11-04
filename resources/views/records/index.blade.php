@@ -22,7 +22,7 @@
         </div>
     </x-slot>
 
-    <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-5">
+    <div class="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
 
         {{-- Flash --}}
         @if(session('ok'))
@@ -69,9 +69,110 @@
             @endif
         </form>
 
-        {{-- Table --}}
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200/70 overflow-hidden">
-            <div class="overflow-x-auto">
+        {{-- Карточки записей: мобильные (< 768px) --}}
+        <div class="records-cards">
+            @forelse($records as $record)
+                @php
+                    $statusVal = $record->status ?? null;
+                    $isGood = in_array($statusVal, ['Сдан', 'Исправен', 'Проверен', 'Работает', 'Да'], true);
+                    $isBad  = in_array($statusVal, ['Не сдан', 'Неисправен', 'Не работает', 'Брак', 'Нет'], true);
+                    $isWarn = in_array($statusVal, ['В работе', 'В ремонт', 'Требует ремонта', 'Требует замены'], true);
+                    $statusCls = match (true) {
+                        $isGood => 'bg-emerald-500 text-white',
+                        $isBad  => 'bg-red-500 text-white',
+                        $isWarn => 'bg-amber-500 text-white',
+                        default => 'bg-gray-200 text-gray-700',
+                    };
+
+                    $skipOnCard = ['record_date', 'post_number', 'status', 'created_by', 'worker1', 'health_indicator', 'fault_code'];
+                    $cardFields = array_values(array_filter($listColumns, fn ($col) => !in_array($col, $skipOnCard, true)));
+                @endphp
+
+                <article class="record-card bg-white rounded-xl shadow-sm border border-gray-200/70 p-4">
+                    <div class="flex items-start justify-between gap-2 mb-2">
+                        <div class="min-w-0">
+                            <div class="text-base font-bold text-gray-900">
+                                {{ $record->record_date ? \Carbon\Carbon::parse($record->record_date)->format('d.m.Y') : '—' }}
+                            </div>
+                            @if(array_key_exists('post_number', $cfg['fields']) && $record->post_number)
+                                <div class="text-xs text-gray-500 mt-0.5">Пост №{{ $record->post_number }}</div>
+                            @endif
+                        </div>
+                        <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                            @if($statusVal)
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shadow-sm {{ $statusCls }}">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+                                    {{ $statusVal }}
+                                </span>
+                            @endif
+                            @if(($record->health ?? null) === 'green')
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 whitespace-nowrap">
+                                    Проверка: работает
+                                </span>
+                            @elseif(($record->health ?? null) === 'yellow')
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-red-800 border border-red-200 whitespace-nowrap">
+                                    Проверка: внимание
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+
+                    @if(!empty($cardFields))
+                        <dl>
+                            @foreach($cardFields as $col)
+                                @php
+                                    $colLabel = $cfg['fields'][$col]['label'] ?? $col;
+                                    $colValue = $record->$col ?? null;
+                                    if ($col === 'is_repaired') {
+                                        $colValue = $colValue ? 'Да' : 'Нет';
+                                    }
+                                @endphp
+                                <div class="min-w-0">
+                                    <dt>{{ $colLabel }}</dt>
+                                    <dd>{{ $colValue !== null && $colValue !== '' ? $colValue : '—' }}</dd>
+                                </div>
+                            @endforeach
+                        </dl>
+                    @endif
+
+                    @if($record->fault_code)
+                        <div class="mt-2 text-xs text-gray-600">
+                            Код неиспр.: <span class="font-mono font-semibold text-gray-900">{{ $record->fault_code }}</span>
+                        </div>
+                    @endif
+
+                    @if($record->workers_list)
+                        <div class="mt-2 text-xs text-gray-600">
+                            Исполнители: <span class="text-gray-900">{{ $record->workers_list }}</span>
+                        </div>
+                    @endif
+
+                    <div class="mt-3 flex items-center gap-2">
+                        <a href="{{ route('records.show', [$sheet, $record->id]) }}"
+                           class="tap-44 flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 rounded-lg transition">
+                            Открыть
+                        </a>
+                        @can('update', $record)
+                            <a href="{{ route('records.edit', [$sheet, $record->id]) }}"
+                               class="tap-44 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 rounded-lg transition">
+                                Изменить
+                            </a>
+                        @endcan
+                    </div>
+                </article>
+            @empty
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200/70 p-6 text-center text-gray-500">
+                    <p class="text-sm font-medium">Записей пока нет</p>
+                    <a href="{{ route('records.create', $sheet) }}" class="inline-flex items-center gap-1.5 text-blue-600 text-sm font-medium mt-2">
+                        Добавить первую запись
+                    </a>
+                </div>
+            @endforelse
+        </div>
+
+        {{-- Table (md+) --}}
+        <div class="records-table bg-white rounded-xl shadow-sm border border-gray-200/70 overflow-hidden">
+            <div class="overflow-x-auto table-scroll">
                 <table class="w-full text-base">
                     <thead>
                         <tr class="bg-gradient-to-r from-gray-50 to-gray-100/50 border-b border-gray-200">

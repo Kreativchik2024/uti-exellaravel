@@ -1,12 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
+        <div class="page-head">
             <h2 class="font-semibold text-xl text-gray-800">Категории прошивок</h2>
             <a href="{{ route('firmware.index') }}" class="text-blue-600 underline">← К прошивкам</a>
         </div>
     </x-slot>
 
-    <div class="py-8 max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-4">
+    <div class="py-8 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
         @if(session('ok'))
             <div class="bg-green-100 text-green-800 p-3 rounded">{{ session('ok') }}</div>
         @endif
@@ -17,14 +17,14 @@
         @endif
 
         <form method="POST" action="{{ route('firmware.categories.store') }}"
-              class="bg-white p-4 rounded shadow grid grid-cols-4 gap-2">
+              class="firmware-cat-form bg-white p-4 rounded shadow">
             @csrf
-            <input name="title" placeholder="Название" required class="border rounded px-2 py-1 col-span-2">
-            <input name="slug" placeholder="slug (латиница, опц.)" class="border rounded px-2 py-1">
-            <button class="bg-blue-600 text-white px-4 py-1 rounded">Добавить</button>
+            <input name="title" placeholder="Название" required class="tap-44 border rounded px-2 py-1 cat-title">
+            <input name="slug" placeholder="slug (латиница, опц.)" class="tap-44 border rounded px-2 py-1">
+            <button class="tap-44 bg-blue-600 text-white px-4 py-1 rounded">Добавить</button>
         </form>
 
-        <div class="bg-white rounded shadow">
+        <div class="bg-white rounded shadow overflow-x-auto table-scroll">
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-100">
                 <tr>

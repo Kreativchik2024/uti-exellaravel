@@ -10,7 +10,9 @@
         <script>
             (function () {
                 try {
-                    var stored = localStorage.getItem('theme');
+                    // ?theme=dark|light — ручное переключение (в т.ч. для проверки)
+                    var forced = new URLSearchParams(window.location.search).get('theme');
+                    var stored = (forced === 'dark' || forced === 'light') ? forced : localStorage.getItem('theme');
                     var prefers = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
                     var isDark = stored === 'dark' || (!stored && prefers);
                     if (isDark) document.documentElement.classList.add('dark');
@@ -18,16 +20,26 @@
             })();
         </script>
 
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+        {{-- Шрифты локально (раньше грузились с fonts.bunny.net) --}}
+        <link rel="stylesheet" href="{{ asset('css/fonts.css') }}?v={{ filemtime(public_path('css/fonts.css')) }}">
+        <link rel="preload" as="font" type="font/woff2" href="{{ asset('fonts/figtree-latin-400-normal.woff2') }}" crossorigin>
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+        {{-- Тёмная тема: отдельный CSS, не зависит от сборки vite --}}
+        <link rel="stylesheet" href="{{ asset('css/dark-theme.css') }}?v={{ filemtime(public_path('css/dark-theme.css')) }}">
+
+        {{-- Адаптивность и отступы под фиксированные элементы (тоже без сборки vite) --}}
+        <link rel="stylesheet" href="{{ asset('css/responsive.css') }}?v={{ filemtime(public_path('css/responsive.css')) }}">
 
         @stack('styles')
     </head>
     <body class="font-sans antialiased">
         <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
-            @include('layouts.navigation')
+            {{-- Навигация требует авторизации; публичные страницы (новости) рендерятся без неё --}}
+            @auth
+                @include('layouts.navigation')
+            @endauth
 
             @isset($header)
                 <header class="bg-white dark:bg-gray-800 shadow">
@@ -37,22 +49,16 @@
                 </header>
             @endisset
 
-            <main class="pb-16">
+            <main class="app-main">
                 {{ $slot }}
             </main>
         </div>
 
-        {{-- Кнопка смены темы --}}
-        <button type="button" onclick="toggleDark()"
-                style="position:fixed; bottom:24px; right:24px; z-index:9999;
-                       width:48px; height:48px; border-radius:50%;
-                       background:#4f46e5; color:#fff; border:none; cursor:pointer;
-                       box-shadow:0 4px 12px rgba(0,0,0,0.3);
-                       display:flex; align-items:center; justify-content:center;
-                       transition:transform 0.15s;"
-                onmouseover="this.style.transform='scale(1.1)'"
-                onmouseout="this.style.transform='scale(1)'"
-                title="Сменить тему">
+        {{-- Кнопка смены темы (на мобильных поднята над панелью «Онлайн» и уменьшена) --}}
+        <button type="button" id="themeToggle" onclick="toggleDark()"
+                class="theme-toggle"
+                style="position:fixed"
+                title="Сменить тему" aria-label="Сменить тему">
             <svg data-theme-icon="moon" width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
             </svg>

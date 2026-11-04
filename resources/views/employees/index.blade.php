@@ -23,7 +23,7 @@
         </div>
     </x-slot>
 
-    <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
+    <div class="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
 
         @if(session('ok'))
             <div class="bg-green-100 text-green-800 p-3 rounded">{{ session('ok') }}</div>
@@ -45,20 +45,20 @@
         @endif
 
         <form method="GET" action="{{ route('employees.index') }}"
-              class="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex gap-2 items-end">
-            <div class="flex-1">
+              class="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex flex-wrap gap-2 items-end">
+            <div class="flex-1 min-w-0">
                 <label class="block text-xs text-gray-500 mb-1">Поиск</label>
                 <input type="text" name="q" value="{{ $q }}"
                        placeholder="Фамилия, имя, должность, участок..."
-                       class="border rounded px-3 py-2 w-full">
+                       class="tap-44 border rounded px-3 py-2 w-full">
             </div>
-            <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Найти</button>
+            <button class="tap-44 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Найти</button>
             @if($q !== '')
                 <a href="{{ route('employees.index') }}" class="text-sm text-gray-500 underline py-2">Сбросить</a>
             @endif
         </form>
 
-        <div class="bg-white rounded-lg shadow overflow-x-auto">
+        <div class="bg-white rounded-lg shadow overflow-x-auto table-scroll">
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-50 text-gray-600">
                     <tr>

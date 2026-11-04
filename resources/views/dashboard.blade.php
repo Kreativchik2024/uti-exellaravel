@@ -1,26 +1,26 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
+        <div class="page-head">
             <h2 class="font-semibold text-xl text-gray-800">Главная</h2>
             @if(auth()->user()->canManageContent())
-                <a href="{{ route('news.create') }}" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition">
+                <a href="{{ route('news.create') }}" class="tap-44 bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition inline-flex items-center">
                     + Новость
                 </a>
             @endif
         </div>
     </x-slot>
 
-    <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8">
+    <div class="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         @if(session('ok'))
             <div class="bg-green-100 text-green-800 p-3 rounded mb-6">{{ session('ok') }}</div>
         @endif
 
-        {{-- Двухколоночная верстка --}}
-        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start;">
+        {{-- Двухколоночная верстка (на мобильных — в одну колонку) --}}
+        <div class="dashboard-cols">
             
             {{-- ЛЕВАЯ КОЛОНКА: Лента новостей --}}
-            <div style="flex: 1 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 1rem;">
+            <div class="dashboard-news">
                 <div id="news-feed" class="space-y-4">
                     @include('news._items', ['news' => $news])
                 </div>
@@ -34,7 +34,7 @@
             </div>
 
             {{-- ПРАВАЯ КОЛОНКА: Статистика --}}
-            <div style="flex: 0 0 280px; width: 100%; max-width: 280px; position: sticky; top: 1rem;">
+            <div class="dashboard-side">
                 <div class="bg-white rounded-lg shadow border border-gray-100 overflow-hidden">
                     
                     {{-- Переключатель периода --}}

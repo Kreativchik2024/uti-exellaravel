@@ -24,31 +24,31 @@ return [
             'policy' => \App\Policies\RecordPolicy::class,
             'fields' => array_merge([
                 'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
-                'post_number' => ['label'=>'Пост','type'=>'number','rules'=>'nullable|integer|min:1|max:30'],
+                'post_number' => ['label'=>'Пост','type'=>'number','rules'=>'required|integer|min:1|max:30'],
             ], $workers, [
                 'work_start'      => ['label'=>'Начало','type'=>'time','rules'=>'nullable'],
                 'work_end'        => ['label'=>'Окончание','type'=>'time','rules'=>'nullable'],
-                'board_number'    => ['label'=>'Номер борта','type'=>'text','rules'=>'nullable|string|max:80'],
-                'ip_address'      => ['label'=>'IP','type'=>'text','rules'=>'nullable|string|max:64'],
+                'board_number'    => ['label'=>'Номер борта','type'=>'text','rules'=>'required|string|max:80'],
+                'ip_address'      => ['label'=>'IP модуля связи','type'=>'text','rules'=>'required|string|max:64'],
                 'fuselage_number' => ['label'=>'№ фюзеляжа','type'=>'text','rules'=>'nullable|string|max:64'],
                 'frame_serial'    => ['label'=>'№ моторамы','type'=>'text','rules'=>'nullable|string|max:120'],
 
                 'cross3_number'   => [
-                    'label'=>'№ Кросс 3',
+                    'label'=>'S/N Кросс 3',
                     'type'=>'text',
-                    'rules'=>'nullable|string|max:120',
+                    'rules'=>'required|string|max:120',
                     'lookup'=>['sheet'=>'cross3','match_by'=>'serial_number','prefix'=>'cross3'],
                 ],
                 'bracket_serial'  => [
-                    'label'=>'Номер камеры',
+                    'label'=>'S/N камеры',
                     'type'=>'text',
-                    'rules'=>'nullable|string|max:120',
+                    'rules'=>'required|string|max:120',
                     'lookup'=>['sheet'=>'camera_bracket','match_by'=>'serial_number','prefix'=>'bracket'],
                 ],
                 'manet_number'    => [
-                    'label'=>'№ Манета',
+                    'label'=>'S/N модуля связи',
                     'type'=>'text',
-                    'rules'=>'nullable|string|max:120',
+                    'rules'=>'required|string|max:120',
                     'lookup'=>['sheet'=>'comm_module','match_by'=>'serial_number','prefix'=>'manet'],
                 ],
 

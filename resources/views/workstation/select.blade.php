@@ -3,7 +3,7 @@
         <h2 class="font-semibold text-xl text-gray-800">Кто работает за рабочим местом?</h2>
     </x-slot>
 
-    <div class="py-8 max-w-3xl mx-auto sm:px-6 lg:px-8">
+    <div class="py-8 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="bg-white rounded-lg shadow p-6">
 
             <p class="text-sm text-gray-600 mb-6">

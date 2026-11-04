@@ -3,7 +3,7 @@
         <h2 class="font-semibold text-xl text-gray-800">Загрузить файл (прошивку / инструкцию)</h2>
     </x-slot>
 
-    <div class="py-8 max-w-2xl mx-auto sm:px-6 lg:px-8">
+    <div class="py-8 max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <form method="POST" action="{{ route('firmware.store') }}" enctype="multipart/form-data"
               class="bg-white p-6 rounded shadow space-y-4">
             @csrf

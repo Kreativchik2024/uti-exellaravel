@@ -30,7 +30,7 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ route('records.index', $sheet) }}"
                    class="inline-flex items-center gap-1.5 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl font-medium text-sm transition">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,7 +76,7 @@
         </div>
     </x-slot>
 
-    <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-5">
+    <div class="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
 
         @if($isTimeLocked)
             <div class="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl flex items-start gap-3">
@@ -273,7 +273,7 @@
                                         : 'bg-red-50 border-red-200 text-red-800';
                                     $icon = $isGreen ? '✓' : '✗';
                                 @endphp
-                                <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border {{ $cls }} text-xs font-medium mb-1.5">
+                                <div class="inline-flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-md border {{ $cls }} text-xs font-medium mb-1.5">
                                     <span class="font-bold">{{ $icon }}</span>
                                     <span>{{ $lookupData['workers'] ?? $lookupData['worker1'] ?? '—' }}</span>
                                     <span class="opacity-50">·</span>

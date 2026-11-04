@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\News;
 use App\Services\StatsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class DashboardController extends Controller
 {
@@ -29,10 +30,16 @@ class DashboardController extends Controller
         if (! in_array($statsPeriod, [1, 7, 30])) $statsPeriod = 30;
 
         $from = now()->subDays($statsPeriod - 1)->startOfDay();
-        
-        // Собираем общую статистику (targetUser = null, чтобы показывать по всем)
-        $perSheet = $s->forPeriod($from, null); 
-        $totals   = $s->totals($perSheet);
+
+        // Сводка по 19 таблицам считается дорого — кешируем на минуту
+        [$perSheet, $totals] = Cache::remember(
+            'dash.stats.' . $statsPeriod . '.' . now()->toDateString(),
+            60,
+            function () use ($s, $from) {
+                $perSheet = $s->forPeriod($from, null);
+                return [$perSheet, $s->totals($perSheet)];
+            }
+        );
 
         return view('dashboard', compact('news', 'perSheet', 'totals', 'statsPeriod'));
     }

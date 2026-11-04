@@ -61,7 +61,7 @@
                              x-transition:leave="transition ease-in duration-100"
                              x-transition:leave-start="opacity-100 translate-x-0"
                              x-transition:leave-end="opacity-0 -translate-x-2"
-                             class="absolute left-full top-0 ml-2 z-50 w-64 max-h-[80vh] overflow-y-auto rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+                             class="absolute left-0 top-full mt-1 z-50 w-64 max-h-[70vh] overflow-y-auto rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
                              style="display:none;"
                              @click="open = false">
                             <div class="py-1">
@@ -118,7 +118,7 @@
                                  x-transition:leave="transition ease-in duration-100"
                                  x-transition:leave-start="opacity-100 translate-x-0"
                                  x-transition:leave-end="opacity-0 -translate-x-2"
-                                 class="absolute left-full top-0 ml-2 z-50 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+                                 class="absolute right-0 top-full mt-1 z-50 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
                                  style="display:none;"
                                  @click="open = false">
                                 <div class="py-1">
@@ -192,7 +192,7 @@
             </div>
 
             <div class="-me-2 flex items-center sm:hidden">
-                <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 focus:text-gray-500 transition duration-150 ease-in-out">
+                <button @click="open = ! open" aria-label="Меню" :aria-expanded="open ? 'true' : 'false'" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 focus:text-gray-500 transition duration-150 ease-in-out">
                     <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                         <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         <path :class="{'hidden': ! open, 'inline-flex': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -203,7 +203,8 @@
     </div>
 
     {{-- Мобильное меню --}}
-    <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
+    <div x-cloak :class="open ? 'block' : 'hidden'" class="sm:hidden"
+         @click="event.target.closest('a') && (open = false)">
         <div class="pt-2 pb-3 space-y-1 max-h-[70vh] overflow-y-auto">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Главная') }}

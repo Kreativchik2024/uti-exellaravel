@@ -39,12 +39,16 @@
         </div>
     </x-slot>
 
-    <div class="py-8 max-w-3xl mx-auto sm:px-6 lg:px-8">
+    <div class="py-8 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <article class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             @php $cover = $news->images->first(); @endphp
             @if($cover)
                 <a href="{{ route('media.show', ['path' => $cover->path]) }}" target="_blank" class="block">
-                    <div style="width:100%; height:400px; background-image:url('{{ route('media.show', ['path' => $cover->thumb_path ?? $cover->path]) }}'); background-size:cover; background-position:center; background-repeat:no-repeat;"></div>
+                    <img src="{{ route('media.show', ['path' => $cover->thumb_path ?? $cover->path]) }}"
+                         alt="{{ $cover->caption ?: ($news->title ?: 'Фото к новости') }}"
+                         width="1600" height="900"
+                         loading="lazy" decoding="async"
+                         class="news-cover news-cover--lg">
                 </a>
             @endif
 
@@ -93,7 +97,11 @@
                             @foreach($news->images->slice(1) as $img)
                                 <figure class="text-center">
                                     <a href="{{ route('media.show', ['path' => $img->path]) }}" target="_blank">
-                                        <div style="width:100%; height:160px; background-image:url('{{ route('media.show', ['path' => $img->thumb_path ?? $img->path]) }}'); background-size:cover; background-position:center; background-repeat:no-repeat; border-radius:6px;"></div>
+                                        <img src="{{ route('media.show', ['path' => $img->thumb_path ?? $img->path]) }}"
+                                             alt="{{ $img->caption ?: 'Фото к новости' }}"
+                                             width="800" height="600"
+                                             loading="lazy" decoding="async"
+                                             class="news-thumb">
                                     </a>
                                     @if($img->caption)
                                         <figcaption class="text-xs text-gray-500 mt-1 italic">{{ $img->caption }}</figcaption>

@@ -26,20 +26,20 @@
      data-can-manage="{{ $canManageWorkers ? '1' : '0' }}"></div>
 
 <div id="workerPinModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-80 p-5 space-y-3">
+    <div class="pin-modal-card bg-white rounded-2xl shadow-2xl p-5 space-y-3">
         <h3 class="font-semibold text-base text-gray-900">Подтверждение ПИН</h3>
         <p class="text-xs text-gray-500">
             Сотрудник: <b id="workerPinEmployee" class="text-gray-900"></b><br>
             Введите его личный ПИН (4–6 цифр).
         </p>
         <input type="password" id="workerPinInput" inputmode="numeric" autocomplete="off"
-               class="block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500">
+               class="tap-44 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500">
         <div id="workerPinError" class="text-red-600 text-xs hidden"></div>
         <div class="flex justify-end gap-2 pt-1">
             <button type="button" id="workerPinCancelBtn"
-                    class="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-md transition">Отмена</button>
+                    class="tap-44 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-md transition">Отмена</button>
             <button type="button" id="workerPinSubmitBtn"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs rounded-md transition">Подтвердить</button>
+                    class="tap-44 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs rounded-md transition">Подтвердить</button>
         </div>
     </div>
 </div>

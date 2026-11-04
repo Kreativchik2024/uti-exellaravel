@@ -29,10 +29,12 @@ class FirmwareVersion extends Model
     public function humanSize(): string
     {
         $size = (int) $this->file_size;
-        foreach (['Б','КБ','МБ','ГБ'] as $unit) {
-            if ($size < 1024) return $size . ' ' . $unit;
+        $units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
+        $i = 0;
+        for (; $i < count($units) - 1 && $size >= 1024; $i++) {
             $size /= 1024;
         }
-        return round($size, 1) . ' ТБ';
+
+        return ($i === 0 ? (string) $size : number_format($size, 1, '.', ' ')) . ' ' . $units[$i];
     }
 }

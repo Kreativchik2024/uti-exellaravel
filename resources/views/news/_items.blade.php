@@ -7,7 +7,11 @@
         <a href="{{ route('news.show', $item) }}" class="block group">
 
             @if($cover)
-                <div style="width:100%; height:280px; background-image:url('{{ route('media.show', ['path' => $cover->thumb_path ?? $cover->path]) }}'); background-size:cover; background-position:center; background-repeat:no-repeat;"></div>
+                <img src="{{ route('media.show', ['path' => $cover->thumb_path ?? $cover->path]) }}"
+                     alt="{{ $cover->caption ?: ($item->title ?: 'Фото к новости') }}"
+                     width="1200" height="800"
+                     loading="lazy" decoding="async"
+                     class="news-cover">
             @endif
 
             <div class="p-4 space-y-2">

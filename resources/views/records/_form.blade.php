@@ -103,7 +103,7 @@
     </div>
 @endif
 
-<div class="p-6 sm:p-8">
+<div class="record-form-card">
     {{-- Исполнители (наверху) --}}
     @if($hasWorkers)
         <div class="mb-8">
@@ -144,7 +144,7 @@
                                         data-original="{{ $originalWorkers[$name] ?? '' }}"
                                         @if($isReq) required @endif
                                         @if($isTimeLocked) disabled @endif
-                                        class="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 hover:border-gray-300">
+                                        class="tap-44 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 hover:border-gray-300">
                                     <option value="">— выберите —</option>
                                     @foreach($employeesList as $emp)
                                         @php $noPin = in_array($emp, $employeesWithoutPin, true); @endphp
@@ -223,12 +223,12 @@
                         $label = $f['label'] ?? $name;
                         $type  = $f['type'] ?? 'text';
 
-                        $baseInput = 'block w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-all duration-150 '
+                        $baseInput = 'tap-44 block w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-all duration-150 '
                                    . 'focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 '
                                    . 'border-gray-200 hover:border-gray-300';
 
                         if ($isTimeLocked) {
-                            $baseInput = 'block w-full rounded-lg border bg-gray-50 px-3.5 py-2.5 text-sm text-gray-500 cursor-not-allowed border-gray-200';
+                            $baseInput = 'tap-44 block w-full rounded-lg border bg-gray-50 px-3.5 py-2.5 text-sm text-gray-500 cursor-not-allowed border-gray-200';
                         }
                     @endphp
 
@@ -250,7 +250,7 @@
                                             : 'bg-red-50 border-red-200 text-red-800';
                                         $icon = $isGreen ? '✓' : '✗';
                                     @endphp
-                                    <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border {{ $cls }} text-xs font-medium">
+                                    <div class="inline-flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-md border {{ $cls }} text-xs font-medium">
                                         <span class="font-bold">{{ $icon }}</span>
                                         <span>{{ $lookupData['worker1'] ?? '—' }}</span>
                                         <span class="opacity-50">·</span>
@@ -327,10 +327,10 @@
         </div>
     @endforeach
 
-    {{-- Панель кнопок --}}
-    <div class="mt-8 pt-6 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3">
+    {{-- Панель кнопок (на мобильных — в столбик, кнопки на всю ширину) --}}
+    <div class="form-actions mt-8 pt-6 border-t border-gray-200">
         <a href="{{ route('records.index', $sheet) }}"
-           class="inline-flex items-center gap-1.5 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg font-medium text-sm transition">
+           class="tap-44 inline-flex items-center gap-1.5 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg font-medium text-sm transition">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
             </svg>
@@ -338,7 +338,7 @@
         </a>
         @if(!$isTimeLocked)
             <button type="submit"
-                    class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg shadow transition">
+                    class="tap-44 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg shadow transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                 </svg>
@@ -364,14 +364,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function render(data) {
             if (!data || !data.found) {
-                resultEl.innerHTML = '<div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border bg-gray-50 border-gray-200 text-xs text-gray-500">Не найдено в таблице</div>';
+                resultEl.innerHTML = '<div class="inline-flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-md border bg-gray-50 border-gray-200 text-xs text-gray-500">Не найдено в таблице</div>';
                 return;
             }
             var isGreen = data.health === 'green';
             var cls = isGreen ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800';
             var icon = isGreen ? '✓' : '✗';
             resultEl.innerHTML =
-                '<div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border ' + cls + ' text-xs font-medium">'
+                '<div class="inline-flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-md border ' + cls + ' text-xs font-medium">'
                 + '<span class="font-bold">' + icon + '</span>'
                 + '<span>' + esc(data.worker1 || '—') + '</span>'
                 + '<span class="opacity-50">·</span>'

@@ -3,7 +3,7 @@
         <h2 class="font-semibold text-xl text-gray-800">Редактировать новость</h2>
     </x-slot>
 
-    <div class="py-8 max-w-3xl mx-auto sm:px-6 lg:px-8">
+    <div class="py-8 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <form method="POST" action="{{ route('news.update', $news) }}" enctype="multipart/form-data"
               class="bg-white p-6 rounded shadow space-y-4">
             @csrf @method('PUT')
@@ -34,6 +34,9 @@
                             <div class="flex gap-3 items-start bg-gray-50 p-2 rounded">
                                 <div class="relative shrink-0">
                                     <img src="{{ route('media.show', ['path' => $img->thumb_path]) }}"
+                                         alt="{{ $img->caption ?: 'Фото к новости' }}"
+                                         width="96" height="96"
+                                         loading="lazy" decoding="async"
                                          class="w-24 h-24 object-cover rounded border">
                                     <button type="button"
                                             onclick="if(confirm('Удалить картинку?')) document.getElementById('del-img-{{ $img->id }}').submit();"

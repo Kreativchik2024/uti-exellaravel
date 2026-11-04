@@ -5,14 +5,56 @@ namespace App\Services;
 use App\Models\Employee;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class StatsService
 {
     private const WORKER_FIELDS = ['worker1', 'worker2', 'worker3', 'worker4', 'worker5'];
 
     private ?array $workersIndex = null;
+
+    /**
+     * Метаданные таблицы берём из config/sheets.php, а не из information_schema:
+     * раньше каждый вызов Schema::hasColumn() был отдельным SQL-запросом
+     * (до ~95 запросов на страницу статистики).
+     */
+    private function metaFor(array $cfg): array
+    {
+        $fields = $cfg['fields'] ?? [];
+
+        $workerFields = [];
+        foreach (self::WORKER_FIELDS as $field) {
+            if (isset($fields[$field])) $workerFields[] = $field;
+        }
+
+        return [
+            'dateField'    => isset($fields['record_date']) ? 'record_date' : 'created_at',
+            'workerFields' => $workerFields,
+            'hasQty'       => isset($fields['qty']),
+            'hasPost'      => isset($fields['post_number']),
+            'hasStatus'    => isset($fields['status']),
+            'hasFault'     => isset($fields['fault_code']),
+        ];
+    }
+
+    /**
+     * Сравнение по «сырому» полю даты вместо DATE(column) — так работает индекс.
+     */
+    private function applyRange($query, string $dateField, ?Carbon $from, ?Carbon $to): void
+    {
+        if ($from !== null) $query->where($dateField, '>=', $from->copy()->startOfDay());
+        if ($to !== null)   $query->where($dateField, '<=', $to->copy()->endOfDay());
+    }
+
+    private function applyWorkerFilter($query, array $workerFields, array $variants): void
+    {
+        $query->where(function ($w) use ($workerFields, $variants) {
+            foreach ($workerFields as $field) {
+                $w->orWhereIn($field, $variants);
+            }
+        });
+    }
 
     public function forPeriod(?Carbon $from, ?Carbon $to = null, ?User $user = null, ?string $worker = null): array
     {
@@ -27,38 +69,30 @@ class StatsService
         }
 
         foreach ($map as $slug => $cfg) {
-            $model = $cfg['model'];
-            $hasQty = isset($cfg['fields']['qty']);
-            $table = (new $model)->getTable();
-            $dateField = Schema::hasColumn($table, 'record_date') ? 'record_date' : 'created_at';
+            if (empty($cfg['model']) || !class_exists($cfg['model'])) continue;
+
+            $model  = $cfg['model'];
+            $meta   = $this->metaFor($cfg);
+            $hasQty = $meta['hasQty'];
 
             $q = $model::query();
-            if ($from !== null) $q->whereDate($dateField, '>=', $from->toDateString());
-            if ($to   !== null) $q->whereDate($dateField, '<=', $to->toDateString());
+            $this->applyRange($q, $meta['dateField'], $from, $to);
 
             if ($user && $user->isExecutor()) {
-                $q->where('created_by', $user->id);
+                $this->applyUserScope($q, $cfg, $user);
             }
 
             if (!empty($workerVariants)) {
-                $workerFields = array_values(array_filter(
-                    self::WORKER_FIELDS,
-                    fn($f) => Schema::hasColumn($table, $f)
-                ));
-                if (empty($workerFields)) continue;
-
-                $q->where(function ($w) use ($workerFields, $workerVariants) {
-                    foreach ($workerFields as $field) {
-                        $w->orWhereIn($field, $workerVariants);
-                    }
-                });
+                if (empty($meta['workerFields'])) continue;
+                $this->applyWorkerFilter($q, $meta['workerFields'], $workerVariants);
             }
 
-            $total = $hasQty ? (clone $q)->sum('qty') : (clone $q)->count();
-
+            // Один запрос вместо двух: сумма по created_by даёт и total, и разбивку
             $byUser = (clone $q)
                 ->select('created_by', $hasQty ? DB::raw('SUM(qty) as c') : DB::raw('COUNT(*) as c'))
                 ->groupBy('created_by')->pluck('c', 'created_by')->toArray();
+
+            $total = array_sum(array_map('intval', $byUser));
 
             $users = User::whereIn('id', array_keys($byUser))->pluck('name', 'id')->toArray();
 
@@ -92,111 +126,73 @@ class StatsService
         return ['total' => $total, 'perUser' => $perUser];
     }
 
+    /**
+     * Детализация по постам — считается в SQL (GROUP BY), без выгрузки всех записей в память.
+     */
     public function byPosts(?Carbon $from, ?Carbon $to, ?User $user): array
     {
-        $pgpTable = (new \App\Models\PgpRecord)->getTable();
-        $dateField = Schema::hasColumn($pgpTable, 'record_date') ? 'record_date' : 'created_at';
+        $cfg = config('sheets.map.pgp');
+        if (!$cfg || empty($cfg['model'])) return [];
 
-        $q = \App\Models\PgpRecord::query();
-        if ($from !== null) $q->whereDate($dateField, '>=', $from->toDateString());
-        if ($to   !== null) $q->whereDate($dateField, '<=', $to->toDateString());
-        if ($user && $user->isExecutor()) $q->where('created_by', $user->id);
+        $model = $cfg['model'];
+        $table = (new $model)->getTable();
+        $meta  = $this->metaFor($cfg);
 
-        $records = $q->get();
+        $q = $model::query();
+        $this->applyRange($q, $meta['dateField'], $from, $to);
+        if ($user && $user->isExecutor()) $this->applyUserScope($q, $cfg, $user);
+
+        $rows = $q->select(
+            'post_number',
+            DB::raw('COUNT(*) as total'),
+            DB::raw("SUM(CASE WHEN `status` = 'Сдан' THEN 1 ELSE 0 END) as delivered")
+        )->groupBy('post_number')->get();
+
         $result = [];
-        foreach ($records as $record) {
-            $post = $record->post_number ?? 'Без поста';
-            if (!isset($result[$post])) $result[$post] = ['total' => 0, 'delivered' => 0];
-            $result[$post]['total']++;
-            if (($record->status ?? null) === 'Сдан') $result[$post]['delivered']++;
+        foreach ($rows as $row) {
+            $post = $row->post_number ?? 'Без поста';
+            $result[$post] = ['total' => (int) $row->total, 'delivered' => (int) $row->delivered];
         }
+
         uasort($result, function ($a, $b) {
             if ($b['delivered'] !== $a['delivered']) return $b['delivered'] <=> $a['delivered'];
             return $b['total'] <=> $a['total'];
         });
+
         return $result;
     }
 
     public function workerSummary(string $name, ?Carbon $from = null, ?Carbon $to = null): array
     {
-        $key = $this->normalizeName($name);
-        if ($key === '') return [];
-
-        $index = $this->workersIndex();
-        if (!isset($index[$key])) return [];
-
-        $variants = $index[$key]['variants'];
+        $variants = $this->variantsForName($name);
         if (empty($variants)) return [];
 
-        $map = config('sheets.map', []);
         $out = [];
+        foreach (config('sheets.map', []) as $slug => $cfg) {
+            if (empty($cfg['model']) || !class_exists($cfg['model'])) continue;
 
-        foreach ($map as $slug => $cfg) {
+            $meta = $this->metaFor($cfg);
+            if (empty($meta['workerFields'])) continue;
+
             $model = $cfg['model'];
-            $table = (new $model)->getTable();
-            $dateField = Schema::hasColumn($table, 'record_date') ? 'record_date' : 'created_at';
-            $hasQty = isset($cfg['fields']['qty']);
-
-            $workerFields = array_values(array_filter(self::WORKER_FIELDS, fn($f) => Schema::hasColumn($table, $f)));
-            if (empty($workerFields)) continue;
+            $hasQty = $meta['hasQty'];
 
             $q = $model::query();
-            if ($from !== null) $q->whereDate($dateField, '>=', $from->toDateString());
-            if ($to   !== null) $q->whereDate($dateField, '<=', $to->toDateString());
-            $q->where(function ($w) use ($workerFields, $variants) {
-                foreach ($workerFields as $field) $w->orWhereIn($field, $variants);
-            });
+            $this->applyRange($q, $meta['dateField'], $from, $to);
+            $this->applyWorkerFilter($q, $meta['workerFields'], $variants);
 
             $total = $hasQty ? (clone $q)->sum('qty') : (clone $q)->count();
             if ($total > 0) {
                 $out[$slug] = ['title' => $cfg['title'], 'total' => (int) $total, 'unit' => $hasQty ? 'шт.' : 'записей'];
             }
         }
+
         return $out;
     }
 
     public function workerBySheet(string $worker, ?Carbon $from = null, ?Carbon $to = null): array
     {
-        $key = $this->normalizeName($worker);
-        if ($key === '') return [];
-
-        $index = $this->workersIndex();
-        if (!isset($index[$key])) return [];
-
-        $variants = $index[$key]['variants'];
-        if (empty($variants)) return [];
-
-        $out = [];
-
-        foreach (config('sheets.map', []) as $slug => $cfg) {
-            if (empty($cfg['model']) || !class_exists($cfg['model'])) continue;
-
-            $model = $cfg['model'];
-            $table = (new $model)->getTable();
-            $dateField = Schema::hasColumn($table, 'record_date') ? 'record_date' : 'created_at';
-            $hasQty = isset($cfg['fields']['qty']);
-
-            $workerFields = array_values(array_filter(self::WORKER_FIELDS, fn($f) => Schema::hasColumn($table, $f)));
-            if (empty($workerFields)) continue;
-
-            $q = $model::query();
-            if ($from !== null) $q->whereDate($dateField, '>=', $from->toDateString());
-            if ($to   !== null) $q->whereDate($dateField, '<=', $to->toDateString());
-            $q->where(function ($w) use ($workerFields, $variants) {
-                foreach ($workerFields as $field) $w->orWhereIn($field, $variants);
-            });
-
-            $total = $hasQty ? (clone $q)->sum('qty') : (clone $q)->count();
-            if ($total > 0) {
-                $out[$slug] = [
-                    'title' => $cfg['title'] ?? $slug,
-                    'total' => (int) $total,
-                    'unit'  => $hasQty ? 'шт.' : 'записей',
-                ];
-            }
-        }
-
-        return $out;
+        return $this->workerSummary($worker, $from, $to);
     }
 
     public function workerRecords(
@@ -209,40 +205,25 @@ class StatsService
         $cfg = config("sheets.map.$slug");
         if (!$cfg || empty($cfg['model']) || !class_exists($cfg['model'])) return [];
 
-        $key = $this->normalizeName($worker);
-        if ($key === '') return [];
-
-        $index = $this->workersIndex();
-        if (!isset($index[$key])) return [];
-
-        $variants = $index[$key]['variants'];
+        $variants = $this->variantsForName($worker);
         if (empty($variants)) return [];
 
-        $model = $cfg['model'];
-        $table = (new $model)->getTable();
-        $dateField = Schema::hasColumn($table, 'record_date') ? 'record_date' : 'created_at';
+        $meta = $this->metaFor($cfg);
+        if (empty($meta['workerFields'])) return [];
 
-        $workerFields = array_values(array_filter(self::WORKER_FIELDS, fn($f) => Schema::hasColumn($table, $f)));
-        if (empty($workerFields)) return [];
+        $model = $cfg['model'];
+        $key   = $this->normalizeName($worker);
 
         $q = $model::query();
-        if ($from !== null) $q->whereDate($dateField, '>=', $from->toDateString());
-        if ($to   !== null) $q->whereDate($dateField, '<=', $to->toDateString());
-        $q->where(function ($w) use ($workerFields, $variants) {
-            foreach ($workerFields as $field) $w->orWhereIn($field, $variants);
-        });
+        $this->applyRange($q, $meta['dateField'], $from, $to);
+        $this->applyWorkerFilter($q, $meta['workerFields'], $variants);
 
-        $hasPost   = Schema::hasColumn($table, 'post_number');
-        $hasStatus = Schema::hasColumn($table, 'status');
-        $hasQty    = Schema::hasColumn($table, 'qty');
-        $hasFault  = Schema::hasColumn($table, 'fault_code');
-
-        $rows = $q->orderByDesc($dateField)->limit($limit)->get();
+        $rows = $q->orderByDesc($meta['dateField'])->limit($limit)->get();
 
         $out = [];
         foreach ($rows as $row) {
             $matchedFields = [];
-            foreach ($workerFields as $f) {
+            foreach ($meta['workerFields'] as $f) {
                 $val = trim((string) ($row->$f ?? ''));
                 if ($val === '') continue;
                 foreach ($this->parseWorkers($val) as $part) {
@@ -253,7 +234,7 @@ class StatsService
                 }
             }
 
-            $dateVal = $row->{$dateField} ?? null;
+            $dateVal = $row->{$meta['dateField']} ?? null;
             if ($dateVal instanceof \DateTimeInterface) {
                 $dateStr = $dateVal->format('Y-m-d');
             } elseif ($dateVal) {
@@ -265,10 +246,10 @@ class StatsService
             $out[] = [
                 'id'           => $row->id,
                 'date'         => $dateStr,
-                'post'         => $hasPost   ? ($row->post_number ?? null) : null,
-                'status'       => $hasStatus ? ($row->status ?? null)      : null,
-                'qty'          => $hasQty    ? ($row->qty ?? null)         : null,
-                'fault_code'   => $hasFault  ? ($row->fault_code ?? null)  : null,
+                'post'         => $meta['hasPost']   ? ($row->post_number ?? null) : null,
+                'status'       => $meta['hasStatus'] ? ($row->status ?? null)      : null,
+                'qty'          => $meta['hasQty']    ? ($row->qty ?? null)         : null,
+                'fault_code'   => $meta['hasFault']  ? ($row->fault_code ?? null)  : null,
                 'worker_field' => implode(',', $matchedFields),
             ];
         }
@@ -283,6 +264,75 @@ class StatsService
             ->orderBy('short_name')
             ->pluck('short_name')
             ->all();
+    }
+
+    /**
+     * Варианты написания ФИО для фильтра. Для аккаунта сотрудника достаточно
+     * точного short_name: записи валидируются по справочнику. Тяжёлый индекс
+     * по всем таблицам здесь больше не строится.
+     */
+    public function workerVariantsForUser(?User $user): array
+    {
+        if (!$user) return [];
+
+        $name = trim((string) (Employee::query()->where('user_id', $user->id)->value('short_name') ?? ''));
+        return $name === '' ? [] : [$name];
+    }
+
+    /**
+     * Ограничить выборку записями, где пользователь указан исполнителем
+     * (worker1..5). Если привязки к сотруднику нет — откат на created_by.
+     */
+    public function applyUserScope($query, array $cfg, User $user): void
+    {
+        $variants = $this->workerVariantsForUser($user);
+        $meta     = $this->metaFor($cfg);
+
+        if (empty($variants) || empty($meta['workerFields'])) {
+            $query->where('created_by', $user->id);
+            return;
+        }
+
+        $this->applyWorkerFilter($query, $meta['workerFields'], $variants);
+    }
+
+    /**
+     * SQL-фрагмент (с ведущим " AND ") для тех же условий в сырых запросах.
+     *
+     * @return array{sql: string, bindings: array}
+     */
+    public function workerScopeSql(array $cfg, ?User $user): array
+    {
+        if (!$user || !$user->isExecutor()) {
+            return ['sql' => '', 'bindings' => []];
+        }
+
+        $variants = $this->workerVariantsForUser($user);
+        $fields   = $this->metaFor($cfg)['workerFields'];
+
+        if (empty($variants) || empty($fields)) {
+            return ['sql' => ' AND `created_by` = ?', 'bindings' => [$user->id]];
+        }
+
+        $parts = [];
+        $bindings = [];
+        foreach ($fields as $field) {
+            $parts[] = "`$field` IN (" . implode(',', array_fill(0, count($variants), '?')) . ')';
+            foreach ($variants as $variant) {
+                $bindings[] = $variant;
+            }
+        }
+
+        return ['sql' => ' AND (' . implode(' OR ', $parts) . ')', 'bindings' => $bindings];
+    }
+
+    private function variantsForName(string $name): array
+    {
+        $key = $this->normalizeName($name);
+        if ($key === '') return [];
+
+        $index = $this->workersIndex();
+        return $index[$key]['variants'] ?? [$name];
     }
 
     private function parseWorkers(string $value): array
@@ -303,32 +353,40 @@ class StatsService
         return trim(rtrim($name, '.,;:'));
     }
 
+    /**
+     * Индекс написаний ФИО по всем таблицам — тяжёлый, поэтому кешируется.
+     */
     private function workersIndex(): array
     {
         if ($this->workersIndex !== null) return $this->workersIndex;
 
-        $index = [];
-        foreach (config('sheets.map', []) as $cfg) {
-            $model = $cfg['model'];
-            $table = (new $model)->getTable();
-            $fields = array_values(array_filter(self::WORKER_FIELDS, fn($f) => Schema::hasColumn($table, $f)));
-            if (empty($fields)) continue;
+        return $this->workersIndex = Cache::remember('stats.workers_index.v1', 600, function () {
+            $index = [];
 
-            foreach ($model::query()->select($fields)->cursor() as $row) {
-                foreach ($fields as $f) {
-                    $fullValue = trim((string) ($row->$f ?? ''));
-                    if ($fullValue === '') continue;
-                    foreach ($this->parseWorkers($fullValue) as $part) {
-                        $key = $this->normalizeName($part);
-                        if ($key === '') continue;
-                        if (!isset($index[$key])) $index[$key] = ['canonical' => $part, 'variants' => []];
-                        elseif (mb_strlen($part) > mb_strlen($index[$key]['canonical'])) $index[$key]['canonical'] = $part;
-                        $index[$key]['variants'][$fullValue] = true;
+            foreach (config('sheets.map', []) as $cfg) {
+                if (empty($cfg['model']) || !class_exists($cfg['model'])) continue;
+
+                $fields = $this->metaFor($cfg)['workerFields'];
+                if (empty($fields)) continue;
+
+                $model = $cfg['model'];
+                foreach ($model::query()->select($fields)->cursor() as $row) {
+                    foreach ($fields as $f) {
+                        $fullValue = trim((string) ($row->$f ?? ''));
+                        if ($fullValue === '') continue;
+                        foreach ($this->parseWorkers($fullValue) as $part) {
+                            $key = $this->normalizeName($part);
+                            if ($key === '') continue;
+                            if (!isset($index[$key])) $index[$key] = ['canonical' => $part, 'variants' => []];
+                            elseif (mb_strlen($part) > mb_strlen($index[$key]['canonical'])) $index[$key]['canonical'] = $part;
+                            $index[$key]['variants'][$fullValue] = true;
+                        }
                     }
                 }
             }
-        }
-        foreach ($index as $key => $data) $index[$key]['variants'] = array_keys($data['variants']);
-        return $this->workersIndex = $index;
+
+            foreach ($index as $key => $data) $index[$key]['variants'] = array_keys($data['variants']);
+            return $index;
+        });
     }
 }

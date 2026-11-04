@@ -2,7 +2,7 @@
     <style>[x-cloak]{display:none!important}</style>
 
     <x-slot name="header">
-        <div class="flex justify-between items-center">
+        <div class="page-head">
             <h2 class="font-semibold text-xl text-gray-800">Статистика</h2>
             <a href="{{ route('stats.export', [
                     'from'   => $from ? $from->format('Y-m-d') : null,
@@ -16,10 +16,11 @@
         </div>
     </x-slot>
 
-    <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6"
+    <div class="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6"
          x-data="statsZones({
              initialFrom: '{{ $from ? $from->format('Y-m-d') : '' }}',
-             initialTo: '{{ $to ? $to->format('Y-m-d') : '' }}'
+             initialTo: '{{ $to ? $to->format('Y-m-d') : '' }}',
+             mode: '{{ request('mode') === 'all' ? 'all' : 'my' }}'
          })">
 
         {{-- ФИЛЬТРЫ --}}
@@ -81,7 +82,7 @@
 
         {{-- ЗОНА 1: сводка по вкладкам --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-            <div class="flex justify-between items-center mb-3">
+            <div class="stat-card-head mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">1. Сводка по вкладкам</h3>
                 <div class="flex gap-2">
                     <button x-show="!expanded1" @click="toggleZone1()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
@@ -103,7 +104,7 @@
 
         {{-- ЗОНА 2: детализация по постам --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-            <div class="flex justify-between items-center mb-3">
+            <div class="stat-card-head mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">2. Детализация по постам <span class="text-sm font-normal text-gray-400">({{ $periodLabel }})</span></h3>
                 <div class="flex gap-2">
                     <button x-show="!expanded3" @click="toggleZone3()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
@@ -113,7 +114,7 @@
             <div x-show="expanded3" x-cloak>
                 <div x-show="loading3" class="text-gray-500 text-sm">Загрузка…</div>
                 <div x-show="loaded3 && !loading3">
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto table-scroll">
                         <table class="min-w-full text-sm">
                             <thead class="bg-gray-50 text-gray-600">
                                 <tr>
@@ -141,7 +142,7 @@
         {{-- ЗОНА 3: сводка по исполнителю — только admin/master --}}
         @if($canSeeWorkersStats)
             <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-                <div class="flex justify-between items-center mb-3">
+                <div class="stat-card-head mb-3">
                     <h3 class="font-semibold text-lg text-gray-800">3. Сводка по исполнителю</h3>
                     <div class="flex gap-2">
                         <button x-show="!expanded2" @click="toggleZone2()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
@@ -200,7 +201,7 @@
                                                 <div x-show="expandedCategories[cat.slug]" x-cloak class="border-t border-gray-200 bg-gray-50 p-3">
                                                     <div x-show="loadingRecords[cat.slug]" class="text-sm text-gray-500">Загрузка записей…</div>
                                                     <div x-show="!loadingRecords[cat.slug]">
-                                                        <div class="overflow-x-auto">
+                                                        <div class="overflow-x-auto table-scroll">
                                                             <table class="min-w-full text-sm">
                                                                 <thead class="text-gray-600">
                                                                     <tr>
@@ -244,7 +245,7 @@
         {{-- ЗОНА 4: график по постам — только admin/master --}}
         @if($canSeeWorkersStats)
             <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-                <div class="flex justify-between items-center mb-3">
+                <div class="stat-card-head mb-3">
                     <h3 class="font-semibold text-lg text-gray-800">4. График по постам</h3>
                     <div class="flex gap-2">
                         <button x-show="!expanded4" @click="toggleZone4()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Открыть график</button>
@@ -266,7 +267,7 @@
 
         {{-- ЗОНА 5: брак по категориям --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-            <div class="flex justify-between items-center mb-3">
+            <div class="stat-card-head mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">5. Брак по категориям</h3>
                 <div class="flex gap-2">
                     <button x-show="!expanded5" @click="toggleZone5()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
@@ -297,7 +298,7 @@
 
         {{-- ЗОНА 6: рейтинг кодов неисправностей --}}
         <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
-            <div class="flex justify-between items-center mb-3">
+            <div class="stat-card-head mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">6. Рейтинг кодов неисправностей</h3>
                 <div class="flex gap-2">
                     <button x-show="!expanded6" @click="toggleZone6()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
@@ -327,7 +328,7 @@
                         <span class="text-gray-600">Всего кодов: <strong class="text-lg text-gray-800" x-text="zone6Rows.length"></strong></span>
                         <span class="text-gray-600">Суммарно вхождений: <strong class="text-lg text-blue-700" x-text="zone6Total()"></strong></span>
                     </div>
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto table-scroll">
                         <table class="min-w-full text-sm">
                             <thead class="bg-gray-50 text-gray-600">
                                 <tr>
@@ -363,7 +364,7 @@
              class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
              @click.self="recordsModalOpen = false">
             <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col">
-                <div class="flex justify-between items-center p-4 border-b border-gray-200">
+                <div class="flex justify-between items-center gap-2 p-4 border-b border-gray-200">
                     <h3 class="font-semibold text-lg text-gray-800">
                         Записи поста <span x-text="recordsContext.post"></span>
                         за <span x-text="formatDate(recordsContext.date)"></span>
@@ -376,6 +377,7 @@
                 <div class="p-4 overflow-y-auto flex-1">
                     <div x-show="recordsLoading" class="text-gray-500 text-sm">Загрузка…</div>
                     <div x-show="!recordsLoading">
+                        <div class="table-scroll">
                         <table class="min-w-full text-sm">
                             <thead class="bg-gray-50 text-gray-600">
                                 <tr>
@@ -408,6 +410,7 @@
                                 </template>
                             </tbody>
                         </table>
+                        </div>
                         <div x-show="recordsList.length === 0" class="p-3 text-sm text-gray-500">
                             За этот день записей поста нет
                         </div>
@@ -419,12 +422,13 @@
     </div>
 
     @push('scripts')
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+        <script src="{{ asset('vendor/chart.umd.min.js') }}"></script>
         <script>
             function statsZones(opts = {}) {
                 return {
                     initialFrom: opts.initialFrom || '',
                     initialTo:   opts.initialTo   || '',
+                    statsMode:   opts.mode        || 'my',
 
                     expanded1: true,
                     expanded2: false,
@@ -484,6 +488,7 @@
                             const params = new URLSearchParams({ sheet: 'pgp' });
                             if (this.initialFrom) params.set('from', this.initialFrom);
                             if (this.initialTo)   params.set('to',   this.initialTo);
+                            params.set('mode', this.statsMode);
                             const res = await fetch('{{ route("stats.zone3") }}?' + params.toString());
                             if (!res.ok) throw new Error('HTTP ' + res.status);
                             this.zone3 = await res.json();
@@ -724,6 +729,7 @@
                             const params = new URLSearchParams();
                             if (this.dateFrom5) params.set('from', this.dateFrom5);
                             if (this.dateTo5)   params.set('to',   this.dateTo5);
+                            params.set('mode', this.statsMode);
                             const res = await fetch('{{ route("stats.zone5") }}?' + params.toString());
                             if (!res.ok) throw new Error('zone5 HTTP ' + res.status);
                             this.zone5Rows = await res.json();
@@ -776,6 +782,7 @@
                             const params = new URLSearchParams({ sheet: this.selectedCategory });
                             if (this.dateFrom5) params.set('from', this.dateFrom5);
                             if (this.dateTo5)   params.set('to',   this.dateTo5);
+                            params.set('mode', this.statsMode);
                             const res = await fetch('{{ route("stats.zone5Chart") }}?' + params.toString());
                             if (!res.ok) throw new Error('zone5Chart HTTP ' + res.status);
                             const data = await res.json();
@@ -805,6 +812,7 @@
                             if (this.dateFrom6) params.set('from', this.dateFrom6);
                             if (this.dateTo6)   params.set('to',   this.dateTo6);
                             if (this.selectedCategory6) params.set('sheet', this.selectedCategory6);
+                            params.set('mode', this.statsMode);
                             const res = await fetch('{{ route("stats.zone6") }}?' + params.toString());
                             if (!res.ok) throw new Error('zone6 HTTP ' + res.status);
                             this.zone6Rows = await res.json();

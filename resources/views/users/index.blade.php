@@ -5,7 +5,7 @@
         </h2>
     </x-slot>
 
-    <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
+    <div class="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
 
         @if(session('ok'))
             <div class="bg-green-100 text-green-800 p-3 rounded">{{ session('ok') }}</div>
@@ -34,7 +34,7 @@
         </form>
 
         {{-- Таблица --}}
-        <div class="bg-white rounded shadow overflow-x-auto">
+        <div class="bg-white rounded shadow overflow-x-auto table-scroll">
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-100">
                 <tr>

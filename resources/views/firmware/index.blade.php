@@ -1,19 +1,19 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
+        <div class="page-head">
             <h2 class="font-semibold text-xl text-gray-800">Прошивки и инструкции</h2>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
                 @if(auth()->user()->canManageContent())
-                    <a href="{{ route('firmware.create') }}" class="bg-blue-600 text-white px-4 py-2 rounded">+ Загрузить</a>
+                    <a href="{{ route('firmware.create') }}" class="tap-44 bg-blue-600 text-white px-4 py-2 rounded">+ Загрузить</a>
                 @endif
                 @if(auth()->user()->isAdmin())
-                    <a href="{{ route('firmware.categories.index') }}" class="bg-gray-200 text-gray-800 px-4 py-2 rounded">Категории</a>
+                    <a href="{{ route('firmware.categories.index') }}" class="tap-44 bg-gray-200 text-gray-800 px-4 py-2 rounded">Категории</a>
                 @endif
             </div>
         </div>
     </x-slot>
 
-    <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
+    <div class="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
         @if(session('ok'))
             <div class="bg-green-100 text-green-800 p-3 rounded">{{ session('ok') }}</div>
         @endif
@@ -45,7 +45,7 @@
             <button class="bg-gray-800 text-white px-4 py-1 rounded">Фильтр</button>
         </form>
 
-        <div class="bg-white rounded shadow overflow-x-auto">
+        <div class="bg-white rounded shadow overflow-x-auto table-scroll">
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-100">
                 <tr>

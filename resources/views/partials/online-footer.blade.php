@@ -1,12 +1,12 @@
 @auth
-<div id="onlineFooter" class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200 shadow-lg">
-    <div class="max-w-7xl mx-auto px-4 py-2 flex items-center gap-3 text-xs">
-        <div class="flex items-center gap-1.5">
+<div id="onlineFooter" class="online-bar fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200 shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 py-2 flex items-center gap-3 text-xs min-w-0">
+        <div class="flex items-center gap-1.5 flex-shrink-0">
             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span class="font-semibold text-gray-700">Онлайн:</span>
+            <span class="online-title font-semibold text-gray-700">Онлайн:</span>
             <span id="onlineCount" class="font-bold text-emerald-600">0</span>
         </div>
-        <div id="onlineList" class="flex flex-wrap gap-1.5 overflow-x-auto flex-1">
+        <div id="onlineList" class="online-list flex gap-1.5 flex-1 min-w-0">
             <span class="text-gray-400 italic">загрузка…</span>
         </div>
     </div>
