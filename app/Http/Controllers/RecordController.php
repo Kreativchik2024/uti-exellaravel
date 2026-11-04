@@ -477,6 +477,13 @@ class RecordController extends Controller
         $cfg = $this->cfg($sheet);
         Gate::authorize('create', $cfg['model']);
 
+        // --- ИСПРАВЛЕНИЕ ДЛЯ ЛОГИЧЕСКОГО ПОЛЯ ---
+        if ($r->has('is_repaired')) {
+            $val = $r->input('is_repaired');
+            if (in_array($val, ['Да', '1', 1, true, 'true'], true)) $r->merge(['is_repaired' => 1]);
+            if (in_array($val, ['Нет', '0', 0, false, 'false'], true)) $r->merge(['is_repaired' => 0]);
+        }
+
         $defaults = $this->defaults($sheet, $cfg);
         foreach ($defaults as $field => $value) {
             if (!$r->exists($field) && $value !== '' && $value !== null) {
@@ -554,6 +561,13 @@ class RecordController extends Controller
 
         if ($this->isRecordLocked($record)) {
             return back()->withErrors(['general' => 'Редактирование запрещено: прошло более 24 часов с момента создания записи.']);
+        }
+
+        // --- ИСПРАВЛЕНИЕ ДЛЯ ЛОГИЧЕСКОГО ПОЛЯ ---
+        if ($r->has('is_repaired')) {
+            $val = $r->input('is_repaired');
+            if (in_array($val, ['Да', '1', 1, true, 'true'], true)) $r->merge(['is_repaired' => 1]);
+            if (in_array($val, ['Нет', '0', 0, false, 'false'], true)) $r->merge(['is_repaired' => 0]);
         }
 
         $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
