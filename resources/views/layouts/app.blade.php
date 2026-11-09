@@ -9,18 +9,8 @@
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
-        <script>
-            (function () {
-                try {
-                    // ?theme=dark|light — ручное переключение (в т.ч. для проверки)
-                    var forced = new URLSearchParams(window.location.search).get('theme');
-                    var stored = (forced === 'dark' || forced === 'light') ? forced : localStorage.getItem('theme');
-                    var prefers = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    var isDark = stored === 'dark' || (!stored && prefers);
-                    if (isDark) document.documentElement.classList.add('dark');
-                } catch (e) {}
-            })();
-        </script>
+        {{-- Тема (авто / светлая / тёмная) — синхронно, до отрисовки, без мигания --}}
+        <script src="{{ asset('js/theme.js') }}?v={{ filemtime(public_path('js/theme.js')) }}"></script>
 
         {{-- Шрифт Inter (с кириллицей) подключается из resources/css/app.css --}}
         @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -62,25 +52,6 @@
             </main>
         </div>
 
-        <script>
-            (function () {
-                window.toggleDark = function () {
-                    var html = document.documentElement;
-                    var nowDark = !html.classList.contains('dark');
-                    html.classList.toggle('dark', nowDark);
-                    try { localStorage.setItem('theme', nowDark ? 'dark' : 'light'); } catch (e) {}
-                    syncIcons();
-                    // Для компонентов, которые красят себя сами (графики и т.п.)
-                    document.dispatchEvent(new CustomEvent('themechange', { detail: { dark: nowDark } }));
-                };
-                function syncIcons() {
-                    var isDark = document.documentElement.classList.contains('dark');
-                    document.querySelectorAll('[data-theme-icon="moon"]').forEach(function (el) { el.style.display = isDark ? 'none' : 'block'; });
-                    document.querySelectorAll('[data-theme-icon="sun"]').forEach(function (el) { el.style.display = isDark ? 'block' : 'none'; });
-                }
-                document.addEventListener('DOMContentLoaded', syncIcons);
-            })();
-        </script>
 
         {{-- ПАНЕЛЬ ОНЛАЙН --}}
         @include('partials.online-footer')

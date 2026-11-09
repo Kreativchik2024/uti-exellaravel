@@ -9,17 +9,8 @@
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
-        {{-- Тёмная тема без мигания при загрузке --}}
-        <script>
-            (function () {
-                try {
-                    var forced = new URLSearchParams(window.location.search).get('theme');
-                    var stored = (forced === 'dark' || forced === 'light') ? forced : localStorage.getItem('theme');
-                    var prefers = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    if (stored === 'dark' || (!stored && prefers)) document.documentElement.classList.add('dark');
-                } catch (e) {}
-            })();
-        </script>
+        {{-- Тема (авто / светлая / тёмная) — синхронно, до отрисовки, без мигания --}}
+        <script src="{{ asset('js/theme.js') }}?v={{ filemtime(public_path('js/theme.js')) }}"></script>
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -111,10 +102,7 @@
             </aside>
 
             <main class="auth__main">
-                <button type="button" onclick="toggleDark()" class="ui-iconbtn absolute top-4 right-4" title="Сменить тему" aria-label="Сменить тему">
-                    <svg data-theme-icon="moon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
-                    <svg data-theme-icon="sun" class="w-5 h-5" style="display:none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                </button>
+                <div class="absolute top-4 right-4"><x-theme-switcher /></div>
 
                 <div class="auth__card">
                     <div class="auth__mobile-brand">
@@ -130,22 +118,5 @@
             </main>
         </div>
 
-        <script>
-            (function () {
-                window.toggleDark = window.toggleDark || function () {
-                    var html = document.documentElement;
-                    var nowDark = !html.classList.contains('dark');
-                    html.classList.toggle('dark', nowDark);
-                    try { localStorage.setItem('theme', nowDark ? 'dark' : 'light'); } catch (e) {}
-                    syncIcons();
-                };
-                function syncIcons() {
-                    var isDark = document.documentElement.classList.contains('dark');
-                    document.querySelectorAll('[data-theme-icon="moon"]').forEach(function (el) { el.style.display = isDark ? 'none' : 'block'; });
-                    document.querySelectorAll('[data-theme-icon="sun"]').forEach(function (el) { el.style.display = isDark ? 'block' : 'none'; });
-                }
-                document.addEventListener('DOMContentLoaded', syncIcons);
-            })();
-        </script>
     </body>
 </html>

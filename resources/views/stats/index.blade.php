@@ -43,7 +43,8 @@
                     'worker' => $canSeeWorkersStats ? ($worker ?: null) : null,
                     'mode'   => request('mode'),
                 ]) }}"
-               class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow transition">
+               class="ui-btn ui-btn--ghost">
+                <svg class="w-4 h-4" style="color: var(--ui-good)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 Скачать Excel
             </a>
         </div>
@@ -57,7 +58,7 @@
          })">
 
         {{-- ФИЛЬТРЫ --}}
-        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+        <div class="ui-card p-4">
             <form method="GET" action="{{ route('stats.index') }}" class="flex flex-wrap items-end gap-4">
                 @if(auth()->user()->isExecutor() && request('mode'))
                     <input type="hidden" name="mode" value="{{ request('mode') }}">
@@ -85,7 +86,7 @@
                     </div>
                 @endif
 
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Применить</button>
+                <button type="submit" class="ui-btn ui-btn--primary ui-btn--sm">Применить</button>
                 <a href="{{ route('stats.index') }}" class="text-sm text-gray-500 hover:text-gray-800 underline px-2 py-1">Сбросить</a>
             </form>
 
@@ -114,12 +115,12 @@
         </div>
 
         {{-- ЗОНА 1: сводка по вкладкам --}}
-        <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+        <div class="ui-card p-5">
             <div class="stat-card-head mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">1. Сводка по вкладкам</h3>
                 <div class="flex gap-2">
-                    <button x-show="!expanded1" @click="toggleZone1()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
-                    <button x-show="expanded1" @click="toggleZone1()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+                    <button x-show="!expanded1" @click="toggleZone1()" class="ui-btn ui-btn--ghost ui-btn--sm">Показать</button>
+                    <button x-show="expanded1" @click="toggleZone1()" class="ui-btn ui-btn--ghost ui-btn--sm">Скрыть</button>
                 </div>
             </div>
             <div x-show="expanded1" x-cloak>
@@ -164,12 +165,12 @@
         </div>
 
         {{-- ЗОНА 2: детализация по постам --}}
-        <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+        <div class="ui-card p-5">
             <div class="stat-card-head mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">2. Детализация по постам <span class="text-sm font-normal text-gray-400">({{ $periodLabel }})</span></h3>
                 <div class="flex gap-2">
-                    <button x-show="!expanded3" @click="toggleZone3()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
-                    <button x-show="expanded3" @click="toggleZone3()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+                    <button x-show="!expanded3" @click="toggleZone3()" class="ui-btn ui-btn--ghost ui-btn--sm">Показать</button>
+                    <button x-show="expanded3" @click="toggleZone3()" class="ui-btn ui-btn--ghost ui-btn--sm">Скрыть</button>
                 </div>
             </div>
             <div x-show="expanded3" x-cloak>
@@ -202,12 +203,12 @@
 
         {{-- ЗОНА 3: сводка по исполнителю — только admin/master --}}
         @if($canSeeWorkersStats)
-            <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+            <div class="ui-card p-5">
                 <div class="stat-card-head mb-3">
                     <h3 class="font-semibold text-lg text-gray-800">3. Сводка по исполнителю</h3>
                     <div class="flex gap-2">
-                        <button x-show="!expanded2" @click="toggleZone2()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
-                        <button x-show="expanded2" @click="toggleZone2()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+                        <button x-show="!expanded2" @click="toggleZone2()" class="ui-btn ui-btn--ghost ui-btn--sm">Показать</button>
+                        <button x-show="expanded2" @click="toggleZone2()" class="ui-btn ui-btn--ghost ui-btn--sm">Скрыть</button>
                     </div>
                 </div>
                 <div x-show="expanded2" x-cloak>
@@ -305,12 +306,12 @@
 
         {{-- ЗОНА 4: график по постам — только admin/master --}}
         @if($canSeeWorkersStats)
-            <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+            <div class="ui-card p-5">
                 <div class="stat-card-head mb-3">
                     <h3 class="font-semibold text-lg text-gray-800">4. График по постам</h3>
                     <div class="flex gap-2">
-                        <button x-show="!expanded4" @click="toggleZone4()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Открыть график</button>
-                        <button x-show="expanded4" @click="toggleZone4()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+                        <button x-show="!expanded4" @click="toggleZone4()" class="ui-btn ui-btn--ghost ui-btn--sm">Открыть график</button>
+                        <button x-show="expanded4" @click="toggleZone4()" class="ui-btn ui-btn--ghost ui-btn--sm">Скрыть</button>
                     </div>
                 </div>
                 <div x-show="expanded4" x-cloak>
@@ -327,12 +328,12 @@
         @endif
 
         {{-- ЗОНА 5: брак по категориям --}}
-        <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+        <div class="ui-card p-5">
             <div class="stat-card-head mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">5. Брак по категориям</h3>
                 <div class="flex gap-2">
-                    <button x-show="!expanded5" @click="toggleZone5()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
-                    <button x-show="expanded5" @click="toggleZone5()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+                    <button x-show="!expanded5" @click="toggleZone5()" class="ui-btn ui-btn--ghost ui-btn--sm">Показать</button>
+                    <button x-show="expanded5" @click="toggleZone5()" class="ui-btn ui-btn--ghost ui-btn--sm">Скрыть</button>
                 </div>
             </div>
             <div x-show="expanded5" x-cloak>
@@ -358,12 +359,12 @@
         </div>
 
         {{-- ЗОНА 6: рейтинг кодов неисправностей --}}
-        <div class="bg-white rounded-lg shadow border border-gray-100 p-4">
+        <div class="ui-card p-5">
             <div class="stat-card-head mb-3">
                 <h3 class="font-semibold text-lg text-gray-800">6. Рейтинг кодов неисправностей</h3>
                 <div class="flex gap-2">
-                    <button x-show="!expanded6" @click="toggleZone6()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 text-sm rounded">Показать</button>
-                    <button x-show="expanded6" @click="toggleZone6()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 text-sm rounded">Скрыть</button>
+                    <button x-show="!expanded6" @click="toggleZone6()" class="ui-btn ui-btn--ghost ui-btn--sm">Показать</button>
+                    <button x-show="expanded6" @click="toggleZone6()" class="ui-btn ui-btn--ghost ui-btn--sm">Скрыть</button>
                 </div>
             </div>
             <div x-show="expanded6" x-cloak>
