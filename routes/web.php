@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\FirmwareCategoryController;
@@ -131,6 +132,16 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/stats/zone5',          [StatsController::class, 'zone5'])->name('stats.zone5');
     Route::get('/stats/zone5-chart',    [StatsController::class, 'zone5Chart'])->name('stats.zone5Chart');
     Route::get('/stats/zone6',          [StatsController::class, 'zone6'])->name('stats.zone6');
+});
+
+// Чат: общий канал и личные сообщения (опрос с клиента)
+Route::middleware('auth')->prefix('chat')->name('chat.')->group(function () {
+    Route::get('/summary',       [ChatController::class, 'summary'])->name('summary');
+    Route::get('/conversations', [ChatController::class, 'conversations'])->name('conversations');
+    Route::get('/users',         [ChatController::class, 'users'])->name('users');
+    Route::get('/messages',      [ChatController::class, 'messages'])->name('messages');
+    Route::post('/messages',     [ChatController::class, 'send'])->middleware('throttle:chat')->name('send');
+    Route::post('/read',         [ChatController::class, 'read'])->name('read');
 });
 
 Route::get('/media/{path}', [MediaController::class, 'show'])

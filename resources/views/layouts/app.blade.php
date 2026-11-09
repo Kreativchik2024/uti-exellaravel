@@ -56,6 +56,9 @@
         {{-- ПАНЕЛЬ ОНЛАЙН --}}
         @include('partials.online-footer')
 
+        {{-- ЧАТ (правый нижний угол) --}}
+        @include('partials.chat-widget')
+
         {{-- ГЛОБАЛЬНЫЙ ТАЙМЕР ПИН --}}
         <script>
             window.GLOBAL_PIN_MAP = @json($globalVerifiedWorkersMap ?? []);

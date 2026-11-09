@@ -117,6 +117,13 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureRateLimiting(): void
     {
+        // Чат: не больше 20 сообщений в минуту от одного пользователя
+        RateLimiter::for('chat', fn (Request $request) => Limit::perMinute(20)
+            ->by('chat:' . ($request->user()?->id ?? $request->ip()))
+            ->response(fn (Request $r, array $headers) => response()->json(
+                ['message' => 'Слишком часто. Подождите немного.'], 429, $headers
+            )));
+
         // Проверка ПИН: 10 попыток в минуту на пользователя (и на IP для страховки)
         RateLimiter::for('pin', function (Request $request) {
             $message = 'Слишком много попыток ввода ПИН. Подождите минуту.';
