@@ -20,7 +20,8 @@
 
 /* ---------- Отступ контенту под фиксированные элементы ---------- */
 .app-main {
-    padding-bottom: calc(var(--online-bar-h) + var(--theme-size) + 40px + var(--safe-bottom));
+    /* место под плавающую плашку «Онлайн» */
+    padding-bottom: calc(88px + var(--safe-bottom));
 }
 
 /* ---------- Кнопка смены темы ---------- */
@@ -181,9 +182,9 @@ button.tap-44 {
     gap: 1rem;
 }
 .dashboard-side {
-    flex: 0 0 280px;
+    flex: 0 0 320px;
     width: 100%;
-    max-width: 280px;
+    max-width: 320px;
 }
 @media (max-width: 1023.98px) {
     .dashboard-news { flex: 1 1 100%; }

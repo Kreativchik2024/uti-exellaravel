@@ -5,17 +5,17 @@
    ============================================================ */
 
 html.dark body {
-    background-color: #0f172a !important;
+    background-color: var(--ui-bg, #0f172a) !important;
     color: #e2e8f0 !important;
 }
 
 /* ---------- Фоны ---------- */
-html.dark .bg-white     { background-color: #1e293b !important; }
+html.dark .bg-white     { background-color: var(--ui-surface, #1e293b) !important; }
 html.dark .bg-white\/95 { background-color: rgba(30, 41, 59, 0.95) !important; }
 html.dark .bg-white\/90 { background-color: rgba(30, 41, 59, 0.90) !important; }
 html.dark .bg-white\/80 { background-color: rgba(30, 41, 59, 0.80) !important; }
-html.dark .bg-gray-50   { background-color: #111827 !important; }
-html.dark .bg-gray-100  { background-color: #0f172a !important; }
+html.dark .bg-gray-50   { background-color: var(--ui-surface-2, #111827) !important; }
+html.dark .bg-gray-100  { background-color: var(--ui-surface-hover, #0f172a) !important; }
 html.dark .bg-gray-200  { background-color: #334155 !important; }
 html.dark .bg-gray-300  { background-color: #475569 !important; }
 
@@ -30,8 +30,8 @@ html.dark .text-gray-400 { color: #64748b !important; }
 
 /* ---------- Границы и разделители ---------- */
 html.dark .border-gray-100,
-html.dark .border-gray-200 { border-color: #334155 !important; }
-html.dark .border-gray-300 { border-color: #475569 !important; }
+html.dark .border-gray-200 { border-color: var(--ui-border, #334155) !important; }
+html.dark .border-gray-300 { border-color: var(--ui-border-strong, #475569) !important; }
 
 html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
 html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #334155 !important; }
@@ -43,9 +43,9 @@ html.dark .ring-gray-300 { --tw-ring-color: #475569 !important; }
 html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="range"]),
 html.dark textarea,
 html.dark select {
-    background-color: #0f172a !important;
+    background-color: var(--ui-surface-2, #0f172a) !important;
     color: #e2e8f0 !important;
-    border-color: #475569 !important;
+    border-color: var(--ui-border-strong, #475569) !important;
 }
 html.dark input::placeholder,
 html.dark textarea::placeholder { color: #64748b !important; }
@@ -58,9 +58,9 @@ html.dark textarea:disabled {
 html.dark select option { background-color: #1e293b; color: #e2e8f0; }
 
 /* ---------- Таблицы ---------- */
-html.dark table thead { background-color: #111827 !important; color: #cbd5e1 !important; }
-html.dark table tbody tr { border-color: #334155 !important; }
-html.dark table tbody tr:hover { background-color: #334155 !important; }
+html.dark table thead { background-color: var(--ui-surface-2, #111827) !important; color: #cbd5e1 !important; }
+html.dark table tbody tr { border-color: var(--ui-border, #334155) !important; }
+html.dark table tbody tr:hover { background-color: var(--ui-surface-hover, #334155) !important; }
 
 /* ---------- Ховеры ---------- */
 html.dark .hover\:bg-white:hover     { background-color: #1e293b !important; }

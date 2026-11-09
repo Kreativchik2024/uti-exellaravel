@@ -22,10 +22,7 @@
             })();
         </script>
 
-        {{-- Шрифты локально (раньше грузились с fonts.bunny.net) --}}
-        <link rel="stylesheet" href="{{ asset('css/fonts.css') }}?v={{ filemtime(public_path('css/fonts.css')) }}">
-        <link rel="preload" as="font" type="font/woff2" href="{{ asset('fonts/figtree-latin-400-normal.woff2') }}" crossorigin>
-
+        {{-- Шрифт Inter (с кириллицей) подключается из resources/css/app.css --}}
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
         {{-- Тёмная тема: отдельный CSS, не зависит от сборки vite --}}
@@ -37,15 +34,15 @@
         @stack('styles')
     </head>
     <body class="font-sans antialiased">
-        <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div class="ui-app">
             {{-- Навигация требует авторизации; публичные страницы (новости) рендерятся без неё --}}
             @auth
                 @include('layouts.navigation')
             @endauth
 
             @isset($header)
-                <header class="bg-white dark:bg-gray-800 shadow">
-                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                <header class="ui-page-header">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         {{ $header }}
                     </div>
                 </header>
@@ -64,19 +61,6 @@
                 {{ $slot }}
             </main>
         </div>
-
-        {{-- Кнопка смены темы (на мобильных поднята над панелью «Онлайн» и уменьшена) --}}
-        <button type="button" id="themeToggle" onclick="toggleDark()"
-                class="theme-toggle"
-                style="position:fixed"
-                title="Сменить тему" aria-label="Сменить тему">
-            <svg data-theme-icon="moon" width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-            </svg>
-            <svg data-theme-icon="sun" width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:none;">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-            </svg>
-        </button>
 
         <script>
             (function () {

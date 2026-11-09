@@ -15,7 +15,8 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                // Inter Variable — с кириллицей (Figtree её не поддерживал)
+                sans: ['"Inter Variable"', 'Inter', ...defaultTheme.fontFamily.sans],
             },
         },
     },

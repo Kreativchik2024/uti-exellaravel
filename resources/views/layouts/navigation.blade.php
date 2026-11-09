@@ -1,8 +1,9 @@
-<nav x-data="{ open: false }" class="bg-white border-b border-gray-100">
+<nav x-data="{ open: false }" class="ui-nav">
     @php
         $currentWorkers = session('workstation_workers', []);
         $workersCount   = count($currentWorkers);
         $activePins     = $globalVerifiedWorkersMap ?? [];
+        $currentSheet   = request()->route('sheet');
 
         $recordTabs = [
             'pgp'                   => 'ПГП (борта)',
@@ -25,177 +26,147 @@
             'router_firmware'       => 'Прошивка роутеров',
             'screw_check'           => 'Проверка винтов',
         ];
+
+        $user     = Auth::user();
+        $initials = collect(preg_split('/\s+/u', trim($user->name)))
+            ->filter()->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode('');
+        $roleLabel = ['admin' => 'Администратор', 'master' => 'Мастер', 'executor' => 'Исполнитель'][$user->role] ?? '';
+        $isAdminArea = request()->routeIs('users.*') || request()->routeIs('employees.*') || request()->routeIs('firmware.categories.*');
     @endphp
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-            <div class="flex">
-                <div class="shrink-0 flex items-center">
-                    <a href="{{ route('dashboard') }}">
-                        <x-application-logo class="block h-9 w-auto fill-current text-gray-800" />
-                    </a>
-                </div>
+        <div class="flex items-center justify-between gap-4" style="height: var(--ui-nav-h)">
 
-                <div class="hidden space-x-4 sm:-my-px sm:ms-6 sm:flex items-center">
+            {{-- Бренд --}}
+            <a href="{{ route('dashboard') }}" class="ui-brand shrink-0">
+                <x-application-logo class="ui-brand__logo" />
+                <span class="hidden lg:block">
+                    <span class="ui-brand__name block">{{ config('app.name', 'УТИ') }}</span>
+                    <span class="ui-brand__sub block">учёт производства</span>
+                </span>
+            </a>
 
-                    <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Главная') }}
-                    </x-nav-link>
+            {{-- Основные разделы (десктоп) --}}
+            <div class="hidden md:flex items-center gap-1 flex-1 min-w-0">
+                <a href="{{ route('dashboard') }}" class="ui-navlink {{ request()->routeIs('dashboard') ? 'ui-navlink--active' : '' }}">Главная</a>
 
-                    {{-- УЧЁТ — раскрывается вбок --}}
-                    <div class="relative" x-data="{ open: false }" @click.outside="open = false">
-                        <button @click="open = !open" type="button"
-                                class="inline-flex items-center px-3 py-2 text-sm font-medium leading-4 rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('records.*') ? 'text-gray-900' : '' }}">
-                            <span>{{ __('Учёт') }}</span>
-                            <svg class="ms-1 fill-current h-4 w-4 transition-transform" :class="open ? 'rotate-90' : ''"
-                                 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
-
-                        <div x-show="open"
-                             x-cloak
-                             x-transition:enter="transition ease-out duration-150"
-                             x-transition:enter-start="opacity-0 -translate-x-2"
-                             x-transition:enter-end="opacity-100 translate-x-0"
-                             x-transition:leave="transition ease-in duration-100"
-                             x-transition:leave-start="opacity-100 translate-x-0"
-                             x-transition:leave-end="opacity-0 -translate-x-2"
-                             class="absolute left-0 top-full mt-1 z-50 w-64 max-h-[70vh] overflow-y-auto rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
-                             style="display:none;"
-                             @click="open = false">
-                            <div class="py-1">
-                                @foreach($recordTabs as $slug => $label)
-                                    <x-dropdown-link :href="route('records.index', $slug)"
-                                                     :class="request()->route('sheet') === $slug ? 'font-semibold text-indigo-600 bg-indigo-50' : ''">
-                                        {{ __($label) }}
-                                    </x-dropdown-link>
-                                @endforeach
-                            </div>
+                {{-- Учёт: панель со всеми вкладками --}}
+                <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
+                    <button type="button" @click="open = !open" :aria-expanded="open"
+                            class="ui-navlink {{ request()->routeIs('records.*') ? 'ui-navlink--active' : '' }}">
+                        Учёт
+                        <svg class="w-4 h-4 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" x-cloak
+                         x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
+                         x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                         class="ui-menu absolute left-0 top-full mt-2 z-50 w-[min(560px,90vw)]">
+                        <div class="ui-menu__label">Вкладки учёта</div>
+                        <div class="grid grid-cols-2 gap-0.5 max-h-[70vh] overflow-y-auto">
+                            @foreach($recordTabs as $slug => $label)
+                                <a href="{{ route('records.index', $slug) }}"
+                                   class="ui-menu__item {{ $currentSheet === $slug ? 'ui-menu__item--active' : '' }}">
+                                    <span class="ui-menu__dot"></span>
+                                    <span class="truncate">{{ $label }}</span>
+                                </a>
+                            @endforeach
                         </div>
                     </div>
-
-                    {{-- ИСПОЛНИТЕЛИ + ТАЙМЕРЫ --}}
-                    <x-nav-link :href="route('workstation.show')" :active="request()->routeIs('workstation.*')">
-                        <div class="flex items-center gap-2">
-                            <span>{{ __('Исполнители') }}@if($workersCount > 0) ({{ $workersCount }})@endif</span>
-                            
-                            @if(!empty($activePins))
-                                <div class="flex gap-1.5 ml-1">
-                                    @foreach($activePins as $name => $expires)
-                                        <span data-pin-timer="{{ $name }}" class="text-[10px] bg-gray-100 border border-gray-200 rounded px-1"></span>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    </x-nav-link>
-
-                    <x-nav-link :href="route('firmware.index')" :active="request()->routeIs('firmware.*')">
-                        {{ __('Прошивки и инструкции') }}
-                    </x-nav-link>
-
-                    <x-nav-link :href="route('stats.index')" :active="request()->routeIs('stats.*')">
-                        {{ __('Статистика') }}
-                    </x-nav-link>
-
-                    @if(auth()->user()->isAdmin())
-                        {{-- АДМИН — раскрывается вбок --}}
-                        <div class="relative" x-data="{ open: false }" @click.outside="open = false">
-                            <button @click="open = !open" type="button"
-                                    class="inline-flex items-center px-3 py-2 text-sm font-medium leading-4 rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('users.*') || request()->routeIs('firmware.categories.*') || request()->routeIs('employees.*') ? 'text-gray-900' : '' }}">
-                                <span>{{ __('Админ') }}</span>
-                                <svg class="ms-1 fill-current h-4 w-4 transition-transform" :class="open ? 'rotate-90' : ''"
-                                     xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-                                </svg>
-                            </button>
-
-                            <div x-show="open"
-                                 x-cloak
-                                 x-transition:enter="transition ease-out duration-150"
-                                 x-transition:enter-start="opacity-0 -translate-x-2"
-                                 x-transition:enter-end="opacity-100 translate-x-0"
-                                 x-transition:leave="transition ease-in duration-100"
-                                 x-transition:leave-start="opacity-100 translate-x-0"
-                                 x-transition:leave-end="opacity-0 -translate-x-2"
-                                 class="absolute right-0 top-full mt-1 z-50 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
-                                 style="display:none;"
-                                 @click="open = false">
-                                <div class="py-1">
-{{-- Переключатель темы --}}
-<button type="button"
-        onclick="toggleDark()"
-        class="p-2 mr-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition"
-        title="Сменить тему" aria-label="Сменить тему">
-    <svg data-theme-icon="moon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-    </svg>
-    <svg data-theme-icon="sun" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-    </svg>
-</button>
-                                    <x-dropdown-link :href="route('users.index')" :class="request()->routeIs('users.*') ? 'font-semibold text-indigo-600 bg-indigo-50' : ''">
-                                        {{ __('Пользователи') }}
-                                    </x-dropdown-link>
-                                    <x-dropdown-link :href="route('employees.index')" :class="request()->routeIs('employees.*') ? 'font-semibold text-indigo-600 bg-indigo-50' : ''">
-                                        {{ __('Сотрудники') }}
-                                    </x-dropdown-link>
-                                    <x-dropdown-link :href="route('firmware.categories.index')" :class="request()->routeIs('firmware.categories.*') ? 'font-semibold text-indigo-600 bg-indigo-50' : ''">
-                                        {{ __('Категории прошивок') }}
-                                    </x-dropdown-link>
-                                </div>
-                            </div>
-                        </div>
-                    @endif
                 </div>
+
+                <a href="{{ route('workstation.show') }}" class="ui-navlink {{ request()->routeIs('workstation.*') ? 'ui-navlink--active' : '' }}">
+                    Исполнители
+                    @if($workersCount > 0)<span class="ui-navlink__count">{{ $workersCount }}</span>@endif
+                    @foreach($activePins as $name => $expires)
+                        <span data-pin-timer="{{ $name }}" class="hidden xl:inline"></span>
+                    @endforeach
+                </a>
+                <a href="{{ route('firmware.index') }}" class="ui-navlink {{ request()->routeIs('firmware.*') && !request()->routeIs('firmware.categories.*') ? 'ui-navlink--active' : '' }}">Прошивки</a>
+                <a href="{{ route('stats.index') }}" class="ui-navlink {{ request()->routeIs('stats.*') ? 'ui-navlink--active' : '' }}">Статистика</a>
+
+                @if($user->isAdmin())
+                    <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
+                        <button type="button" @click="open = !open" :aria-expanded="open"
+                                class="ui-navlink {{ $isAdminArea ? 'ui-navlink--active' : '' }}">
+                            Админ
+                            <svg class="w-4 h-4 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div x-show="open" x-cloak
+                             x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
+                             class="ui-menu absolute left-0 top-full mt-2 z-50 w-60">
+                            <a href="{{ route('users.index') }}" class="ui-menu__item {{ request()->routeIs('users.*') ? 'ui-menu__item--active' : '' }}">
+                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/></svg>
+                                Пользователи
+                            </a>
+                            <a href="{{ route('employees.index') }}" class="ui-menu__item {{ request()->routeIs('employees.*') ? 'ui-menu__item--active' : '' }}">
+                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/></svg>
+                                Сотрудники
+                            </a>
+                            <a href="{{ route('firmware.categories.index') }}" class="ui-menu__item {{ request()->routeIs('firmware.categories.*') ? 'ui-menu__item--active' : '' }}">
+                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                                Категории прошивок
+                            </a>
+                        </div>
+                    </div>
+                @endif
             </div>
 
-            <div class="hidden sm:flex sm:items-center sm:ms-6">
-                <x-dropdown align="right" width="48">
-                    <x-slot name="trigger">
-                        <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
-                            <div>{{ Auth::user()->name }}</div>
-                            <div class="ms-1">
-                                <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                        </button>
-                    </x-slot>
-                    <x-slot name="content">
-                        {{-- ВЫВОД ТАЙМЕРОВ ПИН В МЕНЮ ПРОФИЛЯ --}}
+            {{-- Справа: тема + профиль --}}
+            <div class="flex items-center gap-1.5">
+                <button type="button" onclick="toggleDark()" class="ui-iconbtn" title="Сменить тему" aria-label="Сменить тему">
+                    <svg data-theme-icon="moon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                    <svg data-theme-icon="sun" class="w-5 h-5" style="display:none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                </button>
+
+                <div class="relative hidden md:block" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
+                    <button type="button" @click="open = !open" :aria-expanded="open"
+                            class="flex items-center gap-2.5 h-10 pl-1 pr-2 rounded-xl transition hover:bg-[var(--ui-surface-hover)]">
+                        <span class="ui-avatar">{{ $initials }}</span>
+                        <span class="hidden lg:block text-left leading-tight">
+                            <span class="block text-sm font-semibold" style="color: var(--ui-text)">{{ \Illuminate\Support\Str::limit($user->name, 24) }}</span>
+                            <span class="block text-[11px]" style="color: var(--ui-muted)">{{ $roleLabel }}</span>
+                        </span>
+                        <svg class="w-4 h-4" style="color: var(--ui-faint)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" x-cloak
+                         x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
+                         class="ui-menu absolute right-0 top-full mt-2 z-50 w-64">
+                        <div class="px-2.5 py-2">
+                            <div class="text-sm font-semibold truncate" style="color: var(--ui-text)">{{ $user->name }}</div>
+                            <div class="text-xs truncate" style="color: var(--ui-muted)">{{ $user->email }}</div>
+                        </div>
+
                         @if(!empty($activePins))
-                            <div class="px-4 py-2 border-b border-gray-100">
-                                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Активные ПИН</div>
-                                @foreach($activePins as $name => $expires)
-                                    <div class="flex items-center justify-between py-1">
-                                        <span class="text-sm text-gray-700">{{ $name }}</span>
-                                        <div data-pin-timer="{{ $name }}"></div>
-                                    </div>
-                                @endforeach
-                            </div>
+                            <div class="ui-menu__sep"></div>
+                            <div class="ui-menu__label">Активные ПИН</div>
+                            @foreach($activePins as $name => $expires)
+                                <div class="flex items-center justify-between px-2.5 py-1">
+                                    <span class="text-sm" style="color: var(--ui-text-2)">{{ $name }}</span>
+                                    <span data-pin-timer="{{ $name }}"></span>
+                                </div>
+                            @endforeach
                         @endif
 
-                        <x-dropdown-link :href="route('profile.edit')">
-                            {{ __('Профиль') }}
-                        </x-dropdown-link>
+                        <div class="ui-menu__sep"></div>
+                        <a href="{{ route('profile.edit') }}" class="ui-menu__item">
+                            <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                            Профиль
+                        </a>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
-                            <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">
-                                {{ __('Выйти') }}
-                            </x-dropdown-link>
+                            <button type="submit" class="ui-menu__item" style="color: var(--ui-bad)">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                                Выйти
+                            </button>
                         </form>
-                    </x-slot>
-                </x-dropdown>
-            </div>
+                    </div>
+                </div>
 
-            <div class="-me-2 flex items-center sm:hidden">
-                <button @click="open = ! open" aria-label="Меню" :aria-expanded="open ? 'true' : 'false'" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 focus:text-gray-500 transition duration-150 ease-in-out">
-                    <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                        <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                        <path :class="{'hidden': ! open, 'inline-flex': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                {{-- Бургер (мобильные) --}}
+                <button type="button" @click="open = !open" class="ui-iconbtn md:hidden" aria-label="Меню" :aria-expanded="open ? 'true' : 'false'">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path x-show="!open" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        <path x-show="open" x-cloak stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                 </button>
             </div>
@@ -203,103 +174,63 @@
     </div>
 
     {{-- Мобильное меню --}}
-    <div x-cloak :class="open ? 'block' : 'hidden'" class="sm:hidden"
-         @click="event.target.closest('a') && (open = false)">
-        <div class="pt-2 pb-3 space-y-1 max-h-[70vh] overflow-y-auto">
-            <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                {{ __('Главная') }}
-            </x-responsive-nav-link>
+    <div x-show="open" x-cloak x-transition.opacity class="md:hidden border-t" style="border-color: var(--ui-border)"
+         @click="$event.target.closest('a') && (open = false)">
+        <div class="px-4 py-3 space-y-1 max-h-[75vh] overflow-y-auto">
+            <div class="flex items-center gap-3 px-1 pb-3 mb-1 border-b" style="border-color: var(--ui-border)">
+                <span class="ui-avatar">{{ $initials }}</span>
+                <div class="min-w-0">
+                    <div class="text-sm font-semibold truncate" style="color: var(--ui-text)">{{ $user->name }}</div>
+                    <div class="text-xs" style="color: var(--ui-muted)">{{ $roleLabel }}</div>
+                </div>
+            </div>
 
-            <div x-data="{ expanded: false }" class="border-t border-gray-100 pt-1">
-                <button @click="expanded = !expanded" class="w-full flex justify-between items-center ps-3 pe-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300 focus:outline-none transition duration-150 ease-in-out">
+            <a href="{{ route('dashboard') }}" class="ui-menu__item {{ request()->routeIs('dashboard') ? 'ui-menu__item--active' : '' }}">Главная</a>
+
+            <div x-data="{ expanded: {{ request()->routeIs('records.*') ? 'true' : 'false' }} }">
+                <button type="button" @click="expanded = !expanded" class="ui-menu__item justify-between {{ request()->routeIs('records.*') ? 'ui-menu__item--active' : '' }}">
                     <span>Учёт</span>
-                    <svg :class="expanded ? 'rotate-180' : ''" class="h-4 w-4 transition-transform" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                    </svg>
+                    <svg class="w-4 h-4 transition-transform" :class="expanded && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                 </button>
-                <div x-show="expanded" class="ps-4">
+                <div x-show="expanded" x-cloak class="pl-3 mt-0.5 space-y-0.5">
                     @foreach($recordTabs as $slug => $label)
-                        <x-responsive-nav-link :href="route('records.index', $slug)" :active="request()->route('sheet') === $slug">
-                            {{ __($label) }}
-                        </x-responsive-nav-link>
+                        <a href="{{ route('records.index', $slug) }}" class="ui-menu__item {{ $currentSheet === $slug ? 'ui-menu__item--active' : '' }}">
+                            <span class="ui-menu__dot"></span>{{ $label }}
+                        </a>
                     @endforeach
                 </div>
             </div>
 
-            <x-responsive-nav-link :href="route('workstation.show')" :active="request()->routeIs('workstation.*')">
-                <div class="flex items-center gap-2">
-                    <span>{{ __('Исполнители') }}@if($workersCount > 0) ({{ $workersCount }})@endif</span>
-                    @if(!empty($activePins))
-                        <div class="flex gap-1">
-                            @foreach($activePins as $name => $expires)
-                                <span data-pin-timer="{{ $name }}" class="text-[10px] bg-gray-100 rounded px-1"></span>
-                            @endforeach
-                        </div>
-                    @endif
-                </div>
-            </x-responsive-nav-link>
+            <a href="{{ route('workstation.show') }}" class="ui-menu__item {{ request()->routeIs('workstation.*') ? 'ui-menu__item--active' : '' }}">
+                Исполнители
+                @if($workersCount > 0)<span class="ui-navlink__count ml-auto">{{ $workersCount }}</span>@endif
+            </a>
+            <a href="{{ route('firmware.index') }}" class="ui-menu__item {{ request()->routeIs('firmware.*') && !request()->routeIs('firmware.categories.*') ? 'ui-menu__item--active' : '' }}">Прошивки и инструкции</a>
+            <a href="{{ route('stats.index') }}" class="ui-menu__item {{ request()->routeIs('stats.*') ? 'ui-menu__item--active' : '' }}">Статистика</a>
 
-            <x-responsive-nav-link :href="route('firmware.index')" :active="request()->routeIs('firmware.*')">
-                {{ __('Прошивки и инструкции') }}
-            </x-responsive-nav-link>
-
-            <x-responsive-nav-link :href="route('stats.index')" :active="request()->routeIs('stats.*')">
-                {{ __('Статистика') }}
-            </x-responsive-nav-link>
-
-            @if(auth()->user()->isAdmin())
-                <div x-data="{ expanded: false }" class="border-t border-gray-100 pt-1">
-                    <button @click="expanded = !expanded" class="w-full flex justify-between items-center ps-3 pe-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300 focus:outline-none transition duration-150 ease-in-out">
-                        <span>Админ</span>
-                        <svg :class="expanded ? 'rotate-180' : ''" class="h-4 w-4 transition-transform" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                    <div x-show="expanded" class="ps-4">
-                        <x-responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
-                            {{ __('Пользователи') }}
-                        </x-responsive-nav-link>
-                        <x-responsive-nav-link :href="route('employees.index')" :active="request()->routeIs('employees.*')">
-                            {{ __('Сотрудники') }}
-                        </x-responsive-nav-link>
-                        <x-responsive-nav-link :href="route('firmware.categories.index')" :active="request()->routeIs('firmware.categories.*')">
-                            {{ __('Категории прошивок') }}
-                        </x-responsive-nav-link>
-                    </div>
-                </div>
+            @if($user->isAdmin())
+                <div class="ui-menu__label pt-3">Администрирование</div>
+                <a href="{{ route('users.index') }}" class="ui-menu__item {{ request()->routeIs('users.*') ? 'ui-menu__item--active' : '' }}">Пользователи</a>
+                <a href="{{ route('employees.index') }}" class="ui-menu__item {{ request()->routeIs('employees.*') ? 'ui-menu__item--active' : '' }}">Сотрудники</a>
+                <a href="{{ route('firmware.categories.index') }}" class="ui-menu__item {{ request()->routeIs('firmware.categories.*') ? 'ui-menu__item--active' : '' }}">Категории прошивок</a>
             @endif
-        </div>
 
-        <div class="pt-4 pb-1 border-t border-gray-200">
-            <div class="px-4">
-                <div class="font-medium text-base text-gray-800">{{ Auth::user()->name }}</div>
-                <div class="font-medium text-sm text-gray-500">{{ Auth::user()->email }}</div>
-            </div>
-
-            {{-- ВЫВОД ТАЙМЕРОВ ПИН В МОБИЛЬНОМ МЕНЮ --}}
             @if(!empty($activePins))
-                <div class="px-4 py-2 border-t border-gray-100 mt-2">
-                    <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Активные ПИН</div>
-                    @foreach($activePins as $name => $expires)
-                        <div class="flex items-center justify-between py-1">
-                            <span class="text-sm text-gray-700">{{ $name }}</span>
-                            <div data-pin-timer="{{ $name }}"></div>
-                        </div>
-                    @endforeach
-                </div>
+                <div class="ui-menu__label pt-3">Активные ПИН</div>
+                @foreach($activePins as $name => $expires)
+                    <div class="flex items-center justify-between px-2.5 py-1">
+                        <span class="text-sm" style="color: var(--ui-text-2)">{{ $name }}</span>
+                        <span data-pin-timer="{{ $name }}"></span>
+                    </div>
+                @endforeach
             @endif
 
-            <div class="mt-3 space-y-1">
-                <x-responsive-nav-link :href="route('profile.edit')">
-                    {{ __('Профиль') }}
-                </x-responsive-nav-link>
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <x-responsive-nav-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">
-                        {{ __('Выйти') }}
-                    </x-responsive-nav-link>
-                </form>
-            </div>
+            <div class="ui-menu__sep"></div>
+            <a href="{{ route('profile.edit') }}" class="ui-menu__item">Профиль</a>
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit" class="ui-menu__item" style="color: var(--ui-bad)">Выйти</button>
+            </form>
         </div>
     </div>
 </nav>

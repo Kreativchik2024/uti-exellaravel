@@ -1,7 +1,308 @@
+/* Шрифт Inter (с кириллицей) импортируется в resources/js/app.js —
+   Vite кладёт его в public/build, внешние CDN не нужны. */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Тёмная тема вынесена в public/css/dark-theme.css:
-   глобальные override-правила подключаются напрямую из layouts/app.blade.php
-   и guest.blade.php, чтобы не зависеть от пересборки vite. */
+/* Тёмная тема для старых страниц — глобальные override-правила в
+   public/css/dark-theme.css. Новые элементы оболочки (ниже) красятся
+   через CSS-переменные и в override не нуждаются. */
+
+/* ============================================================
+   Дизайн-токены
+   ============================================================ */
+:root {
+    --ui-bg:            #f5f6fa;
+    --ui-surface:       #ffffff;
+    --ui-surface-2:     #f8fafc;
+    --ui-surface-hover: #f1f5f9;
+    --ui-border:        #e5e7ef;
+    --ui-border-strong: #d4d8e3;
+    --ui-text:          #0f172a;
+    --ui-text-2:        #334155;
+    --ui-muted:         #64748b;
+    --ui-faint:         #94a3b8;
+
+    --ui-accent:        #4f46e5;
+    --ui-accent-hover:  #4338ca;
+    --ui-accent-soft:   #eef2ff;
+    --ui-accent-text:   #4338ca;
+    --ui-ring:          rgba(79, 70, 229, 0.22);
+
+    --ui-good:          #059669;
+    --ui-good-soft:     #ecfdf5;
+    --ui-bad:           #dc2626;
+    --ui-bad-soft:      #fef2f2;
+
+    --ui-radius:        14px;
+    --ui-radius-sm:     10px;
+    --ui-shadow-sm:     0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
+    --ui-shadow:        0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px -4px rgba(15, 23, 42, 0.08);
+    --ui-shadow-lg:     0 12px 32px -8px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.06);
+
+    --ui-nav-h:         64px;
+}
+
+html.dark {
+    --ui-bg:            #0b1120;
+    --ui-surface:       #111a2e;
+    --ui-surface-2:     #0e1628;
+    --ui-surface-hover: #172238;
+    --ui-border:        #1e2a42;
+    --ui-border-strong: #2a3854;
+    --ui-text:          #e5e9f2;
+    --ui-text-2:        #cbd5e1;
+    --ui-muted:         #94a3b8;
+    --ui-faint:         #64748b;
+
+    --ui-accent:        #6366f1;
+    --ui-accent-hover:  #818cf8;
+    --ui-accent-soft:   rgba(99, 102, 241, 0.14);
+    --ui-accent-text:   #a5b4fc;
+    --ui-ring:          rgba(129, 140, 248, 0.35);
+
+    --ui-good:          #34d399;
+    --ui-good-soft:     rgba(16, 185, 129, 0.12);
+    --ui-bad:           #f87171;
+    --ui-bad-soft:      rgba(239, 68, 68, 0.12);
+
+    --ui-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.35);
+    --ui-shadow:        0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px -6px rgba(0, 0, 0, 0.5);
+    --ui-shadow-lg:     0 16px 40px -10px rgba(0, 0, 0, 0.7);
+
+    color-scheme: dark;
+}
+
+@layer base {
+    html { -webkit-tap-highlight-color: transparent; }
+    body {
+        font-feature-settings: 'cv11', 'ss01';  /* Inter: аккуратные «1», «а» */
+        text-rendering: optimizeLegibility;
+    }
+    ::selection { background: var(--ui-ring); }
+}
+
+@layer components {
+    /* ---------- Оболочка ---------- */
+    .ui-app {
+        min-height: 100vh;
+        background:
+            radial-gradient(1200px 400px at 10% -10%, rgba(99, 102, 241, 0.07), transparent 60%),
+            radial-gradient(900px 300px at 100% 0%, rgba(14, 165, 233, 0.05), transparent 60%),
+            var(--ui-bg);
+        color: var(--ui-text);
+    }
+
+    /* ---------- Верхняя панель ---------- */
+    .ui-nav {
+        position: sticky; top: 0; z-index: 40;
+        background: color-mix(in srgb, var(--ui-surface) 82%, transparent);
+        backdrop-filter: saturate(180%) blur(14px);
+        -webkit-backdrop-filter: saturate(180%) blur(14px);
+        border-bottom: 1px solid var(--ui-border);
+    }
+    .ui-brand { display: flex; align-items: center; gap: .625rem; text-decoration: none; }
+    .ui-brand__logo {
+        width: 36px; height: 36px; border-radius: 10px; object-fit: cover;
+        box-shadow: 0 0 0 1px var(--ui-border), var(--ui-shadow-sm);
+    }
+    .ui-brand__name  { font-weight: 700; font-size: .95rem; letter-spacing: -.01em; color: var(--ui-text); line-height: 1.1; }
+    .ui-brand__sub   { font-size: .7rem; color: var(--ui-muted); line-height: 1.1; }
+
+    .ui-navlink {
+        display: inline-flex; align-items: center; gap: .4rem;
+        height: 36px; padding: 0 .8rem; border-radius: 10px;
+        font-size: .875rem; font-weight: 500; color: var(--ui-muted);
+        transition: background-color .15s, color .15s;
+        white-space: nowrap;
+    }
+    .ui-navlink:hover { color: var(--ui-text); background: var(--ui-surface-hover); }
+    .ui-navlink--active,
+    .ui-navlink--active:hover { color: var(--ui-accent-text); background: var(--ui-accent-soft); }
+    .ui-navlink__count {
+        min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: .68rem; font-weight: 700; background: var(--ui-accent); color: #fff;
+    }
+
+    .ui-iconbtn {
+        width: 36px; height: 36px; border-radius: 10px;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: var(--ui-muted); transition: background-color .15s, color .15s;
+    }
+    .ui-iconbtn:hover { color: var(--ui-text); background: var(--ui-surface-hover); }
+
+    /* Выпадающие панели */
+    .ui-menu {
+        background: var(--ui-surface);
+        border: 1px solid var(--ui-border);
+        border-radius: var(--ui-radius);
+        box-shadow: var(--ui-shadow-lg);
+        padding: .375rem;
+    }
+    .ui-menu__label {
+        padding: .5rem .625rem .25rem; font-size: .68rem; font-weight: 600;
+        text-transform: uppercase; letter-spacing: .06em; color: var(--ui-faint);
+    }
+    .ui-menu__item {
+        display: flex; align-items: center; gap: .6rem; width: 100%;
+        padding: .5rem .625rem; border-radius: 8px;
+        font-size: .875rem; color: var(--ui-text-2); text-align: left;
+        transition: background-color .12s, color .12s;
+    }
+    .ui-menu__item:hover { background: var(--ui-surface-hover); color: var(--ui-text); }
+    .ui-menu__item--active { background: var(--ui-accent-soft); color: var(--ui-accent-text); font-weight: 600; }
+    .ui-menu__dot {
+        width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0;
+        background: var(--ui-border-strong);
+    }
+    .ui-menu__item--active .ui-menu__dot { background: var(--ui-accent); }
+    .ui-menu__sep { height: 1px; margin: .375rem .25rem; background: var(--ui-border); }
+
+    .ui-avatar {
+        width: 32px; height: 32px; border-radius: 999px; flex-shrink: 0;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: .75rem; font-weight: 700; color: #fff;
+        background: linear-gradient(135deg, #6366f1, #0ea5e9);
+    }
+
+    /* ---------- Заголовок страницы ---------- */
+    .ui-page-header { padding-top: 1.75rem; }
+    .ui-page-header h1,
+    .ui-page-header h2 {
+        font-size: 1.5rem !important; line-height: 2rem; font-weight: 700 !important;
+        letter-spacing: -.02em; color: var(--ui-text) !important;
+    }
+
+    /* ---------- Карточки и элементы ---------- */
+    .ui-card {
+        background: var(--ui-surface);
+        border: 1px solid var(--ui-border);
+        border-radius: var(--ui-radius);
+        box-shadow: var(--ui-shadow-sm);
+    }
+    .ui-card--hover { transition: box-shadow .2s, transform .2s, border-color .2s; }
+    .ui-card--hover:hover { box-shadow: var(--ui-shadow); border-color: var(--ui-border-strong); }
+
+    .ui-btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+        height: 40px; padding: 0 1rem; border-radius: 10px;
+        font-size: .875rem; font-weight: 600; white-space: nowrap;
+        transition: background-color .15s, box-shadow .15s, color .15s, transform .05s;
+    }
+    .ui-btn:active { transform: translateY(1px); }
+    .ui-btn--primary {
+        background: var(--ui-accent); color: #fff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .1), inset 0 1px 0 rgba(255, 255, 255, .12);
+    }
+    .ui-btn--primary:hover { background: var(--ui-accent-hover); }
+    .ui-btn--ghost { background: var(--ui-surface); color: var(--ui-text-2); border: 1px solid var(--ui-border); }
+    .ui-btn--ghost:hover { background: var(--ui-surface-hover); color: var(--ui-text); }
+
+    .ui-segment {
+        display: flex; padding: 3px; gap: 2px; border-radius: 10px;
+        background: var(--ui-surface-2); border: 1px solid var(--ui-border);
+    }
+    .ui-segment__item {
+        flex: 1; text-align: center; padding: .35rem .5rem; border-radius: 7px;
+        font-size: .78rem; font-weight: 600; color: var(--ui-muted);
+        transition: background-color .15s, color .15s;
+    }
+    .ui-segment__item:hover { color: var(--ui-text); }
+    .ui-segment__item--active,
+    .ui-segment__item--active:hover { background: var(--ui-surface); color: var(--ui-text); box-shadow: var(--ui-shadow-sm); }
+
+    .ui-badge {
+        display: inline-flex; align-items: center; gap: .3rem;
+        padding: .125rem .5rem; border-radius: 999px;
+        font-size: .7rem; font-weight: 600;
+        background: var(--ui-accent-soft); color: var(--ui-accent-text);
+    }
+
+    /* ---------- Плавающая плашка «Онлайн» ---------- */
+    .ui-online {
+        position: fixed; left: 16px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 40;
+        max-width: min(720px, calc(100vw - 96px));
+        display: flex; align-items: center; gap: .6rem;
+        padding: .4rem .5rem .4rem .75rem; border-radius: 999px;
+        background: color-mix(in srgb, var(--ui-surface) 88%, transparent);
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--ui-border);
+        box-shadow: var(--ui-shadow);
+        font-size: .75rem; color: var(--ui-text-2);
+    }
+    .ui-online__pulse {
+        width: 8px; height: 8px; border-radius: 999px; background: #10b981; flex-shrink: 0;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, .5); animation: ui-pulse 2s infinite;
+    }
+    .ui-online__list { display: flex; gap: .3rem; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+    .ui-online__list::-webkit-scrollbar { display: none; }
+    .ui-online__chip {
+        display: inline-flex; align-items: center; gap: .3rem; flex-shrink: 0;
+        padding: .15rem .5rem; border-radius: 999px;
+        background: var(--ui-good-soft); color: var(--ui-good); font-weight: 600; font-size: .7rem;
+    }
+}
+
+@keyframes ui-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, .45); }
+    70%  { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-online__pulse { animation: none; }
+}
+
+/* ============================================================
+   Мягкая модернизация существующих страниц (внутри .app-main).
+   Без !important: специфичность «.app-main .класс» выше утилит.
+   Цвета тёмной темы по-прежнему задаёт public/css/dark-theme.css.
+   ============================================================ */
+.app-main .rounded-lg  { border-radius: 12px; }
+.app-main .rounded-xl  { border-radius: var(--ui-radius); }
+.app-main .rounded-2xl { border-radius: 18px; }
+
+.app-main .shadow,
+.app-main .shadow-sm { box-shadow: var(--ui-shadow-sm); }
+.app-main .shadow-md,
+.app-main .shadow-lg { box-shadow: var(--ui-shadow); }
+
+/* Белые карточки: единая тонкая рамка */
+html:not(.dark) .app-main .bg-white.border-gray-100,
+html:not(.dark) .app-main .bg-white.border-gray-200 { border-color: var(--ui-border); }
+
+/* Основные кнопки — единый акцентный цвет */
+.app-main .bg-blue-600,
+.app-main .bg-indigo-600 { background-color: var(--ui-accent); }
+.app-main .hover\:bg-blue-700:hover,
+.app-main .hover\:bg-indigo-700:hover { background-color: var(--ui-accent-hover); }
+.app-main button.bg-blue-600,
+.app-main a.bg-blue-600,
+.app-main button.bg-indigo-600,
+.app-main a.bg-indigo-600,
+.app-main button.bg-green-600,
+.app-main a.bg-green-600,
+.app-main button.bg-gray-500,
+.app-main button.bg-gray-200 { border-radius: 10px; font-weight: 600; }
+
+/* Поля ввода */
+.app-main input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="range"]),
+.app-main select,
+.app-main textarea { border-radius: 10px; }
+html:not(.dark) .app-main input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="range"]),
+html:not(.dark) .app-main select,
+html:not(.dark) .app-main textarea { border-color: var(--ui-border-strong); }
+.app-main input:focus,
+.app-main select:focus,
+.app-main textarea:focus {
+    outline: none;
+    border-color: var(--ui-accent) !important;
+    box-shadow: 0 0 0 4px var(--ui-ring) !important;
+}
+
+/* Таблицы */
+.app-main table thead th {
+    font-size: .7rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+}
