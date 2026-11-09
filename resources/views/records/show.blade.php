@@ -1,463 +1,227 @@
 <x-app-layout>
+    @php
+        $workerFields = ['worker1', 'worker2', 'worker3', 'worker4', 'worker5'];
+
+        // Раскладка: своя у вкладки (как в форме) или общая группировка
+        $groupDefinitions = !empty($cfg['layout'])
+            ? collect($cfg['layout'])->mapWithKeys(fn ($d, $i) => ['layout_' . $i => $d])->all()
+            : [
+                'main'      => ['title' => 'Основное', 'fields' => ['record_date', 'post_number', 'peripheral_number', 'board_number', 'ip_address', 'fuselage_number', 'frame_serial', 'fuselage_no', 'fuselage_serial', 'work_start', 'work_end', 'qty', 'seq']],
+                'equipment' => ['title' => 'Оборудование', 'fields' => ['cross3_number', 'bracket_serial', 'manet_number', 'serial_number', 'pc_version', 'ahrs', 'compass_version', 'device_type', 'runs_count']],
+                'status'    => ['title' => 'Статус и дефекты', 'fields' => ['status', 'camera_status', 'night_camera_status', 'speed_sensor_status', 'suspension_status', 'is_working', 'is_repaired', 'stand_test', 'barometer_status', 'defect', 'defect_reason', 'fault_code', 'reported_defect', 'found_defect', 'rejected_by', 'analysis_actions', 'result', 'actions_taken', 'work_done']],
+                'notes'     => ['title' => 'Примечания', 'fields' => ['notes', 'comments']],
+            ];
+
+        $groupedFields = [];
+        $usedFields = [];
+        foreach ($groupDefinitions as $key => $def) {
+            $found = array_values(array_filter($def['fields'], fn ($fn) => isset($cfg['fields'][$fn]) && !in_array($fn, $workerFields, true)));
+            if ($found) {
+                $groupedFields[$key] = ['title' => $def['title'], 'fields' => $found];
+                $usedFields = array_merge($usedFields, $found);
+            }
+        }
+        $otherFields = array_values(array_filter(array_keys($cfg['fields']), fn ($fn) => !in_array($fn, $workerFields, true) && !in_array($fn, $usedFields, true)));
+        if ($otherFields) {
+            $groupedFields['other'] = ['title' => 'Дополнительно', 'fields' => $otherFields];
+        }
+
+        // Итог проверки
+        $healthFields = $cfg['health_fields'] ?? [];
+        $goodValues   = $cfg['health_good_values'] ?? ['Работает'];
+        $isGood = collect($healthFields)->every(fn ($f) => in_array($record->{$f} ?? null, $goodValues, true));
+
+        $workers = array_values(array_filter(array_map(fn ($wf) => $record->{$wf} ?? null, $workerFields)));
+        $recordDate = $record->record_date ? \Carbon\Carbon::parse($record->record_date)->format('d.m.Y') : ($record->created_at?->format('d.m.Y') ?? '—');
+
+        $pillFields = ['status', 'camera_status', 'night_camera_status', 'speed_sensor_status', 'suspension_status', 'barometer_status', 'is_working', 'stand_test'];
+    @endphp
+
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-            <div class="flex items-start gap-3">
-                <a href="{{ route('records.index', $sheet) }}"
-                   class="flex-shrink-0 w-11 h-11 inline-flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition active:scale-95"
-                   title="Назад к списку">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                    </svg>
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div class="flex items-center gap-3">
+                <a href="{{ route('records.index', $sheet) }}" class="ui-iconbtn" style="border: 1px solid var(--ui-border); background: var(--ui-surface)" title="Назад к списку" aria-label="Назад к списку">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </a>
                 <div>
                     <div class="flex items-center gap-2 flex-wrap">
-                        <h2 class="font-bold text-2xl text-gray-900 tracking-tight">
-                            {{ $cfg['title'] }}
-                        </h2>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
-                            #{{ $record->id }}
-                        </span>
+                        <h2>{{ $cfg['title'] }}</h2>
+                        <span class="ui-badge font-mono">#{{ $record->id }}</span>
                     </div>
-                    <p class="text-sm text-gray-500 mt-1">
-                        Запись от
-                        <span class="font-semibold text-gray-700">
-                            {{ $record->record_date ? \Carbon\Carbon::parse($record->record_date)->format('d.m.Y') : ($record->created_at?->format('d.m.Y') ?? '—') }}
-                        </span>
-                        @if($record->creator)
-                            · создал <span class="font-medium text-gray-700">{{ $record->creator->name }}</span>
-                        @endif
+                    <p class="text-sm mt-0.5" style="color: var(--ui-muted)">
+                        Запись от <span class="font-semibold" style="color: var(--ui-text-2)">{{ $recordDate }}</span>
+                        @if($record->creator) · создал {{ $record->creator->name }} @endif
                     </p>
                 </div>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <a href="{{ route('records.index', $sheet) }}"
-                   class="inline-flex items-center gap-1.5 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl font-medium text-sm transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                    </svg>
-                    К списку
-                </a>
-
-                @can('delete', $record)
-                    <form method="POST" action="{{ route('records.destroy', [$sheet, $record->id]) }}"
-                          onsubmit="return confirm('Удалить запись?')" class="inline">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit"
-                                class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-95">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
-                            Удалить
-                        </button>
-                    </form>
-                @endcan
-
                 @can('update', $record)
                     @if(!$isTimeLocked)
-                        <a href="{{ route('records.edit', [$sheet, $record->id]) }}"
-                           class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 transition-all active:scale-95">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                            </svg>
+                        <a href="{{ route('records.edit', [$sheet, $record->id]) }}" class="ui-btn ui-btn--primary">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                             Редактировать
                         </a>
                     @else
-                        <span class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-medium text-sm">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
-                            </svg>
-                            Только просмотр
-                        </span>
+                        <span class="ui-pill ui-pill--warn">Только просмотр</span>
                     @endif
                 @endcan
             </div>
         </div>
     </x-slot>
 
-    <div class="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
+    <div class="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         @if($isTimeLocked)
-            <div class="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl flex items-start gap-3">
-                <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                </svg>
-                <div>
-                    <b class="block text-sm font-semibold">Редактирование заблокировано</b>
-                    <span class="text-xs">С момента создания записи прошло более 24 часов. Данные доступны только для просмотра.</span>
+            <div class="ui-card flex items-start gap-3 px-4 py-3 mb-5 text-sm" role="status" style="box-shadow: inset 3px 0 0 #f59e0b, var(--ui-shadow-sm)">
+                <svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: #d97706" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                <div style="color: var(--ui-text-2)">
+                    <b class="block" style="color: var(--ui-text)">Редактирование заблокировано</b>
+                    С момента создания записи прошло более 24 часов — изменить её может только мастер или администратор.
                 </div>
             </div>
         @endif
 
-        @php
-            $workerFields = ['worker1','worker2','worker3','worker4','worker5'];
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
 
-            $groupDefinitions = [
-                'main' => [
-                    'title'    => 'Основное',
-                    'icon'     => 'calendar',
-                    'fields'   => [
-                        'record_date', 'post_number', 'peripheral_number',
-                        'board_number', 'ip_address', 'fuselage_number', 'frame_serial',
-                        'fuselage_no', 'fuselage_serial',
-                        'work_start', 'work_end',
-                        'qty', 'seq',
-                    ],
-                ],
-                'equipment' => [
-                    'title'    => 'Оборудование',
-                    'icon'     => 'chip',
-                    'fields'   => [
-                        'cross3_number', 'bracket_serial', 'manet_number',
-                        'serial_number', 'pc_version', 'ahrs', 'compass_version',
-                        'device_type', 'runs_count',
-                    ],
-                ],
-                'status' => [
-                    'title'    => 'Статус и дефекты',
-                    'icon'     => 'shield',
-                    'fields'   => [
-                        'status', 'camera_status', 'night_camera_status',
-                        'speed_sensor_status', 'suspension_status',
-                        'is_working', 'is_repaired', 'stand_test', 'barometer_status',
-                        'defect', 'defect_reason', 'fault_code',
-                        'reported_defect', 'found_defect', 'rejected_by',
-                        'analysis_actions', 'result', 'actions_taken', 'work_done',
-                    ],
-                ],
-                'notes' => [
-                    'title'    => 'Примечания',
-                    'icon'     => 'note',
-                    'fields'   => ['notes', 'comments'],
-                ],
-            ];
+            {{-- Поля записи --}}
+            <div class="lg:col-span-2 space-y-5">
+                @foreach($groupedFields as $group)
+                    <section class="ui-card overflow-hidden">
+                        <h3 class="rec-section__title">{{ $group['title'] }}</h3>
+                        <dl class="rec-grid">
+                            @foreach($group['fields'] as $name)
+                                @php
+                                    $f = $cfg['fields'][$name];
+                                    $value = $record->{$name} ?? null;
+                                    $type = $f['type'] ?? 'text';
+                                    $lookupData = !empty($f['lookup']) ? ($lookups[$name] ?? null) : null;
 
-            $groupedFields = [];
-            $usedFields    = [];
+                                    $display = $value;
+                                    if ($value !== null && $value !== '') {
+                                        try {
+                                            if ($type === 'date') $display = \Carbon\Carbon::parse($value)->format('d.m.Y');
+                                            elseif ($type === 'time') $display = \Carbon\Carbon::parse($value)->format('H:i');
+                                        } catch (\Throwable $e) {}
+                                    }
+                                    if ($name === 'is_repaired' && $value !== null) $display = $value ? 'Да' : 'Нет';
+                                    $empty = $display === null || $display === '';
+                                @endphp
 
-            foreach ($groupDefinitions as $key => $def) {
-                $found = [];
-                foreach ($def['fields'] as $fn) {
-                    if (isset($cfg['fields'][$fn]) && !in_array($fn, $workerFields, true)) {
-                        $found[]      = $fn;
-                        $usedFields[] = $fn;
-                    }
-                }
-                if (!empty($found)) {
-                    $groupedFields[$key] = array_merge($def, ['fields' => $found]);
-                }
-            }
+                                <div class="rec-field {{ $type === 'textarea' ? 'rec-field--wide' : '' }}">
+                                    <dt>{{ $f['label'] ?? $name }}</dt>
+                                    <dd>
+                                        @if($empty)
+                                            <span style="color: var(--ui-faint)">—</span>
+                                        @elseif(in_array($name, $pillFields, true) || $name === 'is_repaired')
+                                            <x-status-pill :value="$display" />
+                                        @elseif($type === 'textarea')
+                                            <div class="rec-text">{{ $display }}</div>
+                                        @elseif($name === 'fault_code')
+                                            <span class="font-mono text-sm font-semibold px-1.5 py-0.5 rounded-md" style="background: var(--ui-surface-hover)">{{ $display }}</span>
+                                        @else
+                                            <span class="{{ in_array($name, ['ip_address', 'serial_number', 'manet_number', 'cross3_number', 'bracket_serial', 'frame_serial', 'fuselage_number']) ? 'font-mono' : '' }}">{{ $display }}</span>
+                                        @endif
 
-            $otherFields = [];
-            foreach ($cfg['fields'] as $fn => $fc) {
-                if (in_array($fn, $workerFields, true)) continue;
-                if (in_array($fn, $usedFields, true)) continue;
-                $otherFields[] = $fn;
-            }
-            if (!empty($otherFields)) {
-                $groupedFields['other'] = [
-                    'title'  => 'Дополнительно',
-                    'icon'   => 'dot',
-                    'fields' => $otherFields,
-                ];
-            }
+                                        @if($lookupData)
+                                            @php $lookupGood = ($lookupData['health'] ?? 'green') === 'green'; @endphp
+                                            <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" style="color: var(--ui-muted)">
+                                                <x-status-pill :value="$lookupGood ? 'В порядке' : 'Внимание'" :tone="$lookupGood ? 'good' : 'bad'" />
+                                                <span>{{ $lookupData['workers'] ?? $lookupData['worker1'] ?? '—' }}</span>
+                                                <span>· {{ $lookupData['record_date'] ?? '—' }}</span>
+                                                @if(!$lookupGood && !empty($lookupData['status_text']))
+                                                    <span class="basis-full" style="color: var(--ui-bad)">{{ $lookupData['status_text'] }}</span>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </dd>
+                                </div>
+                            @endforeach
+                        </dl>
+                    </section>
+                @endforeach
+            </div>
 
-            $healthFields = $cfg['health_fields'] ?? [];
-            $goodValues   = $cfg['health_good_values'] ?? ['Работает'];
-            $isGood       = true;
-            if (!empty($healthFields)) {
-                foreach ($healthFields as $f) {
-                    $val = $record->{$f} ?? null;
-                    if ($val === null || $val === '' || !in_array($val, $goodValues, true)) {
-                        $isGood = false;
-                        break;
-                    }
-                }
-            }
-        @endphp
-
-        {{-- Верхняя плашка «Проверка» --}}
-        @if(!empty($healthFields))
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200/70 p-4 flex items-center gap-4">
-                @if($isGood)
-                    <div class="flex-shrink-0 w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-base font-bold text-emerald-700">Работает</p>
-                        <p class="text-xs text-gray-500">Все проверки пройдены</p>
-                    </div>
-                @else
-                    <div class="flex-shrink-0 w-12 h-12 rounded-full bg-red-500 flex items-center justify-center shadow-md shadow-red-500/30">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-base font-bold text-red-700">Внимание</p>
-                        <p class="text-xs text-gray-500">Есть проблемы — см. поля проверки</p>
+            {{-- Боковая колонка --}}
+            <aside class="space-y-5 lg:sticky" style="top: calc(var(--ui-nav-h) + 16px)">
+                @if(!empty($healthFields))
+                    <div class="ui-card p-4 flex items-center gap-3.5">
+                        <span class="rec-health {{ $isGood ? 'rec-health--good' : 'rec-health--bad' }}" aria-hidden="true">
+                            @if($isGood)
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            @else
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v3.75m0 3.75h.008M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                            @endif
+                        </span>
+                        <div>
+                            <div class="font-semibold" style="color: {{ $isGood ? 'var(--ui-good)' : 'var(--ui-bad)' }}">{{ $isGood ? 'Работает' : 'Требует внимания' }}</div>
+                            <div class="text-xs" style="color: var(--ui-muted)">{{ $isGood ? 'Все проверки пройдены' : 'Есть замечания — см. поля проверки' }}</div>
+                        </div>
                     </div>
                 @endif
-            </div>
-        @endif
 
-        {{-- Секции полей --}}
-        @foreach($groupedFields as $key => $group)
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200/70 overflow-hidden">
-                <div class="px-5 py-3.5 border-b border-gray-100 bg-gradient-to-r from-gray-50/80 to-white flex items-center gap-3">
-                    <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
-                        @switch($group['icon'])
-                            @case('calendar')
-                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                </svg>
-                                @break
-                            @case('chip')
-                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
-                                </svg>
-                                @break
-                            @case('shield')
-                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                                </svg>
-                                @break
-                            @case('note')
-                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                </svg>
-                                @break
-                            @default
-                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                        @endswitch
-                    </div>
-                    <h3 class="font-semibold text-base text-gray-900">{{ $group['title'] }}</h3>
-                </div>
-
-                <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                    @foreach($group['fields'] as $name)
-                        @php
-                            $f      = $cfg['fields'][$name];
-                            $value  = $record->{$name} ?? null;
-                            $type   = $f['type'] ?? 'text';
-                            $label  = $f['label'] ?? $name;
-                            $hasLookup = !empty($f['lookup']);
-                            $lookupData = $lookups[$name] ?? null;
-
-                            $display = $value;
-                            if ($type === 'date' && $value) {
-                                try { $display = \Carbon\Carbon::parse($value)->format('d.m.Y'); }
-                                catch (\Throwable $e) { $display = $value; }
-                            } elseif ($type === 'time' && $value) {
-                                try { $display = \Carbon\Carbon::parse($value)->format('H:i'); }
-                                catch (\Throwable $e) { $display = $value; }
-                            }
-                        @endphp
-
-                        <div class="{{ in_array($type, ['textarea']) ? 'md:col-span-2' : '' }}">
-                            <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-                                {{ $label }}
-                            </dt>
-
-                            @if($hasLookup && $lookupData)
-                                @php
-                                    $isGreen = ($lookupData['health'] ?? 'green') === 'green';
-                                    $cls = $isGreen
-                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                                        : 'bg-red-50 border-red-200 text-red-800';
-                                    $icon = $isGreen ? '✓' : '✗';
-                                @endphp
-                                <div class="inline-flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-md border {{ $cls }} text-xs font-medium mb-1.5">
-                                    <span class="font-bold">{{ $icon }}</span>
-                                    <span>{{ $lookupData['workers'] ?? $lookupData['worker1'] ?? '—' }}</span>
-                                    <span class="opacity-50">·</span>
-                                    <span>{{ $lookupData['record_date'] ?? '—' }}</span>
-                                    <span class="opacity-50">·</span>
-                                    <span>{{ $lookupData['status_text'] ?? '' }}</span>
-                                </div>
-                                <br>
-                            @endif
-
-                            @if($type === 'textarea')
-                                @if($display)
-                                    <dd class="text-sm text-gray-900 whitespace-pre-line break-words leading-relaxed bg-gray-50/60 rounded-lg px-3 py-2.5 border border-gray-100">
-                                        {{ $display }}
-                                    </dd>
-                                @else
-                                    <dd class="text-sm text-gray-400 italic">— не заполнено —</dd>
-                                @endif
-
-                            @elseif($name === 'status' && $display)
-                                @php
-                                    $isGoodStatus = in_array($display, ['Сдан','Исправен','Проверен','Работает','Да'], true);
-                                    $isBadStatus  = in_array($display, ['Не сдан','Неисправен','Не работает','Брак','Нет'], true);
-                                    $isWarnStatus = in_array($display, ['В работе','В ремонт','Требует ремонта','Требует замены'], true);
-                                    $statusCls = match (true) {
-                                        $isGoodStatus => 'bg-emerald-500 text-white',
-                                        $isBadStatus  => 'bg-red-500 text-white',
-                                        $isWarnStatus => 'bg-amber-500 text-white',
-                                        default       => 'bg-gray-200 text-gray-700',
-                                    };
-                                @endphp
-                                <dd>
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold whitespace-nowrap shadow-sm {{ $statusCls }}">
-                                        <span class="w-2 h-2 rounded-full bg-white"></span>
-                                        {{ $display }}
+                @if($workers)
+                    <section class="ui-card overflow-hidden">
+                        <h3 class="rec-section__title">Исполнители</h3>
+                        <ul class="p-3 pt-0 space-y-1">
+                            @foreach($workers as $i => $w)
+                                <li class="flex items-center gap-2.5 px-1.5 py-1.5">
+                                    <span class="ui-chat__avatar" style="width: 32px; height: 32px; font-size: .7rem">
+                                        {{ mb_strtoupper(mb_substr($w, 0, 1)) }}{{ mb_strtoupper(mb_substr(trim(\Illuminate\Support\Str::after($w, ' ')), 0, 1)) }}
                                     </span>
-                                </dd>
+                                    <span class="text-sm font-medium" style="color: var(--ui-text)">{{ $w }}</span>
+                                    @if($i === 0)<span class="ml-auto text-[11px]" style="color: var(--ui-faint)">основной</span>@endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    </section>
+                @endif
 
-                            @elseif(in_array($name, ['is_working', 'is_repaired']) && $display !== null)
-                                @php
-                                    $isPositive = in_array($display, ['1','Исправен','Да','Работает'], true);
-                                @endphp
-                                <dd>
-                                    @if($isPositive)
-                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold bg-emerald-500 text-white whitespace-nowrap shadow-sm">
-                                            <span class="w-2 h-2 rounded-full bg-white"></span>
-                                            {{ $display === '1' ? 'Да' : $display }}
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold bg-red-500 text-white whitespace-nowrap shadow-sm">
-                                            <span class="w-2 h-2 rounded-full bg-white"></span>
-                                            {{ $display === '0' ? 'Нет' : $display }}
-                                        </span>
-                                    @endif
-                                </dd>
+                <section class="ui-card overflow-hidden">
+                    <h3 class="rec-section__title">Сведения</h3>
+                    <dl class="rec-meta">
+                        <div><dt>Создано</dt><dd>{{ $record->created_at?->format('d.m.Y H:i') ?? '—' }}</dd></div>
+                        <div><dt>Автор</dt><dd>{{ $record->creator?->name ?? '—' }}</dd></div>
+                        <div><dt>Изменено</dt><dd>{{ $record->updated_at?->format('d.m.Y H:i') ?? '—' }}</dd></div>
+                        <div><dt>ID записи</dt><dd class="font-mono">#{{ $record->id }}</dd></div>
+                    </dl>
+                </section>
 
-                            @elseif(in_array($name, ['camera_status','night_camera_status','speed_sensor_status','suspension_status','barometer_status']) && $display)
-                                @php
-                                    $isWorking = $display === 'Работает';
-                                @endphp
-                                <dd>
-                                    @if($isWorking)
-                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold bg-emerald-500 text-white whitespace-nowrap shadow-sm">
-                                            <span class="w-2 h-2 rounded-full bg-white"></span>
-                                            {{ $display }}
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold bg-red-500 text-white whitespace-nowrap shadow-sm">
-                                            <span class="w-2 h-2 rounded-full bg-white"></span>
-                                            {{ $display }}
-                                        </span>
-                                    @endif
-                                </dd>
-
-                            @elseif($display)
-                                <dd class="text-sm text-gray-900 font-medium break-words">
-                                    {{ $display }}
-                                </dd>
-                            @else
-                                <dd class="text-sm text-gray-400 italic">—</dd>
-                            @endif
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-        @endforeach
-
-        {{-- Исполнители --}}
-        @php
-            $workers = [];
-            foreach ($workerFields as $wf) {
-                $v = $record->{$wf} ?? null;
-                if (!empty($v)) $workers[] = $v;
-            }
-        @endphp
-        @if(!empty($workers))
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200/70 overflow-hidden">
-                <div class="px-5 py-3.5 border-b border-gray-100 bg-gradient-to-r from-gray-50/80 to-white flex items-center gap-3">
-                    <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                        </svg>
-                    </div>
-                    <h3 class="font-semibold text-base text-gray-900">Исполнители</h3>
-                </div>
-                <div class="p-5 flex flex-wrap gap-2">
-                    @foreach($workers as $w)
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-sm font-medium">
-                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
-                            </svg>
-                            {{ $w }}
-                        </span>
-                    @endforeach
-                </div>
-            </div>
-        @endif
-
-        {{-- Служебная информация --}}
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200/70 p-5">
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                    <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Создано</dt>
-                    <dd class="text-gray-900 font-medium">
-                        {{ $record->created_at?->format('d.m.Y H:i') ?? '—' }}
-                    </dd>
-                </div>
-                <div>
-                    <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Автор</dt>
-                    <dd class="text-gray-900 font-medium">
-                        {{ $record->creator?->name ?? '—' }}
-                    </dd>
-                </div>
-                <div>
-                    <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Изменено</dt>
-                    <dd class="text-gray-900 font-medium">
-                        {{ $record->updated_at?->format('d.m.Y H:i') ?? '—' }}
-                    </dd>
-                </div>
-                <div>
-                    <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ID записи</dt>
-                    <dd class="text-gray-900 font-mono font-medium">#{{ $record->id }}</dd>
-                </div>
-            </div>
-        </div>
-
-        {{-- Нижние кнопки --}}
-        <div class="pt-2 pb-8 flex flex-wrap items-center justify-between gap-3">
-            <a href="{{ route('records.index', $sheet) }}"
-               class="inline-flex items-center gap-1.5 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg font-medium text-sm transition">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                </svg>
-                К списку
-            </a>
-            
-            <div class="flex items-center gap-2">
                 @can('delete', $record)
-                    <form method="POST" action="{{ route('records.destroy', [$sheet, $record->id]) }}"
-                          onsubmit="return confirm('Удалить запись?')" class="inline">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit"
-                                class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2.5 rounded-lg shadow transition active:scale-95">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
-                            Удалить запись
-                        </button>
-                    </form>
+                    @unless($isTimeLocked)
+                        <form method="POST" action="{{ route('records.destroy', [$sheet, $record->id]) }}"
+                              onsubmit="return confirm('Удалить запись #{{ $record->id }}? Это действие нельзя отменить.')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="ui-btn ui-btn--ghost w-full" style="color: var(--ui-bad)">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                Удалить запись
+                            </button>
+                        </form>
+                    @endunless
                 @endcan
-
-                @can('update', $record)
-                    @if(!$isTimeLocked)
-                        <a href="{{ route('records.edit', [$sheet, $record->id]) }}"
-                           class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg shadow transition active:scale-95">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                            </svg>
-                            Редактировать запись
-                        </a>
-                    @endif
-                @endcan
-            </div>
+            </aside>
         </div>
     </div>
+
+    @push('styles')
+    <style>
+        .rec-section__title { padding: .9rem 1.25rem .4rem; font-size: .8rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ui-muted); }
+        .rec-grid { display: grid; grid-template-columns: 1fr; gap: 0; padding: 0 1.25rem 1rem; }
+        @media (min-width: 640px) { .rec-grid { grid-template-columns: 1fr 1fr; column-gap: 1.5rem; } }
+        .rec-field { padding: .65rem 0; border-top: 1px solid var(--ui-border); min-width: 0; }
+        .rec-field--wide { grid-column: 1 / -1; }
+        .rec-field dt { font-size: .75rem; color: var(--ui-muted); margin-bottom: .2rem; }
+        .rec-field dd { font-size: .925rem; color: var(--ui-text); font-weight: 500; overflow-wrap: anywhere; }
+        .rec-text { white-space: pre-line; font-weight: 400; line-height: 1.55; color: var(--ui-text-2); }
+        .rec-health { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+        .rec-health--good { background: var(--ui-good-soft); color: var(--ui-good); }
+        .rec-health--bad  { background: var(--ui-bad-soft);  color: var(--ui-bad); }
+        .rec-meta { padding: 0 1.25rem 1rem; }
+        .rec-meta > div { display: flex; justify-content: space-between; gap: 1rem; padding: .5rem 0; border-top: 1px solid var(--ui-border); font-size: .85rem; }
+        .rec-meta dt { color: var(--ui-muted); }
+        .rec-meta dd { color: var(--ui-text); font-weight: 500; text-align: right; }
+        @media (max-width: 1023px) { aside.lg\:sticky { position: static; } }
+    </style>
+    @endpush
 </x-app-layout>

@@ -52,9 +52,11 @@ return [
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
             
-            // Блок для бэкапа
+            // Блок для бэкапа (spatie/laravel-backup).
+            // Папка с mysqldump: локально (OSPanel) — C:/OSPanel/modules/MySQL-8.0/bin,
+            // на Linux-сервере оставьте пустым — mysqldump найдётся в PATH (/usr/bin).
             'dump' => [
-                'dump_binary_path' => 'C:/OSPanel/modules/MySQL-8.0/bin',
+                'dump_binary_path' => env('DB_DUMP_BINARY_PATH', ''),
                 'use_single_transaction' => true,
                 'timeout' => 60 * 5,
             ],
