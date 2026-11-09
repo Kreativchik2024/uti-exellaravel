@@ -14,11 +14,6 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class StatsController extends Controller
 {
-    private const DEFECT_VALUES = [
-        'Не сдан', 'Неисправен', 'В ремонт',
-        'Не работает', 'Требует ремонта', 'Требует замены',
-    ];
-
     private function resolveTargetUser(Request $r): ?User
     {
         $user = auth()->user();
@@ -106,7 +101,7 @@ class StatsController extends Controller
         $workersList = $canSeeWorkersStats ? $s->listWorkers() : [];
 
         // Кеш на минуту: расчёт по 19 таблицам — самая дорогая часть страницы
-        $cacheKey = 'stats.index.' . md5(json_encode([
+        $cacheKey = 'stats.index.v2.' . md5(json_encode([
             $from?->toDateString(), $to?->toDateString(), $targetUser?->id, $worker,
         ]));
 
@@ -439,7 +434,7 @@ class StatsController extends Controller
         $to   = $r->input('to');
         $targetUser = $this->resolveTargetUser($r);
         $scopeKey   = $targetUser?->id ?? 'all';
-        $cacheKey = "stats.zone5.{$from}_{$to}.{$scopeKey}";
+        $cacheKey = "stats.zone5.v2.{$from}_{$to}.{$scopeKey}";
 
         $data = Cache::remember($cacheKey, 120, function () use ($from, $to, $targetUser, $s) {
             $summary = [];
@@ -452,39 +447,7 @@ class StatsController extends Controller
                 $scope = $s->workerScopeSql($cfg, $targetUser);
 
                 $hasRecordDate = isset($cfg['fields']['record_date']);
-                $hasStatus     = isset($cfg['fields']['status']);
-
-                $defectConditions = []; $defectBindings = [];
-                $fixedConditions  = []; $fixedBindings  = [];
-
-                if (isset($cfg['fields']['fault_code'])) {
-                    if ($hasStatus) {
-                        $defectConditions[] = "( `fault_code` IS NOT NULL AND `fault_code` != '' AND (`status` IS NULL OR `status` != 'Сдан') )";
-                        $fixedConditions[]  = "( `fault_code` IS NOT NULL AND `fault_code` != '' AND `status` = 'Сдан' )";
-                    } else {
-                        $defectConditions[] = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
-                    }
-                }
-
-                foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
-                    if (($fieldCfg['type'] ?? '') !== 'select' || empty($fieldCfg['options'])) continue;
-                    $matched = array_values(array_intersect($fieldCfg['options'], self::DEFECT_VALUES));
-                    if (empty($matched)) continue;
-                    $placeholders = implode(',', array_fill(0, count($matched), '?'));
-                    $defectConditions[] = "`$fieldName` IN ($placeholders)";
-                    foreach ($matched as $v) $defectBindings[] = $v;
-                }
-
-                foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
-                    if (($fieldCfg['type'] ?? '') !== 'textarea') continue;
-                    if (!preg_match('/(defect|дефект|брак)/iu', $fieldName)) continue;
-                    if ($hasStatus) {
-                        $defectConditions[] = "( `$fieldName` IS NOT NULL AND `$fieldName` != '' AND (`status` IS NULL OR `status` != 'Сдан') )";
-                        $fixedConditions[]  = "( `$fieldName` IS NOT NULL AND `$fieldName` != '' AND `status` = 'Сдан' )";
-                    } else {
-                        $defectConditions[] = "(`$fieldName` IS NOT NULL AND `$fieldName` != '')";
-                    }
-                }
+                $rules = $s->defectSql($cfg);
 
                 $scopeSql      = $scope['sql'];
                 $scopeBindings = $scope['bindings'];
@@ -497,23 +460,16 @@ class StatsController extends Controller
                     $total = (int) (DB::select($totalSql, $scopeBindings)[0]->c ?? 0);
                 }
 
-                $defects = 0;
-                if (!empty($defectConditions) && $total > 0) {
-                    $where = '(' . implode(' OR ', $defectConditions) . ')';
-                    $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$where} {$scopeSql}";
-                    $bindings = array_merge($defectBindings, $scopeBindings);
+                $countWhere = function (?array $rule) use ($table, $scopeSql, $scopeBindings, $hasRecordDate, $dateSql, $dateBindings): int {
+                    if ($rule === null) return 0;
+                    $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$rule['sql']} {$scopeSql}";
+                    $bindings = array_merge($rule['bindings'], $scopeBindings);
                     if ($hasRecordDate) { $sql .= " {$dateSql}"; $bindings = array_merge($bindings, $dateBindings); }
-                    $defects = (int) (DB::select($sql, $bindings)[0]->c ?? 0);
-                }
+                    return (int) (DB::select($sql, $bindings)[0]->c ?? 0);
+                };
 
-                $fixed = 0;
-                if (!empty($fixedConditions) && $total > 0) {
-                    $where = '(' . implode(' OR ', $fixedConditions) . ')';
-                    $sql = "SELECT COUNT(*) AS c FROM `$table` WHERE {$where} {$scopeSql}";
-                    $bindings = array_merge($fixedBindings, $scopeBindings);
-                    if ($hasRecordDate) { $sql .= " {$dateSql}"; $bindings = array_merge($bindings, $dateBindings); }
-                    $fixed = (int) (DB::select($sql, $bindings)[0]->c ?? 0);
-                }
+                $defects = $total > 0 ? $countWhere($rules['defect']) : 0;
+                $fixed   = $total > 0 ? $countWhere($rules['fixed'])  : 0;
 
                 $summary[] = [
                     'slug'          => $slug,
@@ -551,59 +507,23 @@ class StatsController extends Controller
 
         [$dateSql, $dateBindings] = $this->sqlDateRange($from, $to);
 
-        $hasStatus = isset($cfg['fields']['status']);
-        $defectConditions = []; $defectBindings = [];
-        $fixedConditions  = []; $fixedBindings  = [];
-
-        if (isset($cfg['fields']['fault_code'])) {
-            if ($hasStatus) {
-                $defectConditions[] = "( `fault_code` IS NOT NULL AND `fault_code` != '' AND (`status` IS NULL OR `status` != 'Сдан') )";
-                $fixedConditions[]  = "( `fault_code` IS NOT NULL AND `fault_code` != '' AND `status` = 'Сдан' )";
-            } else {
-                $defectConditions[] = "(`fault_code` IS NOT NULL AND `fault_code` != '')";
-            }
-        }
-
-        foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
-            if (($fieldCfg['type'] ?? '') !== 'select' || empty($fieldCfg['options'])) continue;
-            $matched = array_values(array_intersect($fieldCfg['options'], self::DEFECT_VALUES));
-            if (empty($matched)) continue;
-            $placeholders = implode(',', array_fill(0, count($matched), '?'));
-            $defectConditions[] = "`$fieldName` IN ($placeholders)";
-            foreach ($matched as $v) $defectBindings[] = $v;
-        }
-
-        foreach ($cfg['fields'] as $fieldName => $fieldCfg) {
-            if (($fieldCfg['type'] ?? '') !== 'textarea') continue;
-            if (!preg_match('/(defect|дефект|брак)/iu', $fieldName)) continue;
-            if ($hasStatus) {
-                $defectConditions[] = "( `$fieldName` IS NOT NULL AND `$fieldName` != '' AND (`status` IS NULL OR `status` != 'Сдан') )";
-                $fixedConditions[]  = "( `$fieldName` IS NOT NULL AND `$fieldName` != '' AND `status` = 'Сдан' )";
-            } else {
-                $defectConditions[] = "(`$fieldName` IS NOT NULL AND `$fieldName` != '')";
-            }
-        }
-
-        if (empty($defectConditions)) {
+        $rules = $s->defectSql($cfg);
+        if ($rules['defect'] === null) {
             return response()->json(['labels' => [], 'defects' => [], 'fixed' => []]);
         }
 
-        $defectWhere = '(' . implode(' OR ', $defectConditions) . ')';
-        $sqlDefects = "SELECT DATE(record_date) AS d, COUNT(*) AS c FROM `$table`
-                       WHERE {$defectWhere} {$scopeSql} {$dateSql} GROUP BY DATE(record_date) ORDER BY d";
-        $defectRows = DB::select($sqlDefects, array_merge($defectBindings, $scopeBindings, $dateBindings));
+        $countByDay = function (array $rule) use ($table, $scopeSql, $scopeBindings, $dateSql, $dateBindings): array {
+            $sql = "SELECT DATE(record_date) AS d, COUNT(*) AS c FROM `$table`
+                    WHERE {$rule['sql']} {$scopeSql} {$dateSql} GROUP BY DATE(record_date) ORDER BY d";
+            $out = [];
+            foreach (DB::select($sql, array_merge($rule['bindings'], $scopeBindings, $dateBindings)) as $row) {
+                $out[substr((string) $row->d, 0, 10)] = (int) $row->c;
+            }
+            return $out;
+        };
 
-        $fixedCounts = [];
-        if (!empty($fixedConditions)) {
-            $fixedWhere = '(' . implode(' OR ', $fixedConditions) . ')';
-            $sqlFixed = "SELECT DATE(record_date) AS d, COUNT(*) AS c FROM `$table`
-                         WHERE {$fixedWhere} {$scopeSql} {$dateSql} GROUP BY DATE(record_date) ORDER BY d";
-            $fixedRows = DB::select($sqlFixed, array_merge($fixedBindings, $scopeBindings, $dateBindings));
-            foreach ($fixedRows as $row) $fixedCounts[substr((string) $row->d, 0, 10)] = (int) $row->c;
-        }
-
-        $defectCounts = [];
-        foreach ($defectRows as $row) $defectCounts[substr((string) $row->d, 0, 10)] = (int) $row->c;
+        $defectCounts = $countByDay($rules['defect']);
+        $fixedCounts  = $rules['fixed'] ? $countByDay($rules['fixed']) : [];
 
         $rangeFrom = $from ? Carbon::parse($from)->startOfDay() : null;
         $rangeTo   = $to   ? Carbon::parse($to)->endOfDay()     : now()->endOfDay();

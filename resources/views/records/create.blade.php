@@ -19,7 +19,13 @@
           
         <form method="POST" action="{{ route('records.store', $sheet) }}"
               class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            
+
+            @error('general')
+                <div class="mx-6 mt-6 sm:mx-8 sm:mt-8 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl text-sm font-medium">
+                    {{ $message }}
+                </div>
+            @enderror
+
             @include('records._form')
 
         </form>

@@ -9,6 +9,8 @@
 
 /* Alpine: скрыть до инициализации (нужно для мобильного меню) */
 [x-cloak] { display: none !important; }
+/* Атрибут hidden должен побеждать display-классы Tailwind (inline-flex, grid…) */
+[hidden] { display: none !important; }
 
 :root {
     --online-bar-h: 40px;

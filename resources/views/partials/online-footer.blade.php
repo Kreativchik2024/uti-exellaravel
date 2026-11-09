@@ -22,7 +22,7 @@
         fetch(heartbeatUrl, {
             method: 'POST',
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: '_token=' + encodeURIComponent(csrf),
+            body: '_token=' + encodeURIComponent(window.csrfToken ? window.csrfToken() : csrf),
             credentials: 'same-origin',
         }).catch(function () {});
     }

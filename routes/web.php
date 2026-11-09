@@ -14,6 +14,13 @@ use App\Http\Controllers\WorkerSessionController;
 use App\Http\Controllers\WorkstationController;
 use Illuminate\Support\Facades\Route;
 
+// Свежий CSRF-токен для долго открытых страниц (public/js/csrf.js) — защита от 419
+Route::get('/csrf-token', fn () => response()
+    ->json(['token' => csrf_token()])
+    ->header('Cache-Control', 'no-store, private'))
+    ->middleware('throttle:60,1')
+    ->name('csrf.refresh');
+
 Route::middleware('auth')->group(function () {
     Route::get('/workstation/select',  [WorkstationController::class, 'show'])->name('workstation.show');
     Route::post('/workstation/select', [WorkstationController::class, 'store'])->name('workstation.store');
@@ -21,7 +28,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/workstation/clear',  [WorkstationController::class, 'clear'])->name('workstation.clear');
 
     // PIN-проверки: доступны и до workers (на /workstation/select)
-    Route::post('/records-pin-check',  [RecordController::class, 'checkEmployeePin'])->name('records.pinCheck');
+    // Ограничение попыток: защита ПИН (4–6 цифр) от перебора
+    Route::post('/records-pin-check',  [RecordController::class, 'checkEmployeePin'])
+        ->middleware('throttle:pin')
+        ->name('records.pinCheck');
     Route::post('/records-pin-unlock', [RecordController::class, 'checkCurrentUserPin'])->name('records.pinUnlock');
 
     // Онлайн-присутствие исполнителей

@@ -27,7 +27,10 @@ class StatsExport implements FromArray, WithHeadings, WithStyles, WithTitle
     {
         return [
             'Вкладка',
-            'Всего записей',
+            'Всего',
+            'Исправных',
+            'Брак',
+            'Брак, %',
             'Исполнители',
         ];
     }
@@ -36,23 +39,30 @@ class StatsExport implements FromArray, WithHeadings, WithStyles, WithTitle
     {
         $rows = [];
 
-        $rows[] = ["Период: {$this->period} дн. (с {$this->from->format('d.m.Y')} по " . now()->format('d.m.Y') . ")", '', ''];
-        $rows[] = ['', '', ''];
+        $rows[] = ["Период: {$this->period} дн. (с {$this->from->format('d.m.Y')} по " . now()->format('d.m.Y') . ")"];
+        $rows[] = [];
 
         // Сводка
-        $rows[] = ['ИТОГО по всем вкладкам', $this->totals['total'], ''];
-        if (! empty($this->totals['perUser'])) {
-            foreach ($this->totals['perUser'] as $name => $count) {
-                $rows[] = ['  ' . $name, $count, ''];
+        $t = $this->totals;
+        // Брак/исправные по всем вкладкам не суммируем — устройства разные
+        $rows[] = ['ИТОГО по всем вкладкам', $t['total']];
+        if (! empty($t['perUser'])) {
+            foreach ($t['perUser'] as $name => $count) {
+                $rows[] = ['  ' . $name, $count];
             }
         }
-        $rows[] = ['', '', ''];
+        $rows[] = [];
 
         // По вкладкам
         foreach ($this->perSheet as $data) {
+            $total   = $data['total'];
+            $defects = $data['defects'] ?? 0;
             $rows[] = [
                 $data['title'],
-                $data['total'],
+                $total,
+                $data['good'] ?? $total,
+                $defects,
+                $total > 0 ? round($defects / $total * 100, 1) : 0,
                 implode(', ', array_map(fn($u) => "{$u['name']} ({$u['count']})", $data['perUser'])) ?: '—',
             ];
         }

@@ -2,14 +2,43 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Employee;
+use App\Services\EmployeeDirectory;
 use Illuminate\Http\Request;
 
 class WorkstationController extends Controller
 {
+    public function __construct(private EmployeeDirectory $employees) {}
+
+    /**
+     * Защита от открытого редиректа: разрешаем только адреса этого же сайта.
+     */
+    private function safeIntended(mixed $url): string
+    {
+        $fallback = route('dashboard');
+        if (!is_string($url) || $url === '') return $fallback;
+
+        // Относительный путь вида "/records/pgp" (но не "//evil.com" и не "/\evil.com")
+        if (str_starts_with($url, '/') && !str_starts_with($url, '//') && !str_starts_with($url, '/\\')) {
+            return $url;
+        }
+
+        $target = parse_url($url);
+        $app    = parse_url(url('/'));
+        if (
+            $target !== false
+            && in_array(strtolower($target['scheme'] ?? ''), ['http', 'https'], true)
+            && strcasecmp($target['host'] ?? '', $app['host'] ?? '') === 0
+            && ($target['port'] ?? null) === ($app['port'] ?? null)
+        ) {
+            return $url;
+        }
+
+        return $fallback;
+    }
+
     public function show(Request $request)
     {
-        $intended = (string) $request->query('intended', route('dashboard'));
+        $intended = $this->safeIntended($request->query('intended'));
         $selected = session('workstation_workers', []);
         $workplaceType = session('workstation_type', 'post');
         $selectedPost = session('workstation_post');
@@ -17,55 +46,18 @@ class WorkstationController extends Controller
         $posts = range(1, 30);
         $peripherals = range(1, 50);
 
-        $employeesList = Employee::query()
-            ->active()
-            ->whereHas('user', fn($q) => $q->whereNotNull('email')->where('email', '!=', ''))
-            ->orderBy('short_name')
-            ->pluck('short_name')
-            ->map(fn($n) => trim((string) $n))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        $employeesList = $this->employees->namesForSelect();
 
         // ПИН-коды, подтверждённые в сессии
-        $verified = session('verified_workers', []);
-        $now = now()->timestamp;
-        $verifiedMap = [];
-        foreach ($verified as $id => $expires) {
-            if ((int) $expires > $now) {
-                $emp = Employee::find($id);
-                if ($emp && !empty($emp->short_name)) {
-                    $verifiedMap[trim($emp->short_name)] = (int) $expires;
-                }
-            }
-        }
+        $verifiedMap = $this->employees->verifiedMap();
 
         // Сотрудники без ПИН
-        $employeesWithoutPin = Employee::query()->active()->with('user')->get()
-            ->filter(fn($e) => !$e->user || !method_exists($e->user, 'hasPin') || !$e->user->hasPin())
-            ->pluck('short_name')
-            ->map(fn($n) => trim((string) $n))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        [, $employeesWithoutPin] = $this->employees->splitByPin();
 
         $canManageWorkers = auth()->check() && auth()->user()->canManageContent();
 
-        // Имя текущего пользователя (владелец записи) — ВЫЧИСЛЯЕМ ДО fallback
-        $currentEmployeeName = null;
-        if (auth()->check()) {
-            $user = auth()->user();
-            if ($user->employee && !empty($user->employee->short_name)) {
-                $currentEmployeeName = trim((string) $user->employee->short_name);
-            } elseif (isset($user->employee_id)) {
-                $emp = Employee::find($user->employee_id);
-                if ($emp && !empty($emp->short_name)) {
-                    $currentEmployeeName = trim((string) $emp->short_name);
-                }
-            }
-        }
+        // Имя текущего пользователя (владелец записи)
+        $currentEmployeeName = $this->employees->currentEmployeeName();
 
         // АВТО-ПОДСТАНОВКА: если сессия пуста, но есть текущий пользователь — ставим его первым
         $selected = array_values(array_filter((array) $selected, fn($v) => is_string($v) && trim($v) !== ''));
@@ -105,7 +97,7 @@ class WorkstationController extends Controller
             'workstation_peripheral' => $request->input('peripheral'),
         ]);
 
-        return redirect((string) $request->input('intended', route('dashboard')));
+        return redirect($this->safeIntended($request->input('intended')));
     }
 
     public function skip(Request $request)
@@ -117,7 +109,7 @@ class WorkstationController extends Controller
             'workstation_peripheral' => null,
         ]);
 
-        return redirect((string) $request->input('intended', route('dashboard')));
+        return redirect($this->safeIntended($request->input('intended')));
     }
 
     public function clear()

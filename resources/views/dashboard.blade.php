@@ -42,7 +42,7 @@
                         <div class="flex gap-1">
                             @foreach([1 => '1 день', 7 => '7 дней', 30 => '30 дней'] as $p => $label)
                                 <a href="{{ route('dashboard', ['stats_period' => $p]) }}"
-                                   style="flex: 1; text-align: center; padding: 4px 0; font-size: 12px; border-radius: 4px; border: 1px solid {{ ($statsPeriod ?? 30) === $p ? '#4f46e5' : '#d1d5db' }}; background-color: {{ ($statsPeriod ?? 30) === $p ? '#4f46e5' : '#ffffff' }}; color: {{ ($statsPeriod ?? 30) === $p ? '#ffffff' : '#374151' }}; text-decoration: none; font-weight: 500;">
+                                   class="period-btn {{ ($statsPeriod ?? 30) === $p ? 'period-btn--active' : '' }}">
                                     {{ $label }}
                                 </a>
                             @endforeach

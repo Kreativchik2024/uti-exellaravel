@@ -25,9 +25,12 @@ class ProfileController extends Controller
         ]);
 
         $user->fill($data);
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
+        }
         $user->save();
 
-        return back()->with('ok', 'Профиль обновлён.');
+        return redirect()->route('profile.edit')->with('ok', 'Профиль обновлён.');
     }
 
     public function updatePin(Request $request)
@@ -51,6 +54,11 @@ class ProfileController extends Controller
 
     public function destroy(Request $request)
     {
+        // Удаление учётки — только с подтверждением текущим паролем
+        $request->validateWithBag('userDeletion', [
+            'password' => ['required', 'current_password'],
+        ]);
+
         $user = $request->user();
 
         Auth::logout();

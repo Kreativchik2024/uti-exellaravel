@@ -11,9 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Колонка уже создаётся в create_camera_bracket_records_table —
+        // добавляем только на старых базах, где её нет.
+        if (Schema::hasColumn('camera_bracket_records', 'frame_serial')) {
+            return;
+        }
+
         Schema::table('camera_bracket_records', function (Blueprint $table) {
-            // Добавляем столбец frame_serial после serial_number
-            // nullable() — чтобы старые записи не ломались
             $table->string('frame_serial')->nullable()->after('serial_number');
         });
     }
@@ -23,8 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('camera_bracket_records', function (Blueprint $table) {
-            $table->dropColumn('frame_serial');
-        });
+        // Колонкой владеет create_camera_bracket_records_table — здесь ничего не удаляем.
     }
 };

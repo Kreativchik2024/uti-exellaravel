@@ -1,5 +1,38 @@
 <x-app-layout>
-    <style>[x-cloak]{display:none!important}</style>
+    @push('styles')
+    <style>
+        [x-cloak]{display:none!important}
+
+        /* ---- Зона 1: карточки вкладок ---- */
+        .sheet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .75rem; }
+        .sheet-card {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem;
+            padding: 1rem; display: flex; flex-direction: column; gap: .5rem;
+            transition: box-shadow .15s;
+        }
+        .sheet-card:hover { box-shadow: 0 4px 10px rgba(0,0,0,.06); }
+        .sheet-card--empty { opacity: .6; }
+        .sheet-card__title { font-size: .875rem; font-weight: 500; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sheet-card__total { font-size: 2rem; line-height: 1; font-weight: 800; color: #2563eb; font-variant-numeric: tabular-nums; }
+        .sheet-card--empty .sheet-card__total { color: #d1d5db; }
+        .sheet-card__unit  { font-size: .75rem; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: .05em; margin-left: .25rem; }
+        .sheet-card__bar   { display: flex; height: 6px; border-radius: 999px; overflow: hidden; background: #e5e7eb; }
+        .sheet-card__bar-good { background: #10b981; }
+        .sheet-card__bar-bad  { background: #ef4444; }
+        .sheet-card__split { display: flex; justify-content: space-between; gap: .5rem; font-size: .8125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .sheet-card__good  { color: #059669; }
+        .sheet-card__bad   { color: #dc2626; }
+        .sheet-card__muted { color: #9ca3af; font-weight: 400; }
+
+        html.dark .sheet-card__title { color: #94a3b8; }
+        html.dark .sheet-card        { background: #1e293b; border-color: #334155; }
+        html.dark .sheet-card__total { color: #60a5fa; }
+        html.dark .sheet-card--empty .sheet-card__total { color: #475569; }
+        html.dark .sheet-card__bar   { background: #334155; }
+        html.dark .sheet-card__good  { color: #34d399; }
+        html.dark .sheet-card__bad   { color: #f87171; }
+    </style>
+    @endpush
 
     <x-slot name="header">
         <div class="page-head">
@@ -90,12 +123,40 @@
                 </div>
             </div>
             <div x-show="expanded1" x-cloak>
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+                {{-- По вкладкам: выпуск / исправные / брак (общего итога нет — устройства разные) --}}
+                <div class="sheet-grid">
                     @foreach($perSheet as $slug => $data)
-                        <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition border border-gray-200 p-6 flex flex-col items-center justify-center text-center">
-                            <div class="text-sm font-medium text-gray-500 mb-3 truncate w-full" title="{{ $data['title'] }}">{{ $data['title'] }}</div>
-                            <span class="text-5xl font-extrabold {{ $data['total'] > 0 ? 'text-blue-600' : 'text-gray-300' }} leading-none mb-1">{{ $data['total'] }}</span>
-                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">{{ $data['unit'] === 'записей' ? 'штук' : $data['unit'] }}</span>
+                        @php
+                            $total   = $data['total'];
+                            $defects = $data['defects'] ?? 0;
+                            $good    = $data['good'] ?? $total;
+                            $pct     = $total > 0 ? round($defects / $total * 100, 1) : 0;
+                            $unit    = $data['unit'] === 'записей' ? 'шт.' : $data['unit'];
+                        @endphp
+                        <div class="sheet-card {{ $total === 0 ? 'sheet-card--empty' : '' }}">
+                            <div class="sheet-card__title" title="{{ $data['title'] }}">{{ $data['title'] }}</div>
+                            <div class="sheet-card__total">
+                                {{ number_format($total, 0, ',', ' ') }}
+                                <span class="sheet-card__unit">{{ $unit }}</span>
+                            </div>
+
+                            @if($total > 0)
+                                <div class="sheet-card__bar" role="img"
+                                     aria-label="Исправных {{ $good }}, брак {{ $defects }}">
+                                    <span class="sheet-card__bar-good" style="width: {{ 100 - $pct }}%"></span>
+                                    <span class="sheet-card__bar-bad"  style="width: {{ $pct }}%"></span>
+                                </div>
+                                <div class="sheet-card__split">
+                                    <span class="sheet-card__good">✓ {{ number_format($good, 0, ',', ' ') }}</span>
+                                    @if($data['hasDefects'] ?? true)
+                                        <span class="sheet-card__bad">✕ {{ number_format($defects, 0, ',', ' ') }} · {{ $pct }}%</span>
+                                    @else
+                                        <span class="sheet-card__muted">брак не учитывается</span>
+                                    @endif
+                                </div>
+                            @else
+                                <div class="sheet-card__split"><span class="sheet-card__muted">нет данных</span></div>
+                            @endif
                         </div>
                     @endforeach
                 </div>
@@ -424,6 +485,19 @@
     @push('scripts')
         <script src="{{ asset('vendor/chart.umd.min.js') }}"></script>
         <script>
+            // Цвета подписей и сетки графиков под текущую тему
+            (function () {
+                function applyChartTheme() {
+                    if (!window.Chart) return;
+                    var dark = document.documentElement.classList.contains('dark');
+                    Chart.defaults.color       = dark ? '#cbd5e1' : '#4b5563';
+                    Chart.defaults.borderColor = dark ? 'rgba(148, 163, 184, 0.18)' : 'rgba(0, 0, 0, 0.1)';
+                    Object.values(Chart.instances || {}).forEach(function (c) { c.update('none'); });
+                }
+                applyChartTheme();
+                document.addEventListener('themechange', applyChartTheme);
+            })();
+
             function statsZones(opts = {}) {
                 return {
                     initialFrom: opts.initialFrom || '',

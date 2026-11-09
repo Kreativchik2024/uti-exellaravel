@@ -85,7 +85,7 @@ return [
     'prohibited_unless'=> 'Поле :attribute запрещено, если :other не равно :values.',
     'regex'            => 'Формат поля :attribute некорректен.',
     'required'         => 'Поле :attribute обязательно для заполнения.',
-    'required_if'      => 'Поле :attribute обязательно, если :other равно :value.',
+    'required_if'      => 'Поле «:attribute» обязательно, когда :other — «:value».',
     'required_unless'  => 'Поле :attribute обязательно, если :other не равно :values.',
     'required_with'    => 'Поле :attribute обязательно, если :values присутствует.',
     'required_with_all'=> 'Поле :attribute обязательно, если присутствует :values.',

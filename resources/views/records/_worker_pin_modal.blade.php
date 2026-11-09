@@ -51,6 +51,8 @@
 
     var pinCheckUrl = cfgEl.dataset.pinCheckUrl || '';
     var csrf        = cfgEl.dataset.csrf || '';
+    // Актуальный токен (public/js/csrf.js обновляет его на долго открытых страницах)
+    function token() { return window.csrfToken ? (window.csrfToken() || csrf) : csrf; }
     var currentEmployee = (cfgEl.dataset.currentEmployee || '').trim();
     var canManageWorkers = cfgEl.dataset.canManage === '1';
 
@@ -215,7 +217,7 @@
 
         var body = 'short_name=' + encodeURIComponent(pendingEmployee || '')
                  + '&pin=' + encodeURIComponent(pin)
-                 + '&_token=' + encodeURIComponent(csrf);
+                 + '&_token=' + encodeURIComponent(token());
 
         fetch(pinCheckUrl, {
             method: 'POST',
@@ -260,7 +262,7 @@
     function claimWorker(name) {
         if (!name) return;
         var body = new URLSearchParams();
-        body.set('_token', csrf);
+        body.set('_token', token());
         body.set('short_name', name);
         body.set('sheet', '{{ $sheet ?? '' }}');
         body.set('record_id', '{{ $record->id ?? '' }}');

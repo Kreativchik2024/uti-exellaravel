@@ -28,12 +28,13 @@ use App\Observers\FirmwareVersionObserver;
 use App\Policies\FirmwarePolicy;
 use App\Policies\NewsPolicy;
 use App\Policies\RecordPolicy;
+use App\Services\EmployeeDirectory;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\View; // <--- ДОБАВЛЕНО
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 
@@ -41,7 +42,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->scoped(EmployeeDirectory::class);
     }
 
     public function boot(): void
@@ -105,27 +106,10 @@ class AppServiceProvider extends ServiceProvider
             });
         }
 
-        // --- ГЛОБАЛЬНАЯ ПЕРЕДАЧА ПИН-КОДОВ ВО ВСЕ ШАБЛОНЫ ---
-        View::composer('*', function ($view) {
-            $verified = session('verified_workers', []);
-            $now = now()->timestamp;
-            $ids = [];
-            
-            foreach ($verified as $id => $expires) {
-                if ((int) $expires > $now) {
-                    $ids[(int) $id] = (int) $expires;
-                }
-            }
-            
-            $map = [];
-            if (!empty($ids)) {
-                $employees = Employee::whereIn('id', array_keys($ids))->get(['id', 'short_name']);
-                foreach ($employees as $e) {
-                    $map[$e->short_name] = $ids[$e->id];
-                }
-            }
-            
-            $view->with('globalVerifiedWorkersMap', $map);
+        // Подтверждённые ПИН — только в layout-шаблоны, которые их используют
+        // (раньше composer('*') делал запрос к БД на каждый партиал/компонент).
+        View::composer(['layouts.app', 'layouts.navigation'], function ($view) {
+            $view->with('globalVerifiedWorkersMap', app(EmployeeDirectory::class)->verifiedMap());
         });
 
         $this->configureRateLimiting();
@@ -133,6 +117,19 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureRateLimiting(): void
     {
+        // Проверка ПИН: 10 попыток в минуту на пользователя (и на IP для страховки)
+        RateLimiter::for('pin', function (Request $request) {
+            $message = 'Слишком много попыток ввода ПИН. Подождите минуту.';
+            $response = fn (Request $r, array $headers) => response()->json(
+                ['ok' => false, 'error' => $message], 429, $headers
+            );
+
+            return [
+                Limit::perMinute(10)->by('pin-user:' . ($request->user()?->id ?? 'guest'))->response($response),
+                Limit::perMinute(30)->by('pin-ip:' . $request->ip())->response($response),
+            ];
+        });
+
         RateLimiter::for('login', function (Request $request) {
             $key = Str::transliterate(
                 Str::lower((string) $request->input('email')) . '|' . $request->ip()

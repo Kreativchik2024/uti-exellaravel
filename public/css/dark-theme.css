@@ -122,3 +122,64 @@ html.dark .border-blue-200    { border-color: #1e40af !important; }
 html.dark .bg-indigo-600:hover,
 html.dark .bg-blue-600:hover { filter: brightness(1.1); }
 html.dark .text-gray-300 { color: #cbd5e1 !important; }
+
+/* ============================================================
+   Дополнения: классы, которые встречаются в шаблонах,
+   но раньше не были покрыты (найдены сканированием views).
+   ============================================================ */
+
+/* ---------- Полупрозрачные фоны и градиенты ---------- */
+html.dark .bg-gray-50\/50,
+html.dark .bg-gray-50\/60 { background-color: rgba(17, 24, 39, 0.6) !important; }
+html.dark .from-gray-50,
+html.dark .from-gray-50\/80 {
+    --tw-gradient-from: #111827 var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgba(17, 24, 39, 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html.dark .to-white      { --tw-gradient-to: #1e293b var(--tw-gradient-to-position) !important; }
+html.dark .to-gray-100\/50 { --tw-gradient-to: rgba(15, 23, 42, 0.5) var(--tw-gradient-to-position) !important; }
+html.dark .border-gray-200\/70 { border-color: rgba(51, 65, 85, 0.7) !important; }
+
+/* ---------- Цветной текст (тёмные оттенки плохо читаются на тёмном) ---------- */
+html.dark .text-blue-700    { color: #93c5fd !important; }
+html.dark .text-blue-600    { color: #60a5fa !important; }
+html.dark .text-green-700   { color: #86efac !important; }
+html.dark .text-emerald-700 { color: #6ee7b7 !important; }
+html.dark .text-indigo-700  { color: #a5b4fc !important; }
+html.dark .text-amber-900   { color: #fde68a !important; }
+html.dark .text-red-600     { color: #f87171 !important; }
+
+/* ---------- Цветные рамки ---------- */
+html.dark .border-green-300 { border-color: #15803d !important; }
+html.dark .border-red-300   { border-color: #b91c1c !important; }
+
+/* ---------- hover / focus ---------- */
+html.dark .hover\:text-gray-900:hover,
+html.dark .focus\:text-gray-800:focus,
+html.dark .focus\:text-gray-700:focus { color: #f1f5f9 !important; }
+html.dark .hover\:text-blue-700:hover { color: #bfdbfe !important; }
+html.dark .hover\:bg-blue-50\/50:hover { background-color: rgba(23, 37, 84, 0.5) !important; }
+html.dark .focus\:bg-white:focus,
+html.dark .focus\:bg-gray-50:focus,
+html.dark .focus\:bg-gray-100:focus { background-color: #1e293b !important; }
+html.dark .focus\:border-gray-300:focus { border-color: #475569 !important; }
+html.dark .focus\:bg-indigo-100:focus { background-color: #312e81 !important; }
+html.dark .focus\:text-indigo-800:focus { color: #c7d2fe !important; }
+
+/* ---------- Нативные элементы браузера (календарь, скроллбар) ---------- */
+html.dark { color-scheme: dark; }
+
+/* ---------- Переключатель периода на дашборде ---------- */
+.period-btn {
+    flex: 1; text-align: center; padding: 4px 0; font-size: 12px; font-weight: 500;
+    border-radius: 4px; border: 1px solid #d1d5db; background-color: #fff; color: #374151;
+    text-decoration: none;
+}
+.period-btn:hover { background-color: #f3f4f6; }
+.period-btn--active,
+.period-btn--active:hover { border-color: #4f46e5; background-color: #4f46e5; color: #fff; }
+html.dark .period-btn { border-color: #475569; background-color: #1e293b; color: #cbd5e1; }
+html.dark .period-btn:hover { background-color: #334155; }
+html.dark .period-btn--active,
+html.dark .period-btn--active:hover { border-color: #6366f1; background-color: #4f46e5; color: #fff; }

@@ -12,7 +12,63 @@ class StatsService
 {
     private const WORKER_FIELDS = ['worker1', 'worker2', 'worker3', 'worker4', 'worker5'];
 
+    /** Значения select-полей, означающие брак. */
+    public const DEFECT_VALUES = [
+        'Не сдан', 'Неисправен', 'В ремонт',
+        'Не работает', 'Требует ремонта', 'Требует замены',
+    ];
+
     private ?array $workersIndex = null;
+
+    /**
+     * Единое правило «что считать браком» для вкладки (используется в сводке,
+     * в зоне «Брак по категориям» и её графике — цифры везде совпадают).
+     *
+     * defect — брак (не исправлен); fixed — был брак, но изделие сдано.
+     * Каждый элемент: ['sql' => '(...)', 'bindings' => [...]] или null, если правил нет.
+     *
+     * @return array{defect: ?array{sql: string, bindings: array}, fixed: ?array{sql: string, bindings: array}}
+     */
+    public function defectSql(array $cfg): array
+    {
+        $fields    = $cfg['fields'] ?? [];
+        $hasStatus = isset($fields['status']);
+
+        $defect = []; $defectBindings = [];
+        $fixed  = [];
+
+        $notEmpty = function (string $field) use ($hasStatus, &$defect, &$fixed) {
+            if ($hasStatus) {
+                $defect[] = "(`$field` IS NOT NULL AND `$field` != '' AND (`status` IS NULL OR `status` != 'Сдан'))";
+                $fixed[]  = "(`$field` IS NOT NULL AND `$field` != '' AND `status` = 'Сдан')";
+            } else {
+                $defect[] = "(`$field` IS NOT NULL AND `$field` != '')";
+            }
+        };
+
+        if (isset($fields['fault_code'])) {
+            $notEmpty('fault_code');
+        }
+
+        foreach ($fields as $name => $f) {
+            $type = $f['type'] ?? '';
+
+            if ($type === 'select' && !empty($f['options'])) {
+                $matched = array_values(array_intersect($f['options'], self::DEFECT_VALUES));
+                if ($matched) {
+                    $defect[] = "`$name` IN (" . implode(',', array_fill(0, count($matched), '?')) . ')';
+                    array_push($defectBindings, ...$matched);
+                }
+            } elseif ($type === 'textarea' && preg_match('/(defect|дефект|брак)/iu', $name)) {
+                $notEmpty($name);
+            }
+        }
+
+        return [
+            'defect' => $defect ? ['sql' => '(' . implode(' OR ', $defect) . ')', 'bindings' => $defectBindings] : null,
+            'fixed'  => $fixed  ? ['sql' => '(' . implode(' OR ', $fixed) . ')',  'bindings' => []] : null,
+        ];
+    }
 
     /**
      * Метаданные таблицы берём из config/sheets.php, а не из information_schema:
@@ -87,26 +143,37 @@ class StatsService
                 $this->applyWorkerFilter($q, $meta['workerFields'], $workerVariants);
             }
 
-            // Один запрос вместо двух: сумма по created_by даёт и total, и разбивку
-            $byUser = (clone $q)
-                ->select('created_by', $hasQty ? DB::raw('SUM(qty) as c') : DB::raw('COUNT(*) as c'))
-                ->groupBy('created_by')->pluck('c', 'created_by')->toArray();
+            // Один запрос: по created_by сразу и выпуск, и брак (условная сумма)
+            $amount = $hasQty ? 'COALESCE(qty, 0)' : '1';
+            $rule   = $this->defectSql($cfg)['defect'];
 
-            $total = array_sum(array_map('intval', $byUser));
+            $q->select('created_by')
+                ->selectRaw("SUM($amount) as c")
+                ->groupBy('created_by');
+            if ($rule) {
+                $q->selectRaw("SUM(CASE WHEN {$rule['sql']} THEN $amount ELSE 0 END) as d", $rule['bindings']);
+            }
+            $rows = $q->get();
 
-            $users = User::whereIn('id', array_keys($byUser))->pluck('name', 'id')->toArray();
+            $total   = (int) $rows->sum('c');
+            $defects = $rule ? (int) $rows->sum('d') : 0;
+
+            $users = User::whereIn('id', $rows->pluck('created_by')->filter())->pluck('name', 'id')->toArray();
 
             $perUser = [];
-            foreach ($byUser as $uid => $count) {
-                $perUser[] = ['name' => $users[$uid] ?? 'Удалён', 'count' => (int) $count];
+            foreach ($rows as $row) {
+                $perUser[] = ['name' => $users[$row->created_by] ?? 'Удалён', 'count' => (int) $row->c];
             }
             usort($perUser, fn($a, $b) => $b['count'] <=> $a['count']);
 
             $result[$slug] = [
-                'title'   => $cfg['title'],
-                'total'   => (int) $total,
-                'unit'    => $hasQty ? 'шт.' : 'записей',
-                'perUser' => $perUser,
+                'title'      => $cfg['title'],
+                'total'      => $total,
+                'good'       => $total - $defects,
+                'defects'    => $defects,
+                'hasDefects' => $rule !== null, // есть ли у вкладки критерий брака
+                'unit'       => $hasQty ? 'шт.' : 'записей',
+                'perUser'    => $perUser,
             ];
         }
 
@@ -123,6 +190,7 @@ class StatsService
             }
         }
         arsort($perUser);
+
         return ['total' => $total, 'perUser' => $perUser];
     }
 

@@ -3,7 +3,9 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
+        <meta name="csrf-token" content="{{ csrf_token() }}" data-refresh-url="{{ route('csrf.refresh') }}">
+        {{-- Автообновление CSRF-токена: защита от ошибки 419 --}}
+        <script src="{{ asset('js/csrf.js') }}?v={{ filemtime(public_path('js/csrf.js')) }}"></script>
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
@@ -50,6 +52,15 @@
             @endisset
 
             <main class="app-main">
+                {{-- Форма была отправлена с устаревшей страницы (419) — данные возвращены в форму --}}
+                @if(session('csrf_expired'))
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+                        <div class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm font-medium" role="alert">
+                            {{ session('csrf_expired') }}
+                        </div>
+                    </div>
+                @endif
+
                 {{ $slot }}
             </main>
         </div>
@@ -75,6 +86,8 @@
                     html.classList.toggle('dark', nowDark);
                     try { localStorage.setItem('theme', nowDark ? 'dark' : 'light'); } catch (e) {}
                     syncIcons();
+                    // Для компонентов, которые красят себя сами (графики и т.п.)
+                    document.dispatchEvent(new CustomEvent('themechange', { detail: { dark: nowDark } }));
                 };
                 function syncIcons() {
                     var isDark = document.documentElement.classList.contains('dark');

@@ -25,7 +25,13 @@ class RegistrationTest extends TestCase
             'password_confirmation' => 'password',
         ]);
 
-        $this->assertAuthenticated();
-        $response->assertRedirect(route('dashboard', absolute: false));
+        // Новый пользователь ждёт подтверждения админа: не входит и не активен
+        $this->assertGuest();
+        $response->assertRedirect(route('login', absolute: false));
+        $this->assertDatabaseHas('users', [
+            'email' => 'test@example.com',
+            'role' => 'executor',
+            'is_active' => false,
+        ]);
     }
 }

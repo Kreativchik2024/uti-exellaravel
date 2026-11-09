@@ -2,8 +2,8 @@
 // Чистка sled.csv -> sled_clean.csv
 // 13 колонок, разделитель ';', кавычки '"', переносы внутри кавычек
 
-$in  = __DIR__ . '/storage/import/sled.csv';
-$out = __DIR__ . '/storage/import/sled_clean.csv';
+$in  = dirname(__DIR__) . '/storage/import/sled.csv';
+$out = dirname(__DIR__) . '/storage/import/sled_clean.csv';
 
 $fh_in  = fopen($in, 'r');
 $fh_out = fopen($out, 'w');
@@ -69,6 +69,6 @@ fclose($fh_in);
 fclose($fh_out);
 
 if ($bad) {
-    file_put_contents(__DIR__ . '/storage/import/sled_bad.txt', implode("\n", $bad));
+    file_put_contents(dirname(__DIR__) . '/storage/import/sled_bad.txt', implode("\n", $bad));
     echo "Пропущено строк: " . count($bad) . " (см. storage/import/sled_bad.txt)\n";
 }

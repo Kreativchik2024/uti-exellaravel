@@ -58,6 +58,19 @@
         ],
     ];
 
+    $comboOptions = $comboOptions ?? [];
+
+    // Вкладка может задать собственную раскладку ('layout' в config/sheets.php)
+    if (!empty($cfg['layout'])) {
+        $groupDefinitions = [];
+        foreach ($cfg['layout'] as $i => $def) {
+            $groupDefinitions['layout_' . $i] = $def + ['subtitle' => null, 'icon' => 'dot'];
+        }
+    }
+
+    // Текущее значение поля (с учётом old() после ошибки валидации)
+    $currentValue = fn (string $field) => old($field, isset($record) ? $record->{$field} : ($defaults[$field] ?? null));
+
     $groupedFields = [];
     $usedFields    = [];
 
@@ -169,7 +182,14 @@
 
     {{-- Секции полей --}}
     @foreach($groupedFields as $key => $group)
-        <div class="pt-8 first:pt-0">
+        @php
+            // Блок, который появляется только после заполнения поля (например, статуса)
+            $showWhen   = $group['show_when_filled'] ?? null;
+            $groupShown = !$showWhen || filled($currentValue($showWhen));
+        @endphp
+        <div class="pt-8 first:pt-0"
+             @if($showWhen) data-show-when-filled="{{ $showWhen }}" @endif
+             @unless($groupShown) hidden @endunless>
             <div class="flex items-start gap-3 mb-5">
                 <div class="flex-shrink-0 w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
                     @switch($group['icon'])
@@ -217,7 +237,20 @@
                     @php
                         $f = $cfg['fields'][$name];
                         $value = old($name, $record->{$name} ?? ($defaults[$name] ?? ($f['default'] ?? null)));
-                        $isReq = str_contains($f['rules'] ?? '', 'required') && !str_contains($f['rules'] ?? '', 'nullable');
+                        // rules бывают строкой ('required|string') или массивом (когда внутри regex с «|»)
+                        $ruleList = is_array($f['rules'] ?? null) ? $f['rules'] : explode('|', (string) ($f['rules'] ?? ''));
+                        $isReq = in_array('required', $ruleList, true) && !in_array('nullable', $ruleList, true);
+
+                        // Обязательность по значению другого поля: 'required_when' => ['status' => 'Не сдан']
+                        $reqWhenField = $reqWhenValue = null;
+                        if (!empty($f['required_when'])) {
+                            $reqWhenField = array_key_first($f['required_when']);
+                            $reqWhenValue = (string) $f['required_when'][$reqWhenField];
+                            $isReq = (string) $currentValue($reqWhenField) === $reqWhenValue;
+                        }
+                        $reqAttrs = $reqWhenField
+                            ? 'data-required-when-field="'.e($reqWhenField).'" data-required-when-value="'.e($reqWhenValue).'"'
+                            : '';
                         $hasLookup  = !empty($f['lookup']);
                         $lookupData = $lookups[$name] ?? null;
                         $label = $f['label'] ?? $name;
@@ -232,15 +265,54 @@
                         }
                     @endphp
 
-                    <div class="{{ $isTimeLocked ? 'opacity-80' : '' }}">
+                    <div class="{{ $isTimeLocked ? 'opacity-80' : '' }} {{ $type === 'textarea' && !empty($cfg['layout']) ? 'md:col-span-2' : '' }}"
+                         {!! $reqAttrs !!}>
                         <label class="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
                             {{ $label }}
-                            @if($isReq && !$isTimeLocked)
-                                <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-semibold uppercase tracking-wide">Обязательно</span>
+                            @if(!$isTimeLocked && ($isReq || $reqWhenField))
+                                <span data-required-badge
+                                      class="inline-flex items-center px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-semibold uppercase tracking-wide"
+                                      @unless($isReq) hidden @endunless>Обязательно</span>
                             @endif
                         </label>
 
-                        @if($hasLookup)
+                        @if($type === 'ip_suffix')
+                            @php
+                                // Маска IP: фиксированный префикс + последний октет
+                                $ipPrefix = $f['prefix'] ?? '';
+                                $ipFull   = trim((string) $value);
+                                $ipSuffix = str_starts_with($ipFull, $ipPrefix) ? substr($ipFull, strlen($ipPrefix)) : '';
+                                $ipOther  = $ipFull !== '' && $ipSuffix === '' && !ctype_digit($ipFull) ? $ipFull : null;
+                                if ($ipSuffix === '' && ctype_digit($ipFull)) $ipSuffix = $ipFull;
+                            @endphp
+                            <div class="ip-mask flex items-stretch rounded-lg shadow-sm @error($name) ip-mask--error @enderror">
+                                <span class="ip-mask__prefix inline-flex items-center px-3.5 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-sm font-mono text-gray-500 select-none">{{ $ipPrefix }}</span>
+                                <input type="text" name="{{ $name }}" value="{{ $ipSuffix }}"
+                                       inputmode="numeric" maxlength="3" autocomplete="off"
+                                       pattern="25[0-4]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]?"
+                                       title="Число от 1 до 254"
+                                       data-ip-suffix
+                                       @if($isReq) required @endif @if($isTimeLocked) disabled @endif
+                                       placeholder="1–254"
+                                       class="{{ $baseInput }} !rounded-l-none font-mono @error($name) !border-red-400 !ring-red-500/15 @enderror">
+                            </div>
+                            @if($ipOther)
+                                <p class="mt-1 text-xs text-amber-700">Прежнее значение: <span class="font-mono">{{ $ipOther }}</span> — введите новое число</p>
+                            @endif
+
+                        @elseif($type === 'combo')
+                            <input type="text" name="{{ $name }}" value="{{ $value }}"
+                                   list="combo-{{ $name }}" autocomplete="off"
+                                   @if($isReq) required @endif @if($isTimeLocked) disabled @endif
+                                   placeholder="{{ $f['placeholder'] ?? '' }}"
+                                   class="{{ $baseInput }} @error($name) !border-red-400 !ring-red-500/15 @enderror">
+                            <datalist id="combo-{{ $name }}">
+                                @foreach($comboOptions[$name] ?? [] as $opt)
+                                    <option value="{{ $opt }}"></option>
+                                @endforeach
+                            </datalist>
+
+                        @elseif($hasLookup)
                             <div class="lookup-result mb-1.5">
                                 @if($lookupData)
                                     @php
@@ -296,6 +368,12 @@
                                    class="{{ $baseInput }} @error($name) !border-red-400 !ring-red-500/15 @enderror">
 
                         @elseif($type === 'time')
+                            @php
+                                // 'default_now': пустое поле получает время открытия формы (время сервера)
+                                if (!$value && !empty($f['default_now']) && !$isTimeLocked) {
+                                    $value = now()->format('H:i');
+                                }
+                            @endphp
                             <input type="time" name="{{ $name }}"
                                    value="{{ $value ? \Carbon\Carbon::parse($value)->format('H:i') : '' }}"
                                    @if($isReq) required @endif @if($isTimeLocked) disabled @endif
@@ -311,6 +389,10 @@
                                    @if($isReq) required @endif @if($isTimeLocked) disabled @endif
                                    placeholder="{{ $f['placeholder'] ?? '' }}"
                                    class="{{ $baseInput }} @error($name) !border-red-400 !ring-red-500/15 @enderror">
+                        @endif
+
+                        @if(!empty($f['hint']))
+                            <p class="mt-1 text-xs text-gray-500">{{ $f['hint'] }}</p>
                         @endif
 
                         @error($name)
@@ -396,6 +478,48 @@ document.addEventListener('DOMContentLoaded', function () {
             timer = setTimeout(doLookup, 400);
         });
     });
+
+    // --- МАСКА IP: в поле последнего октета — только цифры ---
+    document.querySelectorAll('input[data-ip-suffix]').forEach(function (inp) {
+        inp.addEventListener('input', function () {
+            var clean = inp.value.replace(/\D+/g, '').slice(0, 3);
+            if (clean !== inp.value) inp.value = clean;
+        });
+    });
+
+    // --- ЗАВИСИМЫЕ ПОЛЯ: блок «показать после заполнения» и «обязательно, если …» ---
+    (function () {
+        var form = document.querySelector('.record-form-card') && document.querySelector('.record-form-card').closest('form');
+        if (!form) return;
+
+        function valueOf(field) {
+            var el = form.querySelector('[name="' + field + '"]');
+            return el ? String(el.value || '').trim() : '';
+        }
+
+        function sync() {
+            form.querySelectorAll('[data-show-when-filled]').forEach(function (block) {
+                block.hidden = valueOf(block.dataset.showWhenFilled) === '';
+            });
+
+            form.querySelectorAll('[data-required-when-field]').forEach(function (wrap) {
+                var on = valueOf(wrap.dataset.requiredWhenField) === wrap.dataset.requiredWhenValue;
+                var input = wrap.querySelector('input[name], select[name], textarea[name]');
+                if (input && !input.disabled) input.required = on;
+                var badge = wrap.querySelector('[data-required-badge]');
+                if (badge) badge.hidden = !on;
+            });
+        }
+
+        var watched = {};
+        form.querySelectorAll('[data-show-when-filled]').forEach(function (b) { watched[b.dataset.showWhenFilled] = true; });
+        form.querySelectorAll('[data-required-when-field]').forEach(function (w) { watched[w.dataset.requiredWhenField] = true; });
+        Object.keys(watched).forEach(function (field) {
+            var el = form.querySelector('[name="' + field + '"]');
+            if (el) { el.addEventListener('change', sync); el.addEventListener('input', sync); }
+        });
+        sync();
+    })();
 
     // --- ПРОВЕРКА НА ДУБЛИКАТЫ (для всех пользователей) ---
     var workerSelects = document.querySelectorAll('select[data-worker-field]');

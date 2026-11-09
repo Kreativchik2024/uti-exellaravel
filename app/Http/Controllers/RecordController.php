@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use App\Services\EmployeeDirectory;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -33,66 +34,16 @@ class RecordController extends Controller
         return auth()->check() && auth()->user()->canManageContent();
     }
 
+    public function __construct(private EmployeeDirectory $employees) {}
+
     private function currentEmployeeName(): ?string
     {
-        $user = auth()->user();
-        if (!$user) return null;
-
-        if (!empty($user->employee) && !empty($user->employee->short_name)) {
-            return trim($user->employee->short_name);
-        }
-
-        if (isset($user->employee_id)) {
-            $emp = Employee::find($user->employee_id);
-            if ($emp && !empty($emp->short_name)) {
-                return trim($emp->short_name);
-            }
-        }
-
-        return null;
-    }
-
-    private function employeesRequiringPin(): array
-    {
-        $list = Employee::query()->active()->with('user')->get();
-        $result = [];
-        foreach ($list as $e) {
-            if ($e->user && method_exists($e->user, 'hasPin') && $e->user->hasPin()) {
-                $result[] = trim($e->short_name);
-            }
-        }
-        return $result;
-    }
-
-    private function employeesWithoutPin(): array
-    {
-        $list = Employee::query()->active()->with('user')->get();
-        $result = [];
-        foreach ($list as $e) {
-            if (!$e->user || !method_exists($e->user, 'hasPin') || !$e->user->hasPin()) {
-                $result[] = trim($e->short_name);
-            }
-        }
-        return $result;
+        return $this->employees->currentEmployeeName();
     }
 
     private function verifiedWorkersMap(): array
     {
-        $verified = session('verified_workers', []);
-        $now = now()->timestamp;
-
-        $ids = [];
-        foreach ($verified as $id => $expires) {
-            if ((int) $expires > $now) $ids[(int) $id] = (int) $expires;
-        }
-        if (empty($ids)) return [];
-
-        $employees = Employee::whereIn('id', array_keys($ids))->get(['id', 'short_name']);
-        $map = [];
-        foreach ($employees as $e) {
-            $map[trim($e->short_name)] = $ids[$e->id];
-        }
-        return $map;
+        return $this->employees->verifiedMap();
     }
 
     private function recordWorkerValues($record, array $cfg): array
@@ -113,6 +64,67 @@ class RecordController extends Controller
         return null;
     }
 
+    /**
+     * Поля type=ip_suffix: в форме вводится только последний октет,
+     * здесь он склеивается с префиксом из конфига ('prefix' => '192.168.1.').
+     */
+    private function applyIpSuffix(array $cfg, Request $r): void
+    {
+        foreach ($cfg['fields'] as $name => $f) {
+            if (($f['type'] ?? '') !== 'ip_suffix' || !$r->exists($name)) continue;
+
+            $raw = trim((string) $r->input($name));
+            if ($raw !== '' && ctype_digit($raw)) {
+                $r->merge([$name => ($f['prefix'] ?? '') . ltrim($raw, '0')]);
+            }
+        }
+    }
+
+    /** Свои тексты ошибок из конфига: 'messages' => ['regex' => '...'] у поля. */
+    private function fieldMessages(array $cfg): array
+    {
+        $out = [];
+        foreach ($cfg['fields'] as $name => $f) {
+            foreach ($f['messages'] ?? [] as $rule => $text) {
+                $out["$name.$rule"] = $text;
+            }
+        }
+        return $out;
+    }
+
+    /** Человеческие названия полей для сообщений валидации. */
+    private function attributeNames(array $cfg): array
+    {
+        return collect($cfg['fields'])->map(fn ($f, $k) => mb_strtolower($f['label'] ?? $k))->all();
+    }
+
+    /**
+     * Варианты для полей type=combo: ранее введённые значения (частые — выше)
+     * плюс заданные в конфиге. В форме — выпадающий список с возможностью ввести своё.
+     */
+    private function comboOptions(array $cfg): array
+    {
+        $result = [];
+        foreach ($cfg['fields'] as $name => $f) {
+            if (($f['type'] ?? '') !== 'combo') continue;
+
+            $used = $cfg['model']::query()
+                ->whereNotNull($name)->where($name, '!=', '')
+                ->groupBy($name)
+                ->orderByRaw('COUNT(*) DESC')
+                ->limit(200)
+                ->pluck($name)
+                ->map(fn ($v) => trim((string) $v))
+                ->all();
+
+            $result[$name] = array_values(array_unique(array_filter(
+                array_merge($f['options'] ?? [], $used),
+                fn ($v) => $v !== ''
+            )));
+        }
+        return $result;
+    }
+
     private function withSnapshotRules(array $cfg, array $rules): array
     {
         foreach ($cfg['fields'] as $name => $f) {
@@ -129,13 +141,7 @@ class RecordController extends Controller
 
     private function employeesForSelect(): array
     {
-        return Employee::query()
-            ->active()
-            ->whereHas('user', fn($q) => $q->whereNotNull('email')->where('email', '!=', ''))
-            ->orderBy('short_name')
-            ->pluck('short_name')
-            ->map(fn($name) => trim($name))
-            ->all();
+        return $this->employees->namesForSelect();
     }
 
     private function workerDefaults(): array
@@ -203,12 +209,10 @@ class RecordController extends Controller
             if ($currentName && $value === $currentName) continue;
             if (isset($exemptValues[$field]) && trim($exemptValues[$field]) === $value) continue;
 
-            $employee = Employee::where('short_name', $value)->active()->with('user')->first();
+            $employee = $this->employees->findActiveByName($value);
             if (!$employee) continue;
 
-            if (!$employee->user
-                || !method_exists($employee->user, 'hasPin')
-                || !$employee->user->hasPin()) {
+            if (!$employee->user || !$employee->user->hasPin()) {
                 $errors[$field] = "У сотрудника «{$value}» не установлен ПИН-код. Выберите другого.";
                 continue;
             }
@@ -393,7 +397,7 @@ class RecordController extends Controller
         if ($q !== '') {
             $searchable = [];
             foreach ($cfg['fields'] as $fn => $fc) {
-                if (in_array($fc['type'], ['text', 'textarea', 'string'])) $searchable[] = $fn;
+                if (in_array($fc['type'], ['text', 'textarea', 'string', 'combo', 'ip_suffix'])) $searchable[] = $fn;
             }
             if (!empty($searchable)) {
                 $query->where(function ($w) use ($searchable, $q) {
@@ -455,20 +459,20 @@ class RecordController extends Controller
         $canManageWorkers      = $this->canManageWorkersWithoutPin();
         $verifiedWorkersMap    = $this->verifiedWorkersMap();
         $currentEmployeeName   = $this->currentEmployeeName();
-        $employeesRequiringPin = $this->employeesRequiringPin();
-        $employeesWithoutPin   = $this->employeesWithoutPin();
+        [$employeesRequiringPin, $employeesWithoutPin] = $this->employees->splitByPin();
         $originalWorkers       = array_filter(
             array_intersect_key($defaults, array_flip(self::WORKER_FIELDS)),
             fn($v) => $v !== '' && $v !== null
         );
         $isTimeLocked = false;
         $serverNow    = now()->timestamp;
+        $comboOptions = $this->comboOptions($cfg);
 
         return view('records.create', compact(
             'sheet', 'cfg', 'defaults', 'employeesList', 'lookups',
             'canManageWorkers', 'verifiedWorkersMap', 'currentEmployeeName',
             'employeesRequiringPin', 'employeesWithoutPin', 'originalWorkers',
-            'isTimeLocked', 'serverNow'
+            'isTimeLocked', 'serverNow', 'comboOptions'
         ));
     }
 
@@ -491,10 +495,11 @@ class RecordController extends Controller
             }
         }
 
+        $this->applyIpSuffix($cfg, $r);
         $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
         $rules = $this->withSnapshotRules($cfg, $rules);
 
-        $data = $r->validate($rules);
+        $data = $r->validate($rules, $this->fieldMessages($cfg), $this->attributeNames($cfg));
 
         $exempt = array_filter(
             array_intersect_key($defaults, array_flip(self::WORKER_FIELDS)),
@@ -532,20 +537,20 @@ class RecordController extends Controller
         $canManageWorkers      = $this->canManageWorkersWithoutPin();
         $verifiedWorkersMap    = $this->verifiedWorkersMap();
         $currentEmployeeName   = $this->currentEmployeeName();
-        $employeesRequiringPin = $this->employeesRequiringPin();
-        $employeesWithoutPin   = $this->employeesWithoutPin();
+        [$employeesRequiringPin, $employeesWithoutPin] = $this->employees->splitByPin();
         $originalWorkers       = array_filter(
             $this->recordWorkerValues($record, $cfg),
             fn($v) => $v !== '' && $v !== null
         );
         $isTimeLocked = $this->isRecordLocked($record);
         $serverNow    = now()->timestamp;
+        $comboOptions = $this->comboOptions($cfg);
 
         return view('records.edit', compact(
             'sheet', 'cfg', 'record', 'employeesList', 'lookups',
             'canManageWorkers', 'verifiedWorkersMap', 'currentEmployeeName',
             'employeesRequiringPin', 'employeesWithoutPin', 'originalWorkers',
-            'isTimeLocked', 'serverNow'
+            'isTimeLocked', 'serverNow', 'comboOptions'
         ));
     }
 
@@ -570,10 +575,11 @@ class RecordController extends Controller
             if (in_array($val, ['Нет', '0', 0, false, 'false'], true)) $r->merge(['is_repaired' => 0]);
         }
 
+        $this->applyIpSuffix($cfg, $r);
         $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
         $rules = $this->withSnapshotRules($cfg, $rules);
 
-        $data = $r->validate($rules);
+        $data = $r->validate($rules, $this->fieldMessages($cfg), $this->attributeNames($cfg));
 
         $existing = $this->recordWorkerValues($record, $cfg);
         $this->validateWorkers($data, $existing);

@@ -26,25 +26,19 @@ return [
                 'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
                 'post_number' => ['label'=>'Пост','type'=>'number','rules'=>'required|integer|min:1|max:30'],
             ], $workers, [
-                'work_start'      => ['label'=>'Начало','type'=>'time','rules'=>'nullable'],
-                'work_end'        => ['label'=>'Окончание','type'=>'time','rules'=>'nullable'],
                 'board_number'    => ['label'=>'Номер борта','type'=>'text','rules'=>'required|string|max:80'],
-                'ip_address'      => ['label'=>'IP модуля связи','type'=>'text','rules'=>'required|string|max:64'],
-                'fuselage_number' => ['label'=>'№ фюзеляжа','type'=>'text','rules'=>'nullable|string|max:64'],
-                'frame_serial'    => ['label'=>'№ моторамы','type'=>'text','rules'=>'nullable|string|max:120'],
+                'work_start'      => ['label'=>'Начало','type'=>'time','rules'=>'nullable'],
+                // При открытии формы подставляется текущее время сервера, можно изменить
+                'work_end'        => ['label'=>'Окончание','type'=>'time','rules'=>'nullable|date_format:H:i,H:i:s',
+                                      'default_now'=>true,
+                                      'hint'=>'Подставлено время открытия формы — можно изменить'],
 
-                'cross3_number'   => [
-                    'label'=>'S/N Кросс 3',
-                    'type'=>'text',
-                    'rules'=>'nullable|string|max:120',
-                    'lookup'=>['sheet'=>'cross3','match_by'=>'serial_number','prefix'=>'cross3'],
-                ],
-                'bracket_serial'  => [
-                    'label'=>'S/N камеры',
-                    'type'=>'text',
-                    'rules'=>'nullable|string|max:120',
-                    'lookup'=>['sheet'=>'camera_bracket','match_by'=>'serial_number','prefix'=>'bracket'],
-                ],
+                // Маска: префикс 192.168.1. фиксирован, вводится только последний октет (1–254).
+                // В БД хранится полный адрес (RecordController::applyIpSuffix склеивает).
+                'ip_address'      => ['label'=>'IP модуля связи','type'=>'ip_suffix','prefix'=>'192.168.1.',
+                                      'rules'=>['required', 'regex:/^192\.168\.1\.(25[0-4]|2[0-4]\d|1\d\d|[1-9]\d?)$/'],
+                                      'hint'=>'Введите последнее число адреса: от 1 до 254',
+                                      'messages'=>['regex'=>'IP модуля связи: последнее число должно быть от 1 до 254.']],
                 'manet_number'    => [
                     'label'=>'S/N модуля связи',
                     'type'=>'text',
@@ -52,11 +46,55 @@ return [
                     'lookup'=>['sheet'=>'comm_module','match_by'=>'serial_number','prefix'=>'manet'],
                 ],
 
-                'status'          => ['label'=>'Статус','type'=>'select','rules'=>'required',
+                'status'          => ['label'=>'Статус','type'=>'select','rules'=>'required|in:Сдан,Не сдан',
                                        'options'=>['Сдан','Не сдан']],
-                'defect_reason'   => ['label'=>'Причина','type'=>'textarea','rules'=>'nullable|string'],
+
+                // --- Появляются после выбора статуса; обязательны при «Не сдан» ---
+                'fuselage_number' => ['label'=>'№ фюзеляжа','type'=>'text',
+                                      'rules'=>'nullable|required_if:status,Не сдан|string|max:64',
+                                      'required_when'=>['status'=>'Не сдан']],
+                'frame_serial'    => ['label'=>'№ моторамы','type'=>'text',
+                                      'rules'=>'nullable|required_if:status,Не сдан|string|max:120',
+                                      'required_when'=>['status'=>'Не сдан']],
+                'cross3_number'   => [
+                    'label'=>'S/N Кросс 3',
+                    'type'=>'text',
+                    'rules'=>'nullable|required_if:status,Не сдан|string|max:120',
+                    'required_when'=>['status'=>'Не сдан'],
+                    'lookup'=>['sheet'=>'cross3','match_by'=>'serial_number','prefix'=>'cross3'],
+                ],
+                'bracket_serial'  => [
+                    'label'=>'S/N камеры',
+                    'type'=>'text',
+                    'rules'=>'nullable|required_if:status,Не сдан|string|max:120',
+                    'required_when'=>['status'=>'Не сдан'],
+                    'lookup'=>['sheet'=>'camera_bracket','match_by'=>'serial_number','prefix'=>'bracket'],
+                ],
+                'defect_reason'   => ['label'=>'Причина неисправности','type'=>'textarea',
+                                      'rules'=>'nullable|required_if:status,Не сдан|string',
+                                      'required_when'=>['status'=>'Не сдан']],
+                // Выпадающий список ранее введённых кодов + можно вписать свой
+                'fault_code'      => ['label'=>'Код неисправности','type'=>'combo',
+                                      'rules'=>'nullable|required_if:status,Не сдан|string|max:100',
+                                      'required_when'=>['status'=>'Не сдан'],
+                                      'placeholder'=>'Выберите из списка или введите свой'],
                 'actions_taken'   => ['label'=>'Действия','type'=>'textarea','rules'=>'nullable|string'],
-            ], $faultCode),
+            ]),
+
+            // Своя раскладка формы (вместо общей группировки в records/_form)
+            'layout' => [
+                ['title'=>'Основное', 'subtitle'=>'Дата, пост, борт и рабочее время', 'icon'=>'calendar',
+                 'fields'=>['record_date','post_number','board_number','work_start','work_end']],
+                ['title'=>'Модуль связи', 'subtitle'=>null, 'icon'=>'chip',
+                 'fields'=>['ip_address','manet_number']],
+                ['title'=>'Статус', 'subtitle'=>'После выбора статуса откроются поля проверки', 'icon'=>'shield',
+                 'fields'=>['status']],
+                ['title'=>'Проверка и неисправности',
+                 'subtitle'=>'При «Не сдан» — все поля, кроме «Действия», обязательны; при «Сдан» — по желанию',
+                 'icon'=>'note',
+                 'show_when_filled'=>'status',
+                 'fields'=>['fuselage_number','frame_serial','cross3_number','bracket_serial','defect_reason','fault_code','actions_taken']],
+            ],
 
             'health_fields'      => ['status'],
             'health_good_values' => ['Сдан'],

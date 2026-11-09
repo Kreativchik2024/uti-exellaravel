@@ -73,8 +73,13 @@
                             </p>
                             <div>
                                 <label class="block text-[11px] text-gray-500 mb-1">ПИН (4–6 цифр)</label>
+                                {{-- form="" отвязывает поле от формы: иначе браузер подставляет сюда
+                                     сохранённый пароль, поле не проходит проверку формата и
+                                     «Продолжить» молча не срабатывает. Формат ПИН проверяет submitPin(). --}}
                                 <input type="password" x-model="pinValue" x-ref="pinInput"
-                                       inputmode="numeric" pattern="\d{4,6}"
+                                       form="workstation-pin-detached"
+                                       inputmode="numeric" maxlength="6"
+                                       autocomplete="one-time-code"
                                        @keydown.enter.prevent="submitPin()"
                                        class="border rounded px-2 py-1.5 w-full text-sm">
                             </div>
@@ -287,7 +292,7 @@
                     this.pinLoading = true;
                     try {
                         const body = new URLSearchParams();
-                        body.set('_token', this.csrf);
+                        body.set('_token', window.csrfToken ? (window.csrfToken() || this.csrf) : this.csrf);
                         body.set('short_name', this.pinTarget);
                         body.set('pin', pin);
 
