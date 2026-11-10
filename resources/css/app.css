@@ -797,3 +797,21 @@ html:not(.dark) :is(.app-main, .ui-page-header) textarea { border-color: var(--u
 .ui-systask--done .ui-systask__icon { background: var(--ui-good-soft); color: var(--ui-good); }
 .ui-systask--failed .ui-systask__icon { background: var(--ui-bad-soft); color: var(--ui-bad); }
 .ui-systask__out { margin-top: .6rem; padding: .55rem .7rem; border-radius: 10px; background: var(--ui-surface-2); color: var(--ui-text-2); font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow-y: auto; }
+
+/* ===================================================== Ошибки сайта */
+.ui-syscheck__title--link { display: inline-block; color: var(--ui-accent-text); }
+.ui-syscheck__title--link:hover { text-decoration: underline; }
+.ui-errlog { overflow: hidden; }
+.ui-errlog__head { display: flex; align-items: flex-start; gap: .75rem; padding: .8rem 1rem; cursor: pointer; list-style: none; }
+.ui-errlog__head::-webkit-details-marker { display: none; }
+.ui-errlog__head:hover { background: var(--ui-surface-hover); }
+.ui-errlog__count { flex-shrink: 0; min-width: 44px; text-align: center; padding: .15rem .45rem; border-radius: 999px; font-size: .78rem; font-weight: 800; background: var(--ui-bad-soft); color: var(--ui-bad); }
+.ui-errlog__msg { display: block; font-size: .875rem; font-weight: 600; color: var(--ui-text); overflow-wrap: anywhere; }
+.ui-errlog__meta { display: flex; flex-wrap: wrap; gap: .2rem .9rem; margin-top: .25rem; font-size: .75rem; color: var(--ui-muted); }
+.ui-errlog__level { font-weight: 700; letter-spacing: .03em; }
+.ui-errlog__chev { flex-shrink: 0; margin-top: .2rem; color: var(--ui-muted); transition: transform .15s; }
+.ui-errlog[open] .ui-errlog__chev { transform: rotate(180deg); }
+.ui-errlog__body { padding: .2rem 1rem 1rem calc(44px + 1.75rem); font-size: .82rem; color: var(--ui-text); display: grid; gap: .3rem; overflow-wrap: anywhere; }
+.ui-errlog__body code { font-size: .78rem; padding: .05rem .35rem; border-radius: 5px; background: var(--ui-surface-2); }
+.ui-errlog__trace { margin: 0; padding: .6rem .75rem; border-radius: 10px; background: var(--ui-surface-2); color: var(--ui-text-2); font-size: .72rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 340px; overflow: auto; }
+@media (max-width: 640px) { .ui-errlog__body { padding-left: 1rem; } }

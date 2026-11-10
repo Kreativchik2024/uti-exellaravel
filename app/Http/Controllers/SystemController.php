@@ -118,8 +118,10 @@ class SystemController extends Controller
             $add('Логи', 'warn', 'Лог одним файлом', 'Файл растёт бесконечно. Добавьте строки в .env и обновите кеш (новый файл каждый день, хранится 14 дней)',
                 [$copy("LOG_STACK=daily\nLOG_DAILY_DAYS=14", 'Скопировать строки для .env'), $run('cache', 'Обновить кеш')]);
         }
-        $errors = $this->recentErrors($logs);
-        $add('Логи', $errors ? 'warn' : 'ok', 'Ошибки за сутки', $errors ? count($errors) . ' шт. Последняя: ' . end($errors) : 'Нет');
+        $errors = app(\App\Services\LogReader::class)->errors(24);
+        $add('Логи', $errors ? 'warn' : 'ok', 'Ошибки за сутки',
+            $errors ? count($errors) . ' шт. Последняя (' . substr($errors[0]['time'], 11, 5) . '): ' . mb_strimwidth($errors[0]['message'], 0, 160, '…') : 'Нет',
+            [['type' => 'link', 'url' => route('system.errors'), 'label' => $errors ? 'Посмотреть ошибки' : 'Открыть журнал ошибок']]);
 
         // ---------------------------------------------------------------- база и файлы
         try {
@@ -186,6 +188,21 @@ class SystemController extends Controller
         return back()->with('ok', "Запущено: {$label}. Результат появится на этой странице.");
     }
 
+    /** Ошибки из логов: одинаковые сгруппированы, подробности по клику. */
+    public function errors(Request $r, \App\Services\LogReader $reader)
+    {
+        $hours = in_array((int) $r->query('hours'), [1, 24, 72, 168], true) ? (int) $r->query('hours') : 24;
+        $groups = $reader->grouped($hours);
+        $ids = collect($groups)->pluck('users')->flatten()->unique()->all();
+
+        return view('system.errors', [
+            'groups' => $groups,
+            'hours'  => $hours,
+            'total'  => array_sum(array_column($groups, 'count')),
+            'users'  => \App\Models\User::whereIn('id', $ids)->pluck('name', 'id')->all(),
+        ]);
+    }
+
     /** Ход фоновой задачи (страница опрашивает каждые 3 с). */
     public function status()
     {
@@ -236,27 +253,6 @@ class SystemController extends Controller
         } else {
             exec(escapeshellarg($php) . ' ' . escapeshellarg($artisan) . ' system:task ' . escapeshellarg($task) . ' > /dev/null 2>&1 &');
         }
-    }
-
-    /** Строки ERROR за последние сутки из свежих логов (читается только конец файлов). */
-    private function recentErrors($logs): array
-    {
-        $since = now()->subDay();
-        $out = [];
-        foreach ($logs->sortByDesc(fn ($f) => filemtime($f))->take(2) as $file) {
-            $fh = fopen($file, 'rb');
-            fseek($fh, max(0, filesize($file) - 2 * 1024 * 1024));
-            while (($line = fgets($fh)) !== false) {
-                if (preg_match('/^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\] \w+\.(ERROR|CRITICAL|ALERT|EMERGENCY): (.{0,140})/u', $line, $m)
-                    && Carbon::parse($m[1])->gte($since)) {
-                    $out[] = "{$m[1]} — {$m[3]}";
-                }
-            }
-            fclose($fh);
-        }
-        sort($out);
-
-        return $out;
     }
 
     private function dirSize(string $dir): int

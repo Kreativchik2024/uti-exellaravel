@@ -69,7 +69,12 @@
                     <div class="ui-syscheck ui-syscheck--{{ $c['status'] }}">
                         <span class="ui-syscheck__dot" aria-hidden="true"></span>
                         <div class="min-w-0 flex-1">
-                            <div class="ui-syscheck__title">{{ $c['title'] }}</div>
+                            @php $titleLink = collect($c['actions'] ?? [])->first(fn ($a) => $a['type'] === 'link' && str_contains($a['url'], '/system/errors')); @endphp
+                            @if($titleLink)
+                                <a href="{{ $titleLink['url'] }}" class="ui-syscheck__title ui-syscheck__title--link">{{ $c['title'] }} →</a>
+                            @else
+                                <div class="ui-syscheck__title">{{ $c['title'] }}</div>
+                            @endif
                             @if($c['detail'])<div class="ui-syscheck__detail">{{ $c['detail'] }}</div>@endif
                             @if(!empty($c['actions']))
                                 <div class="ui-syscheck__actions">
