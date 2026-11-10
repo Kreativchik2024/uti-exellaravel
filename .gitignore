@@ -44,3 +44,6 @@ import_cross3.py
 Thumbs.db
 *.pem
 auth.json
+
+# Архивы версий для офлайн-развёртывания (scripts/make-release.ps1)
+/releases/
