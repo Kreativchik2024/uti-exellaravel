@@ -22,7 +22,7 @@ class LogoutWhenIdle
     /** Фоновые запросы — не продлевают сессию. */
     private const BACKGROUND = [
         'chat.summary', 'chat.messages', 'chat.conversations', 'chat.typing', 'chat.users',
-        'worker-sessions.heartbeat', 'worker-sessions.online', 'worker-sessions.occupied',
+        'worker-sessions.heartbeat', 'worker-sessions.occupied',
         'csrf.refresh', 'news.latest',
     ];
 

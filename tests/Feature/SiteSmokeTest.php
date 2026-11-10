@@ -150,10 +150,8 @@ class SiteSmokeTest extends TestCase
 
         $this->asUser($user)->postJson('/worker-sessions/heartbeat')->assertOk()->assertJsonPath('ok', true);
 
-        $this->asUser($user)->getJson('/worker-sessions/online')
-            ->assertOk()
-            ->assertJsonPath('count', 1)
-            ->assertJsonPath('online.0.employee_name', $this->nameOf($user));
+        $this->assertTrue(\App\Models\ActiveWorkerSession::where('user_id', $user->id)
+            ->where('last_heartbeat_at', '>=', now()->subMinute())->exists());
     }
 
     public function test_dashboard_news_feed_loads_next_page_as_json(): void

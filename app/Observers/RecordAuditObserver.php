@@ -84,10 +84,4 @@ class RecordAuditObserver
 
         return self::$slugs[$record::class] ?? class_basename($record);
     }
-
-    /** Модели всех вкладок — для подключения наблюдателя. */
-    public static function models(): array
-    {
-        return collect(config('sheets.map', []))->pluck('model')->filter()->unique()->values()->all();
-    }
 }

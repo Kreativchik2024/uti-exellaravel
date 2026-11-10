@@ -46,11 +46,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/records-pin-check',  [RecordController::class, 'checkEmployeePin'])
         ->middleware('throttle:pin')
         ->name('records.pinCheck');
-    Route::post('/records-pin-unlock', [RecordController::class, 'checkCurrentUserPin'])->name('records.pinUnlock');
 
     // Онлайн-присутствие исполнителей
     Route::post('/worker-sessions/heartbeat', [WorkerSessionController::class, 'heartbeat'])->name('worker-sessions.heartbeat');
-    Route::get('/worker-sessions/online',     [WorkerSessionController::class, 'online'])->name('worker-sessions.online');
     Route::get('/worker-sessions/occupied',   [WorkerSessionController::class, 'occupied'])->name('worker-sessions.occupied');
     Route::post('/worker-sessions/claim',     [WorkerSessionController::class, 'claim'])->name('worker-sessions.claim');
     Route::post('/worker-sessions/release',   [WorkerSessionController::class, 'release'])->name('worker-sessions.release');

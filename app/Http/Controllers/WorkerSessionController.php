@@ -26,32 +26,6 @@ class WorkerSessionController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    public function online()
-    {
-        $cutoff = now()->subSeconds(self::OFFLINE_AFTER_SECONDS);
-
-        $rows = ActiveWorkerSession::query()
-            ->with(['employee', 'user'])
-            ->where('last_heartbeat_at', '>=', $cutoff)
-            ->orderBy('last_heartbeat_at', 'desc')
-            ->get();
-
-        $seen = [];
-        $result = [];
-        foreach ($rows as $row) {
-            if (isset($seen[$row->employee_id])) continue;
-            $seen[$row->employee_id] = true;
-
-            $result[] = [
-                'employee_name' => $row->employee?->short_name,
-                'sheet'         => $row->sheet,
-                'record_id'     => $row->record_id,
-            ];
-        }
-
-        return response()->json(['ok' => true, 'online' => $result, 'count' => count($result)]);
-    }
-
     public function occupied(Request $r)
     {
         $sessionId = $r->session()->getId();

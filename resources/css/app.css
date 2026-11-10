@@ -405,11 +405,6 @@ html.dark .ui-pill--bad { --pill-bg: rgba(239,68,68,.12);  --pill-fg: #fca5a5; -
 html.dark .ui-pill--warn{ --pill-bg: rgba(245,158,11,.12); --pill-fg: #fcd34d; --pill-ring: rgba(245,158,11,.28); }
 html.dark .ui-pill--neutral { --pill-bg: rgba(148,163,184,.1); --pill-fg: #cbd5e1; --pill-ring: rgba(148,163,184,.22); }
 
-@keyframes ui-pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, .45); }
-    70%  { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
 
 
 /* Тона меток статусов — вне @layer: класс собирается динамически
@@ -424,11 +419,6 @@ html.dark .ui-pill--bad { --pill-bg: rgba(239,68,68,.12);  --pill-fg: #fca5a5; -
 html.dark .ui-pill--warn{ --pill-bg: rgba(245,158,11,.12); --pill-fg: #fcd34d; --pill-ring: rgba(245,158,11,.28); }
 html.dark .ui-pill--neutral { --pill-bg: rgba(148,163,184,.1); --pill-fg: #cbd5e1; --pill-ring: rgba(148,163,184,.22); }
 
-@keyframes ui-pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, .45); }
-    70%  { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
 
 
 /* ============================================================

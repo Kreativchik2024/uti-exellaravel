@@ -693,9 +693,4 @@ class RecordController extends Controller
             'server_now'    => now()->timestamp,
         ]);
     }
-
-    public function checkCurrentUserPin(Request $r)
-    {
-        return response()->json(['ok' => false, 'error' => 'Функция отключена.'], 410);
-    }
 }
