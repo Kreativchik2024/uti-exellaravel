@@ -90,6 +90,14 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::delete('/employees/{employee}',   [EmployeeController::class, 'destroy'])->name('employees.destroy');
 
     Route::get('/audit', [\App\Http\Controllers\AuditController::class, 'index'])->name('audit.index');
+
+    // Справочник кодов неисправностей
+    Route::get('/fault-codes',                [\App\Http\Controllers\FaultCodeController::class, 'index'])->name('fault-codes.index');
+    Route::post('/fault-codes',               [\App\Http\Controllers\FaultCodeController::class, 'store'])->name('fault-codes.store');
+    Route::get('/fault-codes/template',       [\App\Http\Controllers\FaultCodeController::class, 'template'])->name('fault-codes.template');
+    Route::post('/fault-codes/import',        [\App\Http\Controllers\FaultCodeController::class, 'import'])->middleware('throttle:10,1')->name('fault-codes.import');
+    Route::patch('/fault-codes/{faultCode}',  [\App\Http\Controllers\FaultCodeController::class, 'update'])->name('fault-codes.update');
+    Route::delete('/fault-codes/{faultCode}', [\App\Http\Controllers\FaultCodeController::class, 'destroy'])->name('fault-codes.destroy');
     Route::get('/system', [\App\Http\Controllers\SystemController::class, 'index'])->name('system.index');
     Route::get('/system/status', [\App\Http\Controllers\SystemController::class, 'status'])->name('system.status');
     Route::get('/system/errors', [\App\Http\Controllers\SystemController::class, 'errors'])->name('system.errors');

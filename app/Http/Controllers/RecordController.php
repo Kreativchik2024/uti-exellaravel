@@ -106,8 +106,16 @@ class RecordController extends Controller
     private function comboOptions(array $cfg): array
     {
         $result = [];
+        $directory = null;
         foreach ($cfg['fields'] as $name => $f) {
             if (($f['type'] ?? '') !== 'combo') continue;
+
+            // Справочник кодов неисправностей: «код — описание»
+            $known = [];
+            if ($name === 'fault_code') {
+                $directory ??= \App\Models\FaultCode::mapFor(app(SectionContext::class)->current());
+                foreach ($directory as $code => $desc) $known[(string) $code] = $desc;
+            }
 
             $used = $cfg['model']::query()
                 ->whereNotNull($name)->where($name, '!=', '')
@@ -118,10 +126,12 @@ class RecordController extends Controller
                 ->map(fn ($v) => trim((string) $v))
                 ->all();
 
-            $result[$name] = array_values(array_unique(array_filter(
-                array_merge($f['options'] ?? [], $used),
-                fn ($v) => $v !== ''
-            )));
+            foreach (array_merge($f['options'] ?? [], $used) as $v) {
+                $v = trim((string) $v);
+                if ($v !== '' && ! array_key_exists($v, $known)) $known[$v] = '';
+            }
+            // [значение => подпись]; подпись — описание из справочника
+            $result[$name] = $known;
         }
         return $result;
     }

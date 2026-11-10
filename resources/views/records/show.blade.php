@@ -119,6 +119,8 @@
                                             <div class="rec-text">{{ $display }}</div>
                                         @elseif($name === 'fault_code')
                                             <span class="font-mono text-sm font-semibold px-1.5 py-0.5 rounded-md" style="background: var(--ui-surface-hover)">{{ $display }}</span>
+                                            @php $faultDesc = \App\Models\FaultCode::mapFor(app(\App\Services\SectionContext::class)->current())[$display] ?? null; @endphp
+                                            @if($faultDesc)<span class="ml-1.5 text-sm" style="color: var(--ui-text-2)">{{ $faultDesc }}</span>@endif
                                         @else
                                             <span class="{{ in_array($name, ['ip_address', 'serial_number', 'manet_number', 'cross3_number', 'bracket_serial', 'frame_serial', 'fuselage_number']) ? 'font-mono' : '' }}">{{ $display }}</span>
                                         @endif

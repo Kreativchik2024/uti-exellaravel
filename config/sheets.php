@@ -9,7 +9,9 @@ $workers = [
 ];
 
 $faultCode = [
-    'fault_code' => ['label'=>'Код неисправности','type'=>'text','rules'=>'nullable|string|max:100'],
+    // Выпадающий список из справочника (Админ → Коды неисправностей) + можно вписать свой
+    'fault_code' => ['label'=>'Код неисправности','type'=>'combo','rules'=>'nullable|string|max:100',
+                     'placeholder'=>'Выберите из списка или введите свой'],
 ];
 
 $map = [

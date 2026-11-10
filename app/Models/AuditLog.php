@@ -28,6 +28,7 @@ class AuditLog extends Model
         'auth'      => 'Вход в систему',
         'chat'      => 'Чат',
         'system'    => 'Обслуживание',
+        'fault_codes' => 'Коды неисправностей',
     ];
 
     public const ACTIONS = [

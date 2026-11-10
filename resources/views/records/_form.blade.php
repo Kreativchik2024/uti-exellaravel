@@ -308,8 +308,8 @@
                                    placeholder="{{ $f['placeholder'] ?? '' }}"
                                    class="{{ $baseInput }} @error($name) !border-red-400 !ring-red-500/15 @enderror">
                             <datalist id="combo-{{ $name }}">
-                                @foreach($comboOptions[$name] ?? [] as $opt)
-                                    <option value="{{ $opt }}"></option>
+                                @foreach($comboOptions[$name] ?? [] as $opt => $optLabel)
+                                    <option value="{{ $opt }}">{{ $optLabel }}</option>
                                 @endforeach
                             </datalist>
 
