@@ -3,6 +3,8 @@
     @method('PUT')
 @endif
 
+@include('records._draft')
+
 @php
     $workerFields          = ['worker1','worker2','worker3','worker4','worker5'];
     $hasWorkers            = collect($workerFields)->contains(fn($f) => isset($cfg['fields'][$f]));

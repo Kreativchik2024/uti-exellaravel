@@ -4,6 +4,8 @@
 <div x-data="chatWidget({
         me: {{ auth()->id() }},
         reactions: @js(\App\Models\ChatMessage::REACTIONS),
+        canPin: @js(auth()->user()->canManageContent()),
+        mentionName: @js((string) \Illuminate\Support\Str::of(auth()->user()->employee?->short_name ?: auth()->user()->name)->trim()->before(' ')),
         urls: {
             summary: @js(route('chat.summary')),
             conversations: @js(route('chat.conversations')),
@@ -13,6 +15,7 @@
             read: @js(route('chat.read')),
             typing: @js(route('chat.typing')),
             react: @js(route('chat.react', ['message' => '__ID__'])),
+            pin: @js(route('chat.pin', ['message' => '__ID__'])),
         },
      })"
      @keydown.escape.window="lightbox ? (lightbox = null) : (open && close())"
@@ -23,7 +26,8 @@
             :aria-label="open ? 'Закрыть чат' : 'Открыть чат' + (unread ? ', непрочитанных: ' + unread : '')">
         <svg x-show="!open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
         <svg x-show="open" x-cloak class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-        <span x-show="unread > 0 && !open" x-cloak class="ui-chat__badge" x-text="unread > 99 ? '99+' : unread"></span>
+        <span x-show="unread > 0 && !open" x-cloak class="ui-chat__badge" :class="mentions > 0 && 'ui-chat__badge--mention'"
+              x-text="(mentions > 0 ? '@ ' : '') + (unread > 99 ? '99+' : unread)"></span>
     </button>
 
     {{-- Панель --}}
@@ -39,6 +43,12 @@
                         <div class="ui-chat__title">Чат</div>
                         <div class="ui-chat__sub" x-text="conv.general.online ? 'онлайн: ' + conv.general.online : 'сообщения сотрудникам'"></div>
                     </div>
+                    <button type="button" class="ui-iconbtn" @click="toggleNotifications()" x-show="notifySupported"
+                            :title="notifyOn ? 'Уведомления включены — нажмите, чтобы выключить' : 'Включить уведомления о личных сообщениях и упоминаниях'"
+                            :aria-label="notifyOn ? 'Выключить уведомления' : 'Включить уведомления'" :style="notifyOn ? 'color: var(--ui-accent)' : ''">
+                        <svg x-show="notifyOn" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 22a2.5 2.5 0 002.45-2h-4.9A2.5 2.5 0 0012 22zm7-6V11a7 7 0 00-5.5-6.84V3.5a1.5 1.5 0 00-3 0v.66A7 7 0 005 11v5l-2 2v1h18v-1l-2-2z"/></svg>
+                        <svg x-show="!notifyOn" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/><path stroke-linecap="round" stroke-width="2" d="M4 4l16 16"/></svg>
+                    </button>
                     <button type="button" class="ui-iconbtn" @click="startNew()" title="Новое сообщение" aria-label="Новое сообщение">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
@@ -156,6 +166,15 @@
                     </button>
                 </header>
 
+                <div x-show="peer === 0 && pinned" class="ui-chat__pinned" role="note">
+                    <svg class="w-4 h-4 shrink-0" style="color: var(--ui-accent)" fill="currentColor" viewBox="0 0 24 24"><path d="M16 3a1 1 0 01.7 1.7L15 6.4V10l2.7 2.7a1 1 0 01-.7 1.7H13v6a1 1 0 01-2 0v-6H6.3a1 1 0 01-.7-1.7L8.3 10V6.4L6.6 4.7A1 1 0 017.3 3H16z"/></svg>
+                    <button type="button" class="ui-chat__pinned-body" @click="pinned && scrollToMessage(pinned.id)" title="Перейти к сообщению">
+                        <span class="ui-chat__pinned-title">Закреплено · <span x-text="pinned && pinned.sender_name"></span></span>
+                        <span class="ui-chat__pinned-text" x-text="pinned && (pinned.body || 'Вложение')"></span>
+                    </button>
+                    <button type="button" x-show="canPin" class="ui-iconbtn" style="width: 28px; height: 28px" @click="togglePin(pinned)" title="Открепить" aria-label="Открепить">✕</button>
+                </div>
+
                 <div class="ui-chat__scroll ui-chat__messages" x-ref="list" @scroll.passive="onScroll()" @click.self="actionsFor = null">
                     <div class="text-center py-2" x-show="hasMore">
                         <button type="button" class="ui-chat__link" @click="loadOlder()" :disabled="loadingOlder"
@@ -174,6 +193,10 @@
                                         <template x-for="(e, ei) in reactionSet" :key="e">
                                             <button type="button" class="ui-chat__actions-emoji" :style="'--i:' + ei" @click="react(m, e)" x-text="e" :aria-label="'Реакция ' + e"></button>
                                         </template>
+                                        <button type="button" x-show="canPin && peer === 0" class="ui-chat__actions-reply" @click="togglePin(m)"
+                                                :title="pinned && pinned.id === m.id ? 'Открепить' : 'Закрепить для всех'">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 3l5 5-4 1-4 4 1 5-3 3-4-4-4 4M8 13l-5-5 3-3 5 1 4-4"/></svg>
+                                        </button>
                                         <button type="button" class="ui-chat__actions-reply" @click="startReply(m)" title="Ответить">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
                                         </button>
@@ -208,7 +231,7 @@
                                             </a>
                                         </template>
 
-                                        <div x-show="m.body" class="ui-chat__text" x-text="m.body"></div>
+                                        <div x-show="m.body" class="ui-chat__text" x-html="formatBody(m.body)"></div>
 
                                         <div class="ui-chat__meta">
                                             <span x-text="timeOnly(m.at)"></span>
@@ -264,6 +287,17 @@
                     </template>
                 </div>
 
+                <div x-show="mentionList.length" class="ui-chat__mentions" role="listbox" aria-label="Упомянуть сотрудника">
+                    <template x-for="(u, ui) in mentionList" :key="u.peer">
+                        <button type="button" class="ui-chat__mention-item" :class="ui === mentionIdx && 'is-active'" role="option"
+                                @mousedown.prevent="pickMention(u)">
+                            <span class="ui-chat__avatar" style="width: 26px; height: 26px; font-size: .62rem" x-text="u.initials"></span>
+                            <span x-text="u.name"></span>
+                            <span x-show="u.online" class="ui-chat__online-dot"></span>
+                        </button>
+                    </template>
+                </div>
+
                 <form class="ui-chat__compose" @submit.prevent="send()">
                     <button type="button" class="ui-chat__attach" @click="$refs.fileInput.click()" title="Прикрепить файл или фото" aria-label="Прикрепить файл">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
@@ -273,8 +307,13 @@
                            @change="addFiles($event.target.files); $event.target.value = ''">
                     <textarea x-ref="input" x-model="draft" rows="1" maxlength="2000"
                               placeholder="Сообщение…" aria-label="Текст сообщения"
-                              @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); send(); }"
-                              @input="stripEmoji($event.target); autoGrow($event.target); notifyTyping()"
+                              @keydown.enter="if (mentionList.length) { $event.preventDefault(); pickMention(mentionList[mentionIdx]); return; } if (!$event.shiftKey) { $event.preventDefault(); send(); }"
+                              @keydown.tab="if (mentionList.length) { $event.preventDefault(); pickMention(mentionList[mentionIdx]); }"
+                              @keydown.arrow-down="if (mentionList.length) { $event.preventDefault(); mentionIdx = (mentionIdx + 1) % mentionList.length; }"
+                              @keydown.arrow-up="if (mentionList.length) { $event.preventDefault(); mentionIdx = (mentionIdx + mentionList.length - 1) % mentionList.length; }"
+                              @keydown.escape.stop="mentionList = []"
+                              @blur="setTimeout(() => mentionList = [], 150)"
+                              @input="stripEmoji($event.target); autoGrow($event.target); notifyTyping(); onMentionInput($event.target)"
                               @paste="onPaste($event)"></textarea>
                     <button type="submit" class="ui-chat__send" :disabled="!draft.trim() && !pendingFiles.length" aria-label="Отправить">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
@@ -306,7 +345,9 @@ document.addEventListener('alpine:init', () => {
         let fileSeq = 0, lastTypingSent = 0, rootEl = null;
 
         return {
-            me: cfg.me, urls: cfg.urls, reactionSet: cfg.reactions,
+            me: cfg.me, urls: cfg.urls, reactionSet: cfg.reactions, canPin: cfg.canPin, mentionName: cfg.mentionName,
+            mentions: 0, pinned: null, mentionList: [], mentionIdx: 0, mentionTimer: null,
+            notifyOn: false, notifyAfter: null, notifySupported: 'Notification' in window && window.isSecureContext, hiddenTicks: 0,
             open: false, view: 'list',
             unread: 0,
             conv: { general: { unread: 0, online: 0, last: null }, direct: [] },
@@ -324,6 +365,11 @@ document.addEventListener('alpine:init', () => {
                 // Корень виджета. $refs в обработчиках, вызванных из исчезающих
                 // элементов (строка списка → переписка), ищет не там — поэтому так.
                 rootEl = this.$el;
+                try {
+                    this.notifyOn = localStorage.getItem('uti-chat-notify:' + this.me) === '1' && this.notifySupported && Notification.permission === 'granted';
+                    const after = parseInt(localStorage.getItem('uti-chat-notified:' + this.me), 10);
+                    this.notifyAfter = after > 0 ? after : null;
+                } catch (e) {}
                 this.refreshSummary();
                 this.timer = setInterval(() => this.tick(), 4000);
                 document.addEventListener('visibilitychange', () => { if (!document.hidden) this.tick(true); });
@@ -359,7 +405,10 @@ document.addEventListener('alpine:init', () => {
 
             // ---- опрос ----
             tick(force = false) {
-                if (document.hidden && !force) return;
+                if (document.hidden && !force) {
+                    if (++this.hiddenTicks % 8 === 0) this.refreshSummary();   // ~30 с: уведомления при свёрнутой вкладке
+                    return;
+                }
                 this.ticks++;
                 if (!this.open) {
                     if (force || this.ticks % 5 === 0) this.refreshSummary();     // ~20 с
@@ -371,7 +420,85 @@ document.addEventListener('alpine:init', () => {
                 }
             },
             async refreshSummary() {
-                try { this.unread = (await this.api(this.urls.summary)).unread || 0; } catch (e) {}
+                try {
+                    const params = this.notifyAfter ? { after: this.notifyAfter } : {};
+                    const data = await this.api(this.withParams(this.urls.summary, params));
+                    this.unread = data.unread || 0;
+                    this.mentions = data.mentions || 0;
+                    if (this.notifyAfter) (data.notify || []).forEach(n => this.showNotification(n));
+                    this.notifyAfter = Math.max(this.notifyAfter || 0, data.last_id || 0);
+                    try { localStorage.setItem('uti-chat-notified:' + this.me, String(this.notifyAfter)); } catch (e) {}
+                } catch (e) {}
+            },
+
+            // ---- уведомления браузера: личные сообщения и упоминания ----
+            async toggleNotifications() {
+                if (!this.notifySupported) return;
+                if (this.notifyOn) { this.notifyOn = false; }
+                else {
+                    const perm = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission;
+                    this.notifyOn = perm === 'granted';
+                    if (perm === 'denied') this.error = 'Уведомления запрещены в настройках браузера для этого сайта';
+                }
+                try { localStorage.setItem('uti-chat-notify:' + this.me, this.notifyOn ? '1' : '0'); } catch (e) {}
+            },
+            showNotification(n) {
+                // Уже открыт этот разговор и вкладка на экране — не мешаем
+                if (!document.hidden && this.open && this.view === 'thread' && this.peer === n.peer) return;
+                if (!this.notifyOn || Notification.permission !== 'granted') return;
+                try {
+                    const note = new Notification(n.mention ? n.name + ' упомянул(а) вас в общем чате' : 'Сообщение от ' + n.name, {
+                        body: n.preview, icon: '/icons/icon-192.png', tag: 'uti-chat-' + n.id,
+                    });
+                    note.onclick = () => {
+                        window.focus();
+                        this.open = true;
+                        this.openThread(n.peer, n.peer === 0 ? 'Общий чат' : n.name, false);
+                        note.close();
+                    };
+                } catch (e) {}
+            },
+
+            // ---- @упоминания ----
+            formatBody(text) {
+                const esc = String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+                const me = (this.mentionName || '').toLowerCase();
+                return esc.replace(/(^|[\s(,.;:!?])@([\p{L}\-]{2,40})/gu, (all, pre, name) => {
+                    const mine = name.toLowerCase() === me || name.toLowerCase() === 'все';
+                    return pre + '<span class="ui-chat__mention' + (mine ? ' ui-chat__mention--me' : '') + '">@' + name + '</span>';
+                });
+            },
+            onMentionInput(t) {
+                const m = /(^|\s)@([\p{L}\-]{0,30})$/u.exec(t.value.slice(0, t.selectionStart));
+                clearTimeout(this.mentionTimer);
+                if (!m) { this.mentionList = []; return; }
+                const q = m[2];
+                this.mentionTimer = setTimeout(async () => {
+                    try {
+                        const users = (await this.api(this.withParams(this.urls.users, { q }))).users || [];
+                        const list = users.slice(0, 6);
+                        if (this.peer === 0 && 'все'.startsWith(q.toLowerCase())) list.unshift({ peer: -1, name: 'все', initials: '@', online: false });
+                        this.mentionList = list;
+                        this.mentionIdx = 0;
+                    } catch (e) { this.mentionList = []; }
+                }, 200);
+            },
+            pickMention(u) {
+                const t = this.el('input');
+                if (!t || !u) return;
+                const surname = u.peer === -1 ? 'все' : String(u.name).trim().split(/\s+/)[0];
+                const before = t.value.slice(0, t.selectionStart).replace(/@[\p{L}\-]*$/u, '@' + surname + ' ');
+                this.draft = t.value = before + t.value.slice(t.selectionStart);
+                this.mentionList = [];
+                this.$nextTick(() => { t.focus(); t.setSelectionRange(before.length, before.length); });
+            },
+
+            // ---- закреплённое сообщение ----
+            async togglePin(m) {
+                this.actionsFor = null;
+                if (!m || typeof m.id !== 'number') return;
+                try { this.pinned = (await this.post(this.urls.pin.replace('__ID__', m.id), {})).pinned; }
+                catch (e) { this.error = e.message; }
             },
             async loadConversations() {
                 try {
@@ -417,6 +544,7 @@ document.addEventListener('alpine:init', () => {
                 if (Array.isArray(data.reads)) this.generalReads = data.reads;
                 if (Array.isArray(data.typing)) this.typingNames = data.typing;
                 if (data.server_time) this.since = data.server_time;
+                if ('pinned' in data) this.pinned = data.pinned;
                 for (const u of (data.updates || [])) {
                     const m = this.messages.find(x => x.id === u.id);
                     if (m) m.reactions = u.reactions;

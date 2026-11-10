@@ -24,7 +24,8 @@ class PruneChat extends Command
         $messages = 0;
         $files = 0;
 
-        ChatMessage::where('created_at', '<', $border)->select('id')->chunkById(500, function ($chunk) use (&$messages, &$files) {
+        // Закреплённое объявление хранится, пока его не открепят
+        ChatMessage::where('created_at', '<', $border)->whereNull('pinned_at')->select('id')->chunkById(500, function ($chunk) use (&$messages, &$files) {
             $ids = $chunk->pluck('id');
 
             // Через модель — чтобы удалились и файлы с диска

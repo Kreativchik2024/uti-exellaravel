@@ -101,6 +101,7 @@ class NewsController extends Controller
 
         $this->attachImages($news, $r->file('images', []), $r->input('captions', []));
 
+        \App\Models\AuditLog::write('news', 'created', 'Новость: ' . $news->title, ['subject_type' => 'news', 'subject_id' => $news->id, 'section_id' => $news->section_id]);
         return redirect()->route('dashboard')->with('ok', 'Новость опубликована');
     }
 
@@ -147,6 +148,7 @@ class NewsController extends Controller
 
         $this->attachImages($news, $r->file('images', []), $r->input('captions', []));
 
+        \App\Models\AuditLog::write('news', 'updated', 'Новость: ' . $news->title, ['subject_type' => 'news', 'subject_id' => $news->id, 'section_id' => $news->section_id]);
         return redirect()->route('news.index')->with('ok', 'Новость обновлена');
     }
 
@@ -158,6 +160,7 @@ class NewsController extends Controller
         foreach ($news->images as $img) {
             Storage::disk('local')->delete([$img->path, $img->thumb_path]);
         }
+        \App\Models\AuditLog::write('news', 'deleted', 'Новость: ' . $news->title, ['subject_type' => 'news', 'subject_id' => $news->id, 'section_id' => $news->section_id]);
         $news->delete();
 
         return redirect()->route('news.index')->with('ok', 'Новость удалена');

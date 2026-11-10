@@ -95,6 +95,8 @@ class FirmwareController extends Controller
             'uploaded_at' => now(),
         ]);
 
+        \App\Models\AuditLog::write('firmware', 'created', "Прошивка {$cat->title} {$version->version}", ['subject_type' => 'firmware', 'subject_id' => $version->id]);
+
         return redirect()->route('firmware.index', ['tab' => $version->status])
             ->with('ok', 'Файл загружен' . ($r->filled('new_category') ? ' (категория создана)' : ''));
     }
@@ -107,6 +109,7 @@ class FirmwareController extends Controller
             'status' => ['required', Rule::in(['actual','deprecated','archive'])],
         ]);
 
+        \App\Models\AuditLog::write('firmware', 'status', "Прошивка {$version->version}", ['subject_type' => 'firmware', 'subject_id' => $version->id, 'changes' => ['статус' => [$version->status, $data['status']]]]);
         $version->update(['status' => $data['status']]);
 
         return back()->with('ok', 'Статус обновлён');
@@ -130,6 +133,7 @@ class FirmwareController extends Controller
         Gate::authorize('delete', $version);
 
         Storage::disk('local')->delete($version->file_path);
+        \App\Models\AuditLog::write('firmware', 'deleted', "Прошивка {$version->version}", ['subject_type' => 'firmware', 'subject_id' => $version->id]);
         $version->delete();
 
         return back()->with('ok', 'Прошивка удалена');

@@ -47,9 +47,12 @@ return [
 
         'destination' => [
             'filename_prefix' => 'uti-',
-            'disks' => [
+            // Второй экземпляр копий — на другом носителе (флешка, сетевая папка):
+            // BACKUP_EXTERNAL_PATH=/mnt/backup в .env. Без него копии только на SD-карте сервера.
+            'disks' => array_values(array_filter([
                 'local',
-            ],
+                env('BACKUP_EXTERNAL_PATH') ? 'backup_external' : null,
+            ])),
         ],
 
         'temporary_directory' => storage_path('app/backup-temp'),
@@ -103,10 +106,14 @@ return [
     |--------------------------------------------------------------------------
     */
 
+    // Пробное восстановление (backup:verify --restore): ОТДЕЛЬНАЯ пустая база, куда
+    // загружается дамп для проверки. Пользователю БД нужны права на неё. Не рабочая база!
+    'verify_database' => env('BACKUP_VERIFY_DATABASE'),
+
     'monitor_backups' => [
         [
             'name' => env('APP_NAME', 'laravel-backup'),
-            'disks' => ['local'],
+            'disks' => array_values(array_filter(['local', env('BACKUP_EXTERNAL_PATH') ? 'backup_external' : null])),
             'health_checks' => [
                 \Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumAgeInDays::class => 1,
                 \Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumStorageInMegabytes::class => 5000,

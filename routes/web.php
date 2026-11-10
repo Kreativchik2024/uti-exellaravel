@@ -28,6 +28,20 @@ Route::get('/csrf-token', fn () => response()
 Route::get('/rules', [ConsentController::class, 'rules'])->name('legal.rules');
 Route::post('/consent', [ConsentController::class, 'accept'])->middleware('throttle:20,1')->name('consent.accept');
 
+// Пользователь активен (public/js/idle.js) — продлевает сессию при автовыходе по бездействию
+Route::get('/session/ping', fn () => response()->json(['ok' => true])->header('Cache-Control', 'no-store'))
+    ->middleware(['auth', 'throttle:10,1'])->name('session.ping');
+
+// Вход с кодом из приложения на телефоне (App\Http\Middleware\EnsureTwoFactor)
+Route::middleware('auth')->prefix('two-factor')->name('two-factor.')->controller(\App\Http\Controllers\TwoFactorController::class)->group(function () {
+    Route::get('/',            'setup')->name('setup');
+    Route::post('/confirm',    'confirm')->middleware('throttle:10,1')->name('confirm');
+    Route::get('/challenge',   'challenge')->name('challenge');
+    Route::post('/challenge',  'verify')->middleware('throttle:10,1')->name('verify');
+    Route::post('/recovery',   'regenerate')->middleware('throttle:5,1')->name('regenerate');
+    Route::post('/disable',    'disable')->middleware('throttle:5,1')->name('disable');
+});
+
 // Выбор текущего участка (в шапке)
 Route::post('/section/switch', [SectionController::class, 'switch'])->middleware('auth')->name('section.switch');
 
@@ -71,6 +85,7 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::patch('/users/{user}/deactivate', [UserController::class, 'deactivate'])->name('users.deactivate');
     Route::patch('/users/{user}/password',   [UserController::class, 'resetPassword'])->name('users.password');
     Route::patch('/users/{user}/pin',        [UserController::class, 'resetPin'])->name('users.pin');
+    Route::patch('/users/{user}/two-factor', [UserController::class, 'resetTwoFactor'])->name('users.two-factor');
     Route::delete('/users/{user}',           [UserController::class, 'destroy'])->name('users.destroy');
 
     Route::get('/employees/export',   [EmployeeController::class, 'export'])->name('employees.export');
@@ -84,6 +99,9 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/employees/{employee}/edit', [EmployeeController::class, 'edit'])->name('employees.edit');
     Route::put('/employees/{employee}',      [EmployeeController::class, 'update'])->name('employees.update');
     Route::delete('/employees/{employee}',   [EmployeeController::class, 'destroy'])->name('employees.destroy');
+
+    Route::get('/audit', [\App\Http\Controllers\AuditController::class, 'index'])->name('audit.index');
+    Route::get('/system', [\App\Http\Controllers\SystemController::class, 'index'])->name('system.index');
 
     Route::get('/sections',              [SectionController::class, 'index'])->name('sections.index');
     Route::post('/sections',             [SectionController::class, 'store'])->name('sections.store');
@@ -124,6 +142,12 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/firmware',                    [FirmwareController::class, 'index'])->middleware('section.feature:firmware')->name('firmware.index');
     Route::get('/firmware/{version}/download', [FirmwareController::class, 'download'])->middleware('section.feature:firmware')->name('firmware.download');
 
+    Route::get('/search', [\App\Http\Controllers\SearchController::class, 'index'])->name('search');
+
+    // Отчёты мастера: смена и анализ брака (по текущему участку)
+    Route::get('/reports/shift',   [\App\Http\Controllers\ReportController::class, 'shift'])->middleware('role:admin,master')->name('reports.shift');
+    Route::get('/reports/defects', [\App\Http\Controllers\ReportController::class, 'defects'])->middleware('role:admin,master')->name('reports.defects');
+
     Route::get('/records/{sheet}',           [RecordController::class, 'index'])->name('records.index');
     Route::get('/records/{sheet}/create',    [RecordController::class, 'create'])->name('records.create');
     Route::post('/records/{sheet}',          [RecordController::class, 'store'])->name('records.store');
@@ -158,6 +182,7 @@ Route::middleware('auth')->prefix('chat')->name('chat.')->group(function () {
     Route::post('/messages',     [ChatController::class, 'send'])->middleware('throttle:chat')->name('send');
     Route::post('/read',         [ChatController::class, 'read'])->name('read');
     Route::post('/messages/{message}/react', [ChatController::class, 'react'])->middleware('throttle:60,1')->name('react');
+    Route::post('/messages/{message}/pin',   [ChatController::class, 'pin'])->middleware('throttle:30,1')->name('pin');
     Route::post('/typing',       [ChatController::class, 'typing'])->middleware('throttle:40,1')->name('typing');
     Route::get('/attachments/{attachment}/{variant?}', [ChatController::class, 'attachment'])
         ->whereIn('variant', ['thumb'])->name('attachment');

@@ -14,7 +14,7 @@
         $initials = collect(preg_split('/\s+/u', trim($user->name)))
             ->filter()->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode('');
         $roleLabel = ['admin' => 'Администратор', 'master' => 'Мастер', 'executor' => 'Исполнитель'][$user->role] ?? '';
-        $isAdminArea = request()->routeIs('users.*') || request()->routeIs('employees.*') || request()->routeIs('firmware.categories.*') || request()->routeIs('sections.*');
+        $isAdminArea = request()->routeIs('users.*') || request()->routeIs('employees.*') || request()->routeIs('firmware.categories.*') || request()->routeIs('sections.*') || request()->routeIs('audit.*') || request()->routeIs('system.*');
     @endphp
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -72,6 +72,20 @@
                 @endif
                 <a href="{{ route('stats.index') }}" class="ui-navlink {{ request()->routeIs('stats.*') ? 'ui-navlink--active' : '' }}">Статистика</a>
 
+                @if($user->canManageContent())
+                    <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
+                        <button type="button" @click="open = !open" :aria-expanded="open"
+                                class="ui-navlink {{ request()->routeIs('reports.*') ? 'ui-navlink--active' : '' }}">
+                            Отчёты
+                            <svg class="w-4 h-4 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div x-show="open" x-cloak class="ui-menu absolute left-0 top-full mt-2 z-50 w-56">
+                            <a href="{{ route('reports.shift') }}" class="ui-menu__item {{ request()->routeIs('reports.shift') ? 'ui-menu__item--active' : '' }}">Отчёт по смене</a>
+                            <a href="{{ route('reports.defects') }}" class="ui-menu__item {{ request()->routeIs('reports.defects') ? 'ui-menu__item--active' : '' }}">Причины брака</a>
+                        </div>
+                    </div>
+                @endif
+
                 @if($user->isAdmin())
                     <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
                         <button type="button" @click="open = !open" :aria-expanded="open"
@@ -98,6 +112,14 @@
                                 <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
                                 Категории прошивок
                             </a>
+                            <a href="{{ route('audit.index') }}" class="ui-menu__item {{ request()->routeIs('audit.*') ? 'ui-menu__item--active' : '' }}">
+                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                                Журнал действий
+                            </a>
+                            <a href="{{ route('system.index') }}" class="ui-menu__item {{ request()->routeIs('system.*') ? 'ui-menu__item--active' : '' }}">
+                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>
+                                Состояние сервера
+                            </a>
                         </div>
                     </div>
                 @endif
@@ -105,6 +127,11 @@
 
             {{-- Справа: тема + профиль --}}
             <div class="flex items-center gap-1.5">
+                {{-- Поиск по участку (горячая клавиша «/») --}}
+                <a href="{{ route('search') }}" class="ui-iconbtn" title="Поиск по номеру борта, серийнику… (клавиша /)" aria-label="Поиск"
+                   x-data @keydown.window="if ($event.key === '/' && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName) && !document.activeElement.isContentEditable) { $event.preventDefault(); window.location = '{{ route('search') }}'; }">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </a>
                 <x-theme-switcher />
 
                 <div class="relative hidden md:block" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
@@ -235,12 +262,18 @@
                 <a href="{{ route('firmware.index') }}" class="ui-menu__item {{ request()->routeIs('firmware.*') && !request()->routeIs('firmware.categories.*') ? 'ui-menu__item--active' : '' }}">Прошивки и инструкции</a>
             @endif
             <a href="{{ route('stats.index') }}" class="ui-menu__item {{ request()->routeIs('stats.*') ? 'ui-menu__item--active' : '' }}">Статистика</a>
+            @if($user->canManageContent())
+                <a href="{{ route('reports.shift') }}" class="ui-menu__item {{ request()->routeIs('reports.shift') ? 'ui-menu__item--active' : '' }}">Отчёт по смене</a>
+                <a href="{{ route('reports.defects') }}" class="ui-menu__item {{ request()->routeIs('reports.defects') ? 'ui-menu__item--active' : '' }}">Причины брака</a>
+            @endif
 
             @if($user->isAdmin())
                 <div class="ui-menu__label pt-3">Администрирование</div>
                 <a href="{{ route('sections.index') }}" class="ui-menu__item {{ request()->routeIs('sections.*') ? 'ui-menu__item--active' : '' }}">Участки</a>
                 <a href="{{ route('users.index') }}" class="ui-menu__item {{ request()->routeIs('users.*') ? 'ui-menu__item--active' : '' }}">Пользователи</a>
                 <a href="{{ route('employees.index') }}" class="ui-menu__item {{ request()->routeIs('employees.*') ? 'ui-menu__item--active' : '' }}">Сотрудники</a>
+                <a href="{{ route('audit.index') }}" class="ui-menu__item {{ request()->routeIs('audit.*') ? 'ui-menu__item--active' : '' }}">Журнал действий</a>
+                <a href="{{ route('system.index') }}" class="ui-menu__item {{ request()->routeIs('system.*') ? 'ui-menu__item--active' : '' }}">Состояние сервера</a>
                 <a href="{{ route('firmware.categories.index') }}" class="ui-menu__item {{ request()->routeIs('firmware.categories.*') ? 'ui-menu__item--active' : '' }}">Категории прошивок</a>
             @endif
 

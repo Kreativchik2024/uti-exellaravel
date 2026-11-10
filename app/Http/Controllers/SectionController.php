@@ -44,6 +44,7 @@ class SectionController extends Controller
         // Админ, создавший участок, сразу в нём
         $section->users()->syncWithoutDetaching([$r->user()->id]);
 
+        \App\Models\AuditLog::write('sections', 'created', "Создан участок «{$section->name}» ({$section->slug})", ['subject_type' => 'section', 'subject_id' => $section->id, 'section_id' => $section->id]);
         return back()->with('ok', "Участок «{$section->name}» создан. Код для config/sheets.php: {$section->slug}");
     }
 
@@ -57,6 +58,7 @@ class SectionController extends Controller
 
         $section->update($data);
 
+        \App\Models\AuditLog::write('sections', 'updated', "Изменён участок «{$section->name}»", ['subject_type' => 'section', 'subject_id' => $section->id, 'section_id' => $section->id]);
         return back()->with('ok', "Участок «{$section->name}» сохранён");
     }
 
@@ -68,8 +70,11 @@ class SectionController extends Controller
             'sections.*' => ['integer', Rule::exists('sections', 'id')],
         ])['sections'] ?? [];
 
+        $before = $user->sections()->pluck('name')->sort()->implode(', ');
         $user->sections()->sync($ids);
 
+        \App\Models\AuditLog::write('users', 'sections', "Участки {$user->name}", ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null,
+            'changes' => ['участки' => [$before ?: '—', $user->sections()->pluck('name')->sort()->implode(', ') ?: '—']]]);
         return back()->with('ok', "Участки пользователя {$user->name} обновлены");
     }
 

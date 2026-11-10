@@ -255,6 +255,61 @@ class ChatFeaturesTest extends TestCase
         $this->actingAs($a)->getJson('/chat/messages?peer=0&initial=1')->assertJsonPath('first_unread_id', null);
     }
 
+    // ---------------------------------------------------------------- упоминания и уведомления
+
+    public function test_summary_reports_mentions_and_new_messages_to_notify(): void
+    {
+        $a = $this->user();
+        $b = User::factory()->admin()->create(['name' => 'Сидоров П.П.']);
+
+        $this->say($a, 'было до');
+        $start = $this->actingAs($b)->getJson('/chat/summary')->assertOk()->json('last_id');
+        $this->assertGreaterThan(0, $start);
+
+        $this->say($a, 'Коллеги, @Сидоров посмотри борт');
+        $this->say($a, 'лично тебе', $b->id);
+        $this->say($a, 'просто сообщение');
+
+        $res = $this->actingAs($b)->getJson("/chat/summary?after={$start}")->assertOk();
+        $res->assertJsonPath('mentions', 1);
+        $notify = collect($res->json('notify'));
+        $this->assertCount(2, $notify, 'упоминание + личное, без обычных сообщений');
+        $this->assertTrue($notify->firstWhere('peer', 0)['mention']);
+        $this->assertSame($a->id, $notify->firstWhere('mention', false)['peer']);
+
+        // Без after (первый запрос) — ничего не всплывает
+        $this->actingAs($b)->getJson('/chat/summary')->assertJsonCount(0, 'notify');
+    }
+
+    // ---------------------------------------------------------------- закреплённое
+
+    public function test_master_pins_message_others_cannot_and_pinned_survives_prune(): void
+    {
+        $admin = $this->user();
+        $worker = User::factory()->create(['role' => 'executor']);
+        $id = $this->say($admin, 'Объявление: в пятницу короткий день');
+
+        $worker->forceFill(['session_id' => null])->saveQuietly();
+        $this->actingAs($worker)->postJson("/chat/messages/{$id}/pin")->assertForbidden();
+
+        $this->actingAs($admin)->postJson("/chat/messages/{$id}/pin")->assertOk()->assertJsonPath('pinned.id', $id);
+        $this->actingAs($admin)->getJson('/chat/messages?peer=0')->assertJsonPath('pinned.id', $id);
+
+        ChatMessage::whereKey($id)->update(['created_at' => now()->subDays(10)]);
+        $this->artisan('chat:prune')->assertSuccessful();
+        $this->assertNotNull(ChatMessage::find($id), 'закреплённое не удаляется через 7 дней');
+
+        $this->actingAs($admin)->postJson("/chat/messages/{$id}/pin")->assertJsonPath('pinned', null);   // открепить
+    }
+
+    public function test_private_message_cannot_be_pinned(): void
+    {
+        [$a, $b] = [$this->user(), $this->user()];
+        $id = $this->say($a, 'лично', $b->id);
+
+        $this->actingAs($a)->postJson("/chat/messages/{$id}/pin")->assertStatus(422);
+    }
+
     // ---------------------------------------------------------------- 7 дней
 
     public function test_messages_older_than_7_days_are_hidden_and_pruned_with_files(): void

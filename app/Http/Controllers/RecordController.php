@@ -446,7 +446,15 @@ class RecordController extends Controller
 
         $lookups = $this->buildLookupFromRecord($cfg, $record);
         $isTimeLocked = $this->isRecordLocked($record);
-        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups', 'isTimeLocked'));
+
+        // История изменений записи (журнал действий) — мастеру и админу
+        $history = auth()->user()->canManageContent()
+            ? \App\Models\AuditLog::where('area', 'records')->where('subject_type', $sheet)->where('subject_id', $record->id)
+                ->orderByDesc('id')->limit(30)->get()
+            : collect();
+        $historyLabels = \App\Http\Controllers\AuditController::fieldLabels();
+
+        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups', 'isTimeLocked', 'history', 'historyLabels'));
     }
 
     public function create(Request $r, string $sheet)

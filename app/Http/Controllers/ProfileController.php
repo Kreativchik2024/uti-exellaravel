@@ -73,6 +73,7 @@ class ProfileController extends Controller
             RateLimiter::clear($key);
         }
 
+        \App\Models\AuditLog::write('profile', 'pin', $hadPin ? 'Сменил свой ПИН' : 'Задал свой ПИН', ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null]);
         $user->setPin($data['pin']);
 
         return back()->with('ok', $hadPin ? 'ПИН изменён.' : 'ПИН установлен.');
@@ -91,6 +92,7 @@ class ProfileController extends Controller
             return back()->withErrors(['password' => 'Нельзя удалить последнего администратора — сначала назначьте другого.'], 'userDeletion');
         }
 
+        \App\Models\AuditLog::write('profile', 'deleted', "Удалил свою учётку {$user->email}", ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null]);
         Auth::logout();
 
         $user->delete();

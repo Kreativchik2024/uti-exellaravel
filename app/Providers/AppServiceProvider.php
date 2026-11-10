@@ -74,6 +74,21 @@ class AppServiceProvider extends ServiceProvider
 
         FirmwareVersion::observe(FirmwareVersionObserver::class);
 
+        // Журнал действий: изменения записей всех вкладок и вход в систему
+        foreach (\App\Observers\RecordAuditObserver::models() as $model) {
+            $model::observe(\App\Observers\RecordAuditObserver::class);
+        }
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, function ($e) {
+            \App\Models\AuditLog::write('auth', 'login', 'Вход: ' . $e->user->email . ($e->remember ? ' (запомнить)' : ''), ['user' => $e->user, 'section_id' => null]);
+        });
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Failed::class, function ($e) {
+            $email = mb_strimwidth((string) ($e->credentials['email'] ?? ''), 0, 120);
+            \App\Models\AuditLog::write('auth', 'login_failed', 'Неверный пароль для ' . $email . ($e->user ? '' : ' (такой учётки нет)'), ['section_id' => null]);
+        });
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Logout::class, function ($e) {
+            if ($e->user) \App\Models\AuditLog::write('auth', 'logout', 'Выход: ' . $e->user->email, ['user' => $e->user, 'section_id' => null]);
+        });
+
         Relation::morphMap([
             'pgp'                   => PgpRecord::class,
             'comm_module'           => CommModuleRecord::class,

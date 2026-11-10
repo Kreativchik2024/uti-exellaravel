@@ -236,11 +236,80 @@ class ChatController extends Controller
     /** Лёгкий опрос для значка на кнопке. */
     public function summary(Request $r): JsonResponse
     {
-        $u = $this->unread((int) $r->user()->id);
+        $me = (int) $r->user()->id;
+        $u = $this->unread($me);
+        $after = max(0, (int) $r->query('after', 0));
+
+        // Упоминания меня в общем чате (непрочитанные)
+        $generalRead = (int) ChatRead::where('user_id', $me)->where('peer_id', 0)->value('last_read_id');
+        $mentions = fn () => ChatMessage::query()->general()->recent()
+            ->where('sender_id', '!=', $me)->where('id', '>', $generalRead)
+            ->where(fn ($w) => $this->whereMentions($w, $me));
+
+        // Новое для уведомления: личные сообщения мне и упоминания — после $after
+        $notify = collect();
+        if ($after > 0) {
+            $reads = ChatRead::where('user_id', $me)->pluck('last_read_id', 'peer_id');
+            $direct = ChatMessage::query()->recent()->with('attachments')
+                ->where('recipient_id', $me)->where('id', '>', $after)
+                ->orderBy('id')->limit(10)->get()
+                ->filter(fn ($m) => $m->id > (int) ($reads[$m->sender_id] ?? 0));
+            $mentioned = $mentions()->with('attachments')->where('id', '>', $after)->orderBy('id')->limit(10)->get();
+            $names = $this->displayNames($direct->pluck('sender_id')->merge($mentioned->pluck('sender_id')));
+
+            $notify = $direct->map(fn ($m) => ['id' => $m->id, 'peer' => $m->sender_id, 'mention' => false, 'name' => $names[$m->sender_id] ?? '—', 'preview' => $this->preview($m)])
+                ->merge($mentioned->map(fn ($m) => ['id' => $m->id, 'peer' => 0, 'mention' => true, 'name' => $names[$m->sender_id] ?? '—', 'preview' => $this->preview($m)]))
+                ->sortBy('id')->take(-5)->values();
+        }
 
         return response()->json([
-            'unread' => $u['general'] + array_sum($u['direct']),
+            'unread'   => $u['general'] + array_sum($u['direct']),
+            'mentions' => $mentions()->count(),
+            'notify'   => $notify,
+            'last_id'  => (int) ChatMessage::max('id'),
         ])->header('Cache-Control', 'no-store');
+    }
+
+    /** Фамилия для упоминаний: первое слово отображаемого имени («Иванов О.П.» → «Иванов»). */
+    private function mentionName(int $userId): string
+    {
+        return (string) Str::of($this->displayNames([$userId])[$userId] ?? '')->trim()->before(' ');
+    }
+
+    /** Условие «сообщение упоминает пользователя»: @Фамилия или @все. */
+    private function whereMentions($query, int $me): void
+    {
+        $name = $this->mentionName($me);
+        $query->where('body', 'like', '%@все%');
+        if ($name !== '') {
+            $query->orWhere('body', 'like', '%@' . addcslashes($name, '%_\\') . '%');
+        }
+    }
+
+    /** Закрепить сообщение общего чата (одно на канал) или открепить. Мастер и админ. */
+    public function pin(Request $r, ChatMessage $message): JsonResponse
+    {
+        abort_unless($r->user()->canManageContent(), 403);
+        abort_unless($message->recipient_id === null, 422, 'Закрепить можно только сообщение общего чата');
+
+        $pin = $message->pinned_at === null;
+        DB::transaction(function () use ($message, $pin, $r) {
+            ChatMessage::whereNotNull('pinned_at')->update(['pinned_at' => null, 'pinned_by' => null]);
+            if ($pin) {
+                $message->forceFill(['pinned_at' => now(), 'pinned_by' => $r->user()->id])->saveQuietly();
+            }
+        });
+        \App\Models\AuditLog::write('chat', $pin ? 'pinned' : 'unpinned', ($pin ? 'Закрепил' : 'Открепил') . ' сообщение: ' . $this->preview($message), ['subject_type' => 'chat', 'subject_id' => $message->id, 'section_id' => null]);
+
+        return response()->json(['pinned' => $this->pinned((int) $r->user()->id)]);
+    }
+
+    /** Закреплённое сообщение общего чата (или null). */
+    private function pinned(int $me): ?array
+    {
+        $m = ChatMessage::query()->general()->whereNotNull('pinned_at')->latest('pinned_at')->first();
+
+        return $m ? $this->present(collect([$m]), $me)[0] + ['pinned_at' => $m->pinned_at->toIso8601String()] : null;
     }
 
     /** Список разговоров: общий канал + личные (последние сверху). */
@@ -393,6 +462,7 @@ class ChatController extends Controller
             'updates'         => $updates,
             'typing'          => $this->typingNames($me, $peer),
             'server_time'     => now()->toIso8601String(),
+            'pinned'          => $peer === 0 ? $this->pinned($me) : null,
         ] + $this->receipts($me, $peer))->header('Cache-Control', 'no-store');
     }
 

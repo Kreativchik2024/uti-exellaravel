@@ -156,6 +156,37 @@ class SecurityTest extends TestCase
             ->postJson('/records-pin-check', ['short_name' => $emp->short_name, 'pin' => '4321'])->assertStatus(429);
     }
 
+    // ---------------------------------------------------------------- автовыход
+
+    public function test_idle_user_is_logged_out_but_background_polling_does_not_keep_session(): void
+    {
+        config(['auth.idle_logout_minutes' => 15]);
+        $user = User::factory()->admin()->create();
+
+        $this->actingAs($user)->get('/profile')->assertOk();
+
+        // Фоновый опрос чата каждые 10 минут — не активность
+        $this->travel(10)->minutes();
+        $this->getJson('/chat/summary')->assertOk();
+        $this->travel(6)->minutes();
+        $this->get('/profile')->assertRedirect('/login');
+        $this->assertGuest();
+        $this->assertTrue(\App\Models\AuditLog::where('action', 'logout')->exists());
+    }
+
+    public function test_ping_keeps_session_alive_while_user_works(): void
+    {
+        config(['auth.idle_logout_minutes' => 15]);
+        $user = User::factory()->admin()->create();
+
+        $this->actingAs($user)->get('/profile')->assertOk();
+        foreach (range(1, 3) as $i) {
+            $this->travel(10)->minutes();
+            $this->getJson('/session/ping')->assertOk();   // браузер: человек печатает
+        }
+        $this->get('/profile')->assertOk();
+    }
+
     // ---------------------------------------------------------------- Excel
 
     public function test_excel_export_never_writes_formulas_from_user_data(): void

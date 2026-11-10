@@ -187,6 +187,28 @@
                     </dl>
                 </section>
 
+                @if(($history ?? collect())->isNotEmpty())
+                    <section class="ui-card overflow-hidden">
+                        <h3 class="rec-section__title">История изменений</h3>
+                        <div class="px-1 pb-2">
+                            @foreach($history as $log)
+                                <div class="ui-audit ui-audit--compact">
+                                    <div class="ui-audit__head">
+                                        <span class="ui-audit__badge ui-audit__badge--{{ $log->action }}">{{ $log->actionLabel() }}</span>
+                                    </div>
+                                    <div class="ui-audit__meta">
+                                        <span>{{ $log->created_at->format('d.m.Y H:i') }}</span>
+                                        <span>{{ $log->user_name }}</span>
+                                    </div>
+                                    @if($log->action === 'updated')
+                                        @include('audit._changes', ['log' => $log, 'labels' => $historyLabels])
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+
                 @can('delete', $record)
                     @unless($isTimeLocked)
                         <form method="POST" action="{{ route('records.destroy', [$sheet, $record->id]) }}"

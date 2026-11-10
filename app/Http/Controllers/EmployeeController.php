@@ -125,6 +125,7 @@ class EmployeeController extends Controller
             throw $e;
         }
 
+        \App\Models\AuditLog::write('employees', 'created', 'Добавлен сотрудник ' . trim($data['last_name'] . ' ' . $data['first_name'] . ' ' . ($data['middle_name'] ?? '')), ['subject_type' => 'employee', 'section_id' => null]);
         return redirect()->route('employees.index')->with('ok', 'Сотрудник добавлен');
     }
 
@@ -172,11 +173,13 @@ class EmployeeController extends Controller
             throw $e;
         }
 
+        \App\Models\AuditLog::write('employees', 'updated', 'Изменён сотрудник ' . $employee->short_name, ['subject_type' => 'employee', 'subject_id' => $employee->id, 'section_id' => null]);
         return redirect()->route('employees.index')->with('ok', 'Сотрудник обновлён');
     }
 
     public function destroy(Employee $employee)
     {
+        \App\Models\AuditLog::write('employees', 'deleted', 'Удалён сотрудник ' . $employee->short_name, ['subject_type' => 'employee', 'subject_id' => $employee->id, 'section_id' => null]);
         $employee->delete();
         return redirect()->route('employees.index')->with('ok', 'Сотрудник удалён');
     }
@@ -300,6 +303,8 @@ class EmployeeController extends Controller
             if ($employee->exists) $updated++; else $created++;
             $employee->save();
         }
+
+        \App\Models\AuditLog::write('employees', 'imported', "Импорт сотрудников: добавлено {$created}, обновлено {$updated}, пропущено {$skipped}", ['subject_type' => 'employee', 'section_id' => null]);
 
         return redirect()->route('employees.index')
             ->with('ok', "Импорт завершён: добавлено {$created}, обновлено {$updated}, пропущено {$skipped}")

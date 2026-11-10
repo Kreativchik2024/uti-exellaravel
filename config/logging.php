@@ -65,6 +65,7 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Лог по дням: laravel-ГГГГ-ММ-ДД.log, хранится LOG_DAILY_DAYS дней (на сервере: LOG_STACK=daily)
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),

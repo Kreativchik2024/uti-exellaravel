@@ -46,7 +46,9 @@ class UserController extends Controller
             return back()->withErrors(['role' => 'Нельзя снять роль админа с самого себя.']);
         }
 
+        $oldRole = $user->role;
         $user->forceFill(['role' => $data['role']])->save();
+        \App\Models\AuditLog::write('users', 'role', "Роль {$user->name} ({$user->email}): {$data['role']}", ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null, 'changes' => ['роль' => [$oldRole, $data['role']]]]);
         return back()->with('ok', "Роль пользователя {$user->name} изменена на {$data['role']}");
     }
 
@@ -63,6 +65,7 @@ class UserController extends Controller
         if (!$user->isAdmin() && $user->sections()->doesntExist() && ($section = app(SectionContext::class)->current())) {
             $user->sections()->attach($section->id);
         }
+        \App\Models\AuditLog::write('users', 'approved', "Активирован {$user->name} ({$user->email})", ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null]);
         return back()->with('ok', "Пользователь {$user->name} активирован");
     }
 
@@ -72,6 +75,7 @@ class UserController extends Controller
             return back()->withErrors(['general' => 'Нельзя деактивировать самого себя.']);
         }
         $user->forceFill(['is_active' => false])->save();
+        \App\Models\AuditLog::write('users', 'deactivated', "Деактивирован {$user->name} ({$user->email})", ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null]);
         return back()->with('ok', "Пользователь {$user->name} деактивирован");
     }
 
@@ -82,6 +86,7 @@ class UserController extends Controller
         ]);
 
         $user->update(['password' => Hash::make($data['password'])]);
+        \App\Models\AuditLog::write('users', 'password', "Сброшен пароль {$user->name} ({$user->email})", ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null]);
         return back()->with('ok', "Пароль пользователя {$user->name} изменён");
     }
 
@@ -89,7 +94,17 @@ class UserController extends Controller
     public function resetPin(User $user)
     {
         $user->forceFill(['pin_hash' => null])->saveQuietly();
+        \App\Models\AuditLog::write('users', 'pin', "Сброшен ПИН {$user->name} ({$user->email})", ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null]);
         return back()->with('ok', "ПИН пользователя {$user->name} сброшен. Пусть задаст новый в профиле.");
+    }
+
+    /** Сброс входа с кодом (потерян телефон): пользователь заново настроит его при входе. */
+    public function resetTwoFactor(User $user)
+    {
+        $user->forceFill(['two_factor_secret' => null, 'two_factor_recovery_codes' => null, 'two_factor_confirmed_at' => null])->save();
+        \App\Models\AuditLog::write('users', 'two_factor', "Сброшен вход с кодом у {$user->name} ({$user->email})", ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null]);
+
+        return back()->with('ok', "Вход с кодом у {$user->name} сброшен. При входе он настроит его заново.");
     }
 
     public function destroy(User $user)
@@ -97,6 +112,7 @@ class UserController extends Controller
         if ($user->id === auth()->id()) {
             return back()->withErrors(['general' => 'Нельзя удалить самого себя.']);
         }
+        \App\Models\AuditLog::write('users', 'deleted', "Удалён пользователь {$user->name} ({$user->email}, роль {$user->role})", ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null]);
         $user->delete();
         return back()->with('ok', 'Пользователь удалён');
     }

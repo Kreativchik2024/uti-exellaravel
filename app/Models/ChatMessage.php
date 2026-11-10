@@ -17,7 +17,7 @@ class ChatMessage extends Model
 
     protected $fillable = ['sender_id', 'recipient_id', 'reply_to_id', 'body'];
 
-    protected $casts = ['created_at' => 'datetime', 'updated_at' => 'datetime'];
+    protected $casts = ['created_at' => 'datetime', 'updated_at' => 'datetime', 'pinned_at' => 'datetime'];
 
     public function sender(): BelongsTo
     {

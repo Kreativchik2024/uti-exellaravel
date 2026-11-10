@@ -30,6 +30,13 @@ return [
 
     'disks' => [
 
+        // Второй носитель для резервных копий (config/backup.php)
+        'backup_external' => [
+            'driver' => 'local',
+            'root' => env('BACKUP_EXTERNAL_PATH', storage_path('app/backup-external')),
+            'throw' => false,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
