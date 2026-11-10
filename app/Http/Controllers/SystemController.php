@@ -167,6 +167,9 @@ class SystemController extends Controller
                 [$copy("LEGAL_OPERATOR=\"ООО «Название»\"\nLEGAL_ADDRESS=\"г. Город, ул. Улица, д. 1\"\nLEGAL_CONTACT=\"администратор системы\"", 'Скопировать строки для .env'),
                  ['type' => 'link', 'url' => route('legal.rules'), 'label' => 'Открыть правила']]);
         }
+        $idle = (int) config('auth.idle_logout_minutes');
+        $add('Настройки', 'ok', 'Сессия', 'Действует до выхода (до ' . round(config('session.lifetime') / 60) . ' ч)'
+            . ($idle > 0 ? ", автовыход после {$idle} мин бездействия" : ', автовыход по бездействию выключен'));
         $add('Настройки', 'ok', 'Версии', 'PHP ' . PHP_VERSION . ', Laravel ' . app()->version(),
             [$run('cache', 'Обновить кеш сайта', 'Сбросить и пересобрать кеш? Нужно после правки .env или выкладки новой версии.')]);
 

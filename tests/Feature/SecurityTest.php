@@ -174,6 +174,20 @@ class SecurityTest extends TestCase
         $this->assertTrue(\App\Models\AuditLog::where('action', 'logout')->exists());
     }
 
+    public function test_session_lasts_until_logout_and_idle_limit_is_30_minutes(): void
+    {
+        $this->assertSame(30, config('auth.idle_logout_minutes'));
+        $this->assertGreaterThanOrEqual(720, config('session.lifetime'), 'сессия — не меньше рабочего дня');
+        $this->assertFalse(config('session.expire_on_close'));
+
+        $user = User::factory()->admin()->create();
+        $this->actingAs($user)->get('/profile')->assertOk();
+        $this->travel(29)->minutes();
+        $this->get('/profile')->assertOk();   // 29 минут без действий — ещё в системе
+        $this->travel(31)->minutes();
+        $this->get('/profile')->assertRedirect('/login');   // больше 30 — выход
+    }
+
     public function test_ping_keeps_session_alive_while_user_works(): void
     {
         config(['auth.idle_logout_minutes' => 15]);

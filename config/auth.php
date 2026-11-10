@@ -115,7 +115,7 @@ return [
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
     // Автовыход при бездействии, минут (0 — выключен). App\Http\Middleware\LogoutWhenIdle
-    'idle_logout_minutes' => (int) env('IDLE_LOGOUT_MINUTES', 15),
+    'idle_logout_minutes' => (int) env('IDLE_LOGOUT_MINUTES', 30),
 
     // Восстановление пароля по email (routes/auth.php). Без настроенной почты — выключено.
     'password_reset_by_email' => (bool) env('PASSWORD_RESET_EMAIL', false),

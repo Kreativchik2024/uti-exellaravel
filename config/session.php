@@ -32,9 +32,11 @@ return [
     |
     */
 
-    'lifetime' => (int) env('SESSION_LIFETIME', 120),
+    // Сессия живёт до выхода из системы: не меньше рабочего дня (12 ч), даже если в .env меньше.
+    // Выход по бездействию — отдельно: auth.idle_logout_minutes (по умолчанию 30 мин).
+    'lifetime' => max((int) env('SESSION_LIFETIME', 720), 720),
 
-    'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
+    'expire_on_close' => false,   // закрытие вкладки не выкидывает из системы
 
     /*
     |--------------------------------------------------------------------------
