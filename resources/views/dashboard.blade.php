@@ -12,7 +12,7 @@
     <x-slot name="header">
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
-                <p class="text-sm font-medium first-letter:uppercase" style="color: var(--ui-muted)">{{ now()->translatedFormat('l, j F') }}</p>
+                <p class="text-sm font-medium first-letter:uppercase" style="color: var(--ui-muted)">{{ now()->translatedFormat('l, j F') }}@if($section) · {{ $section->name }}@endif</p>
                 <h2>{{ $greeting }}, {{ $firstName }}</h2>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -35,6 +35,18 @@
         @if(session('ok'))
             <div class="ui-card px-4 py-3 mb-6 text-sm font-medium" style="background: var(--ui-good-soft); color: var(--ui-good); border-color: transparent">{{ session('ok') }}</div>
         @endif
+
+        @unless($section)
+            <div class="ui-card p-6 mb-6 flex items-start gap-4" role="status">
+                <span class="rec-health" style="width:44px;height:44px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:var(--ui-accent-soft);color:var(--ui-accent-text)">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                </span>
+                <div>
+                    <div class="font-semibold" style="color: var(--ui-text)">Вам пока не назначен участок</div>
+                    <div class="text-sm mt-1" style="color: var(--ui-muted)">Учёт и статистика появятся, когда администратор назначит вам участок. Общие новости и чат доступны уже сейчас.</div>
+                </div>
+            </div>
+        @endunless
 
         <div class="dashboard-cols">
 

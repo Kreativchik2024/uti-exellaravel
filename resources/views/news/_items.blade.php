@@ -18,6 +18,9 @@
 
             <div class="p-5">
                 <header class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style="color: var(--ui-muted)">
+                    @if($item->section_id === null)
+                        <span class="ui-pill ui-pill--neutral" title="Видна на всех участках">Для всех участков</span>
+                    @endif
                     @if($item->is_pinned)
                         <span class="ui-badge">
                             <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10.5 2.5a1 1 0 00-1.6-.8L5.7 4.1a1 1 0 01-.6.2H3a1 1 0 00-.7 1.7l3.1 3.1-3.1 4.9a.5.5 0 00.7.7l4.9-3.1 3.1 3.1A1 1 0 0012.7 14v-2.1a1 1 0 01.2-.6l2.4-3.2a1 1 0 00-.8-1.6H12a1 1 0 01-1-1V2.5z"/></svg>

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Section;
 use App\Models\User;
+use App\Services\SectionContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -13,6 +15,8 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $users = User::query()
+            ->with('sections:id,name')
+            ->when($request->filled('section'), fn($q) => $q->whereHas('sections', fn($s) => $s->whereKey((int) $request->section)))
             ->when($request->filled('q'), fn($q) => $q
                 ->where('name', 'like', "%{$request->q}%")
                 ->orWhere('email', 'like', "%{$request->q}%"))
@@ -27,7 +31,9 @@ class UserController extends Controller
             ->paginate(30)
             ->withQueryString();
 
-        return view('users.index', compact('users'));
+        $sections = Section::ordered()->get(['id', 'name', 'is_active']);
+
+        return view('users.index', compact('users', 'sections'));
     }
 
     public function updateRole(Request $request, User $user)
@@ -51,6 +57,11 @@ class UserController extends Controller
             'approved_by' => auth()->id(),
             'approved_at' => now(),
         ]);
+
+        // Без участка пользователь ничего не увидит — назначаем текущий участок админа
+        if (!$user->isAdmin() && $user->sections()->doesntExist() && ($section = app(SectionContext::class)->current())) {
+            $user->sections()->attach($section->id);
+        }
         return back()->with('ok', "Пользователь {$user->name} активирован");
     }
 

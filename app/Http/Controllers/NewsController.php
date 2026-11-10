@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\News;
 use App\Models\NewsImage;
+use App\Services\SectionContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -12,9 +13,40 @@ use Intervention\Image\Laravel\Facades\Image;
 
 class NewsController extends Controller
 {
+    public function __construct(private SectionContext $sections) {}
+
+    /** Новость видна, если она общая или с доступного участка. */
+    private function canSee(News $news): bool
+    {
+        return $news->section_id === null
+            || $this->sections->available()->contains('id', $news->section_id);
+    }
+
+    /** Менять общую новость может только админ; участковую — с доступом к участку. */
+    private function authorizeSection(News $news): void
+    {
+        abort_unless(
+            $news->section_id === null ? (bool) auth()->user()?->isAdmin() : $this->canSee($news),
+            403, 'Нет доступа к новостям этого участка'
+        );
+    }
+
+    /** Проверка выбранного в форме участка: null («для всех») — только админ. */
+    private function sectionFromRequest(Request $r): ?int
+    {
+        $id = $r->input('section_id');
+        if ($id === null || $id === '' || $id === 'all') {
+            abort_unless(auth()->user()->isAdmin(), 403, 'Новость для всех участков может опубликовать только администратор');
+            return null;
+        }
+        abort_unless($this->sections->available()->contains('id', (int) $id), 403, 'Нет доступа к участку');
+        return (int) $id;
+    }
+
     public function index(Request $r)
     {
-        $news = News::with(['author','images'])
+        $news = News::with(['author','images', 'section'])
+            ->forSection($this->sections->current())
             ->published()
             ->orderByDesc('is_pinned')
             ->orderByDesc('published_at')
@@ -29,8 +61,9 @@ class NewsController extends Controller
         if (!$news->is_published && !auth()->check()) {
             abort(404);
         }
+        abort_unless($this->canSee($news), 404);
 
-        $news->load(['author', 'images']);
+        $news->load(['author', 'images', 'section']);
 
         return view('news.show', compact('news'));
     }
@@ -38,7 +71,7 @@ class NewsController extends Controller
     public function create()
     {
         Gate::authorize('create', News::class);
-        return view('news.create');
+        return view('news.create', ['sections' => $this->sections->available(), 'currentSection' => $this->sections->current()]);
     }
 
     public function store(Request $r)
@@ -56,6 +89,7 @@ class NewsController extends Controller
         ]);
 
         $news = News::create([
+            'section_id'   => $this->sectionFromRequest($r),
             'title'        => $data['title'] ?? Str::limit(strip_tags($data['body']), 60),
             'body'         => $data['body'],
             'is_pinned'    => $r->boolean('is_pinned'),
@@ -72,13 +106,15 @@ class NewsController extends Controller
     public function edit(News $news)
     {
         Gate::authorize('update', $news);
+        $this->authorizeSection($news);
         $news->load('images');
-        return view('news.edit', compact('news'));
+        return view('news.edit', ['news' => $news, 'sections' => $this->sections->available(), 'currentSection' => $this->sections->current()]);
     }
 
     public function update(Request $r, News $news)
     {
         Gate::authorize('update', $news);
+        $this->authorizeSection($news);
 
         $data = $r->validate([
             'title'               => 'nullable|string|max:200',
@@ -93,6 +129,7 @@ class NewsController extends Controller
         ]);
 
         $news->update([
+            'section_id' => $this->sectionFromRequest($r),
             'title'     => $data['title'] ?? Str::limit(strip_tags($data['body']), 60),
             'body'      => $data['body'],
             'is_pinned' => $r->boolean('is_pinned'),
@@ -115,6 +152,7 @@ class NewsController extends Controller
     public function destroy(News $news)
     {
         Gate::authorize('delete', $news);
+        $this->authorizeSection($news);
 
         foreach ($news->images as $img) {
             Storage::disk('local')->delete([$img->path, $img->thumb_path]);
@@ -127,6 +165,7 @@ class NewsController extends Controller
     public function destroyImage(News $news, NewsImage $image)
     {
         Gate::authorize('update', $news);
+        $this->authorizeSection($news);
         abort_unless((int) $image->news_id === (int) $news->id, 404);
 
         Storage::disk('local')->delete([$image->path, $image->thumb_path]);
@@ -140,6 +179,7 @@ class NewsController extends Controller
         $after = (int) $request->query('after', 0);
 
         $news = News::query()
+            ->forSection($this->sections->current())
             ->where('is_published', true)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())

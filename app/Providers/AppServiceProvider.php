@@ -29,6 +29,7 @@ use App\Policies\FirmwarePolicy;
 use App\Policies\NewsPolicy;
 use App\Policies\RecordPolicy;
 use App\Services\EmployeeDirectory;
+use App\Services\SectionContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
@@ -43,6 +44,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped(EmployeeDirectory::class);
+        $this->app->scoped(SectionContext::class);
     }
 
     public function boot(): void
@@ -110,6 +112,16 @@ class AppServiceProvider extends ServiceProvider
         // (раньше composer('*') делал запрос к БД на каждый партиал/компонент).
         View::composer(['layouts.app', 'layouts.navigation'], function ($view) {
             $view->with('globalVerifiedWorkersMap', app(EmployeeDirectory::class)->verifiedMap());
+        });
+
+        // Участок: выбор в шапке, вкладки «Учёта», видимость разделов
+        View::composer('layouts.navigation', function ($view) {
+            $sections = app(SectionContext::class);
+            $view->with([
+                'currentSection'    => $sections->current(),
+                'availableSections' => $sections->available(),
+                'sectionSheets'     => $sections->sheets(),
+            ]);
         });
 
         $this->configureRateLimiting();

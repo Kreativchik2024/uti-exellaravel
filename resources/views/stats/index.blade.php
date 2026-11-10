@@ -378,7 +378,7 @@
                             <label class="block text-xs text-gray-500 mb-1">Категория</label>
                             <select x-model="selectedCategory6" @change="loadZone6(true)" class="border rounded px-3 py-2 text-sm bg-white w-full">
                                 <option value="">— Все категории —</option>
-                                @foreach(config('sheets.map', []) as $slug => $cfg)
+                                @foreach(app(\App\Services\SectionContext::class)->sheets() as $slug => $cfg)
                                     @if(isset($cfg['fields']['fault_code']))
                                         <option value="{{ $slug }}">{{ $cfg['title'] ?? $slug }}</option>
                                     @endif
@@ -492,6 +492,8 @@
                     if (!window.Chart) return;
                     var dark = document.documentElement.classList.contains('dark');
                     Chart.defaults.color       = dark ? '#cbd5e1' : '#4b5563';
+                    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;   // Inter, как на сайте
+                    Chart.defaults.font.size   = 13;                                         // было 12 — в тон общему кеглю
                     Chart.defaults.borderColor = dark ? 'rgba(148, 163, 184, 0.18)' : 'rgba(0, 0, 0, 0.1)';
                     Object.values(Chart.instances || {}).forEach(function (c) { c.update('none'); });
                 }

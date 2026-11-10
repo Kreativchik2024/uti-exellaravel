@@ -12,8 +12,7 @@ $faultCode = [
     'fault_code' => ['label'=>'Код неисправности','type'=>'text','rules'=>'nullable|string|max:100'],
 ];
 
-return [
-    'map' => [
+$map = [
 
         // =====================================================
         // ПГП (борта)
@@ -443,5 +442,15 @@ return [
             'list_columns' => ['record_date','qty','fault_code'],
         ],
 
-    ],
+];
+
+// Участок каждой вкладки (slug из таблицы sections). Вкладки без явного
+// 'section' относятся к участку испытаний. Для нового участка добавьте
+// вкладки с 'section' => '<slug участка>'.
+foreach ($map as $slug => $cfg) {
+    $map[$slug]['section'] ??= 'ispytaniya';
+}
+
+return [
+    'map' => $map,
 ];

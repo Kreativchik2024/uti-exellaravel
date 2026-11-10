@@ -4,34 +4,17 @@
         $workersCount   = count($currentWorkers);
         $activePins     = $globalVerifiedWorkersMap ?? [];
         $currentSheet   = request()->route('sheet');
+        $user           = Auth::user();
+        $canSwitch      = ($availableSections ?? collect())->count() > 1 || $user->isAdmin();
 
-        $recordTabs = [
-            'pgp'                   => 'ПГП (борта)',
-            'comm_module'           => 'Модуль связи',
-            'cross1'                => 'Кросс 1',
-            'cross3'                => 'Кросс 3',
-            'cross5'                => 'Кросс 5',
-            'mini_pc'               => 'Мини ПК',
-            'research'              => 'Исследования',
-            'pc_check'              => 'Проверка ПК',
-            'sophon_check'          => 'Проверка Sophon',
-            'software_install'      => 'Установка ПО',
-            'motor_regulator'       => 'Регулятор мотора',
-            'power_wires'           => 'Провода питания',
-            'data15'                => 'Data 15',
-            'data17'                => 'Data 17',
-            'camera_bracket'        => 'Кронштейн с камерой',
-            'night_camera_assembly' => 'Ночная камера в сборе с дневной',
-            'speed_sensor'          => 'Датчик скорости',
-            'router_firmware'       => 'Прошивка роутеров',
-            'screw_check'           => 'Проверка винтов',
-        ];
+        // Вкладки учёта текущего участка (config/sheets.php → 'section')
+        $recordTabs = collect($sectionSheets ?? [])->map(fn ($cfg) => $cfg['title'] ?? '')->all();
+        $hasFirmware = (bool) ($currentSection?->has_firmware);
 
-        $user     = Auth::user();
         $initials = collect(preg_split('/\s+/u', trim($user->name)))
             ->filter()->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode('');
         $roleLabel = ['admin' => 'Администратор', 'master' => 'Мастер', 'executor' => 'Исполнитель'][$user->role] ?? '';
-        $isAdminArea = request()->routeIs('users.*') || request()->routeIs('employees.*') || request()->routeIs('firmware.categories.*');
+        $isAdminArea = request()->routeIs('users.*') || request()->routeIs('employees.*') || request()->routeIs('firmware.categories.*') || request()->routeIs('sections.*');
     @endphp
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -40,7 +23,7 @@
             {{-- Бренд --}}
             <a href="{{ route('dashboard') }}" class="ui-brand shrink-0">
                 <x-application-logo class="ui-brand__logo" />
-                <span class="hidden lg:block">
+                <span class="hidden 2xl:block">
                     <span class="ui-brand__name block">{{ config('app.name', 'УТИ') }}</span>
                     <span class="ui-brand__sub block">учёт производства</span>
                 </span>
@@ -61,7 +44,10 @@
                          x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                          x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                          class="ui-menu absolute left-0 top-full mt-2 z-50 w-[min(560px,90vw)]">
-                        <div class="ui-menu__label">Вкладки учёта</div>
+                        <div class="ui-menu__label">Вкладки учёта · {{ $currentSection?->name }}</div>
+                        @if(empty($recordTabs))
+                            <div class="px-2.5 py-3 text-sm" style="color: var(--ui-muted)">У этого участка пока нет вкладок учёта.</div>
+                        @endif
                         <div class="grid grid-cols-2 gap-0.5 max-h-[70vh] overflow-y-auto">
                             @foreach($recordTabs as $slug => $label)
                                 <a href="{{ route('records.index', $slug) }}"
@@ -81,7 +67,9 @@
                         <span data-pin-timer="{{ $name }}" class="hidden xl:inline"></span>
                     @endforeach
                 </a>
-                <a href="{{ route('firmware.index') }}" class="ui-navlink {{ request()->routeIs('firmware.*') && !request()->routeIs('firmware.categories.*') ? 'ui-navlink--active' : '' }}">Прошивки</a>
+                @if($hasFirmware)
+                    <a href="{{ route('firmware.index') }}" class="ui-navlink {{ request()->routeIs('firmware.*') && !request()->routeIs('firmware.categories.*') ? 'ui-navlink--active' : '' }}">Прошивки</a>
+                @endif
                 <a href="{{ route('stats.index') }}" class="ui-navlink {{ request()->routeIs('stats.*') ? 'ui-navlink--active' : '' }}">Статистика</a>
 
                 @if($user->isAdmin())
@@ -94,6 +82,10 @@
                         <div x-show="open" x-cloak
                              x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                              class="ui-menu absolute left-0 top-full mt-2 z-50 w-60">
+                            <a href="{{ route('sections.index') }}" class="ui-menu__item {{ request()->routeIs('sections.*') ? 'ui-menu__item--active' : '' }}">
+                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                Участки
+                            </a>
                             <a href="{{ route('users.index') }}" class="ui-menu__item {{ request()->routeIs('users.*') ? 'ui-menu__item--active' : '' }}">
                                 <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/></svg>
                                 Пользователи
@@ -119,7 +111,7 @@
                     <button type="button" @click="open = !open" :aria-expanded="open"
                             class="flex items-center gap-2.5 h-10 pl-1 pr-2 rounded-xl transition hover:bg-[var(--ui-surface-hover)]">
                         <span class="ui-avatar">{{ $initials }}</span>
-                        <span class="hidden lg:block text-left leading-tight">
+                        <span class="hidden 2xl:block text-left leading-tight">
                             <span class="block text-sm font-semibold" style="color: var(--ui-text)">{{ \Illuminate\Support\Str::limit($user->name, 24) }}</span>
                             <span class="block text-[11px]" style="color: var(--ui-muted)">{{ $roleLabel }}</span>
                         </span>
@@ -132,6 +124,31 @@
                             <div class="text-sm font-semibold truncate" style="color: var(--ui-text)">{{ $user->name }}</div>
                             <div class="text-xs truncate" style="color: var(--ui-muted)">{{ $user->email }}</div>
                         </div>
+
+                        {{-- Участок: выбор (если их несколько) или просто название --}}
+                        @if($currentSection)
+                            <div class="ui-menu__sep"></div>
+                            <div class="ui-menu__label">Участок</div>
+                            @if($canSwitch)
+                                @foreach($availableSections as $sec)
+                                    <form method="POST" action="{{ route('section.switch') }}">
+                                        @csrf
+                                        <input type="hidden" name="section_id" value="{{ $sec->id }}">
+                                        <button type="submit" class="ui-menu__item {{ $sec->id === $currentSection->id ? 'ui-menu__item--active' : '' }}">
+                                            <span class="ui-menu__dot"></span><span class="flex-1 truncate">{{ $sec->name }}</span>
+                                            @if($sec->id === $currentSection->id)
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                            @endif
+                                        </button>
+                                    </form>
+                                @endforeach
+                                @if($user->isAdmin())
+                                    <a href="{{ route('sections.index') }}" class="ui-menu__item" style="color: var(--ui-muted)">Управление участками…</a>
+                                @endif
+                            @else
+                                <div class="px-2.5 py-1.5 text-sm" style="color: var(--ui-text-2)">{{ $currentSection->name }}</div>
+                            @endif
+                        @endif
 
                         @if(!empty($activePins))
                             <div class="ui-menu__sep"></div>
@@ -182,6 +199,18 @@
                 </div>
             </div>
 
+            @if($currentSection && $canSwitch)
+                <div class="ui-menu__label">Участок</div>
+                <form method="POST" action="{{ route('section.switch') }}" class="px-1 pb-2">
+                    @csrf
+                    <select name="section_id" onchange="this.form.submit()" class="w-full rounded-[10px] px-3 py-2 text-sm" aria-label="Участок">
+                        @foreach($availableSections as $sec)
+                            <option value="{{ $sec->id }}" @selected($sec->id === $currentSection->id)>{{ $sec->name }}</option>
+                        @endforeach
+                    </select>
+                </form>
+            @endif
+
             <a href="{{ route('dashboard') }}" class="ui-menu__item {{ request()->routeIs('dashboard') ? 'ui-menu__item--active' : '' }}">Главная</a>
 
             <div x-data="{ expanded: {{ request()->routeIs('records.*') ? 'true' : 'false' }} }">
@@ -202,11 +231,14 @@
                 Исполнители
                 @if($workersCount > 0)<span class="ui-navlink__count ml-auto">{{ $workersCount }}</span>@endif
             </a>
-            <a href="{{ route('firmware.index') }}" class="ui-menu__item {{ request()->routeIs('firmware.*') && !request()->routeIs('firmware.categories.*') ? 'ui-menu__item--active' : '' }}">Прошивки и инструкции</a>
+            @if($hasFirmware)
+                <a href="{{ route('firmware.index') }}" class="ui-menu__item {{ request()->routeIs('firmware.*') && !request()->routeIs('firmware.categories.*') ? 'ui-menu__item--active' : '' }}">Прошивки и инструкции</a>
+            @endif
             <a href="{{ route('stats.index') }}" class="ui-menu__item {{ request()->routeIs('stats.*') ? 'ui-menu__item--active' : '' }}">Статистика</a>
 
             @if($user->isAdmin())
                 <div class="ui-menu__label pt-3">Администрирование</div>
+                <a href="{{ route('sections.index') }}" class="ui-menu__item {{ request()->routeIs('sections.*') ? 'ui-menu__item--active' : '' }}">Участки</a>
                 <a href="{{ route('users.index') }}" class="ui-menu__item {{ request()->routeIs('users.*') ? 'ui-menu__item--active' : '' }}">Пользователи</a>
                 <a href="{{ route('employees.index') }}" class="ui-menu__item {{ request()->routeIs('employees.*') ? 'ui-menu__item--active' : '' }}">Сотрудники</a>
                 <a href="{{ route('firmware.categories.index') }}" class="ui-menu__item {{ request()->routeIs('firmware.categories.*') ? 'ui-menu__item--active' : '' }}">Категории прошивок</a>

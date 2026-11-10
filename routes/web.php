@@ -9,6 +9,7 @@ use App\Http\Controllers\MediaController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecordController;
+use App\Http\Controllers\SectionController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkerSessionController;
@@ -21,6 +22,9 @@ Route::get('/csrf-token', fn () => response()
     ->header('Cache-Control', 'no-store, private'))
     ->middleware('throttle:60,1')
     ->name('csrf.refresh');
+
+// Выбор текущего участка (в шапке)
+Route::post('/section/switch', [SectionController::class, 'switch'])->middleware('auth')->name('section.switch');
 
 Route::middleware('auth')->group(function () {
     Route::get('/workstation/select',  [WorkstationController::class, 'show'])->name('workstation.show');
@@ -75,9 +79,14 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::put('/employees/{employee}',      [EmployeeController::class, 'update'])->name('employees.update');
     Route::delete('/employees/{employee}',   [EmployeeController::class, 'destroy'])->name('employees.destroy');
 
-    Route::get('/firmware/categories',               [FirmwareCategoryController::class, 'index'])->name('firmware.categories.index');
-    Route::post('/firmware/categories',              [FirmwareCategoryController::class, 'store'])->name('firmware.categories.store');
-    Route::delete('/firmware/categories/{category}', [FirmwareCategoryController::class, 'destroy'])->name('firmware.categories.destroy');
+    Route::get('/sections',              [SectionController::class, 'index'])->name('sections.index');
+    Route::post('/sections',             [SectionController::class, 'store'])->name('sections.store');
+    Route::patch('/sections/{section}',  [SectionController::class, 'update'])->name('sections.update');
+    Route::patch('/users/{user}/sections', [SectionController::class, 'assign'])->name('users.sections');
+
+    Route::get('/firmware/categories',               [FirmwareCategoryController::class, 'index'])->middleware('section.feature:firmware')->name('firmware.categories.index');
+    Route::post('/firmware/categories',              [FirmwareCategoryController::class, 'store'])->middleware('section.feature:firmware')->name('firmware.categories.store');
+    Route::delete('/firmware/categories/{category}', [FirmwareCategoryController::class, 'destroy'])->middleware('section.feature:firmware')->name('firmware.categories.destroy');
 });
 
 Route::middleware('auth')->group(function () {
@@ -99,15 +108,15 @@ Route::middleware(['auth', 'role:admin,master'])->group(function () {
     Route::delete('/news/{news}',                [NewsController::class, 'destroy'])->name('news.destroy');
     Route::delete('/news/{news}/images/{image}', [NewsController::class, 'destroyImage'])->name('news.images.destroy');
 
-    Route::get('/firmware/create',             [FirmwareController::class, 'create'])->name('firmware.create');
-    Route::post('/firmware',                   [FirmwareController::class, 'store'])->name('firmware.store');
-    Route::patch('/firmware/{version}/status', [FirmwareController::class, 'status'])->name('firmware.status');
-    Route::delete('/firmware/{version}',       [FirmwareController::class, 'destroy'])->name('firmware.destroy');
+    Route::get('/firmware/create',             [FirmwareController::class, 'create'])->middleware('section.feature:firmware')->name('firmware.create');
+    Route::post('/firmware',                   [FirmwareController::class, 'store'])->middleware('section.feature:firmware')->name('firmware.store');
+    Route::patch('/firmware/{version}/status', [FirmwareController::class, 'status'])->middleware('section.feature:firmware')->name('firmware.status');
+    Route::delete('/firmware/{version}',       [FirmwareController::class, 'destroy'])->middleware('section.feature:firmware')->name('firmware.destroy');
 });
 
 Route::middleware(['auth', 'workers'])->group(function () {
-    Route::get('/firmware',                    [FirmwareController::class, 'index'])->name('firmware.index');
-    Route::get('/firmware/{version}/download', [FirmwareController::class, 'download'])->name('firmware.download');
+    Route::get('/firmware',                    [FirmwareController::class, 'index'])->middleware('section.feature:firmware')->name('firmware.index');
+    Route::get('/firmware/{version}/download', [FirmwareController::class, 'download'])->middleware('section.feature:firmware')->name('firmware.download');
 
     Route::get('/records/{sheet}',           [RecordController::class, 'index'])->name('records.index');
     Route::get('/records/{sheet}/create',    [RecordController::class, 'create'])->name('records.create');
@@ -142,6 +151,10 @@ Route::middleware('auth')->prefix('chat')->name('chat.')->group(function () {
     Route::get('/messages',      [ChatController::class, 'messages'])->name('messages');
     Route::post('/messages',     [ChatController::class, 'send'])->middleware('throttle:chat')->name('send');
     Route::post('/read',         [ChatController::class, 'read'])->name('read');
+    Route::post('/messages/{message}/react', [ChatController::class, 'react'])->middleware('throttle:60,1')->name('react');
+    Route::post('/typing',       [ChatController::class, 'typing'])->middleware('throttle:40,1')->name('typing');
+    Route::get('/attachments/{attachment}/{variant?}', [ChatController::class, 'attachment'])
+        ->whereIn('variant', ['thumb'])->name('attachment');
 });
 
 Route::get('/media/{path}', [MediaController::class, 'show'])

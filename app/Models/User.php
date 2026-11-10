@@ -35,6 +35,12 @@ class User extends Authenticatable
         return $this->hasOne(Employee::class);
     }
 
+    /** Участки, назначенные пользователю (админ видит все — см. SectionContext). */
+    public function sections()
+    {
+        return $this->belongsToMany(Section::class);
+    }
+
     public function isAdmin(): bool    { return $this->role === 'admin'; }
     public function isMaster(): bool   { return $this->role === 'master'; }
     public function isExecutor(): bool { return $this->role === 'executor'; }

@@ -34,6 +34,8 @@
                 <div id="caption-fields" class="mt-3 space-y-2"></div>
             </div>
 
+            @include('news._section_field')
+
             <label class="flex items-center gap-2">
                 <input type="checkbox" name="is_pinned" value="1" @checked(old('is_pinned'))>
                 <span>Закрепить на главной</span>

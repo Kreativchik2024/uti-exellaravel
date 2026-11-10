@@ -75,7 +75,9 @@ html.dark {
 }
 
 @layer base {
-    html { -webkit-tap-highlight-color: transparent; }
+    /* Базовый кегль 17,5px вместо 16 (+9%): всё в rem — текст, отступы, таблицы —
+       вырастает пропорционально. Для экранов в цеху, которые читают с расстояния. */
+    html { -webkit-tap-highlight-color: transparent; font-size: 109.375%; }
     body {
         font-feature-settings: 'cv11', 'ss01';  /* Inter: аккуратные «1», «а» */
         text-rendering: optimizeLegibility;
@@ -125,6 +127,14 @@ html.dark {
         display: inline-flex; align-items: center; justify-content: center;
         font-size: .68rem; font-weight: 700; background: var(--ui-accent); color: #fff;
     }
+
+    .ui-section-btn {
+        display: inline-flex; align-items: center; gap: .4rem; height: 34px; padding: 0 .7rem;
+        border-radius: 10px; font-size: .8rem; font-weight: 600; color: var(--ui-text-2);
+        background: var(--ui-surface-2); border: 1px solid var(--ui-border);
+        transition: background-color .15s, border-color .15s;
+    }
+    .ui-section-btn:hover { background: var(--ui-surface-hover); border-color: var(--ui-border-strong); }
 
     .ui-iconbtn {
         width: 36px; height: 36px; border-radius: 10px;
@@ -501,3 +511,136 @@ html:not(.dark) :is(.app-main, .ui-page-header) textarea { border-color: var(--u
 :is(.app-main, .ui-page-header) table thead th {
     font-size: .7rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
 }
+
+/* ============================================================
+   Чат: ответы, вложения, реакции, «печатает…».
+   Вне @layer — часть классов собирается динамически (ui-chat__images--N),
+   Tailwind иначе выбросил бы их при сборке.
+   ============================================================ */
+.ui-chat__screen { position: relative; }
+.ui-chat__retention { padding: .75rem; text-align: center; font-size: .7rem; color: var(--ui-faint); }
+
+/* Разделитель «Новые сообщения» */
+.ui-chat__new-divider { display: flex; align-items: center; gap: .6rem; margin: .8rem 0 .4rem; color: var(--ui-accent-text); font-size: .7rem; font-weight: 700; }
+.ui-chat__new-divider::before, .ui-chat__new-divider::after { content: ""; flex: 1; height: 1px; background: var(--ui-accent); opacity: .35; }
+
+/* Пузырёк и панель действий */
+.ui-chat__bubble-wrap { position: relative; max-width: 82%; display: flex; flex-direction: column; }
+.ui-chat__msg--mine .ui-chat__bubble-wrap { align-items: flex-end; }
+.ui-chat__bubble-wrap .ui-chat__bubble { max-width: 100%; cursor: pointer; }
+.ui-chat__msg--flash .ui-chat__bubble { animation: ui-chat-flash 1.6s ease; }
+@keyframes ui-chat-flash { 0%, 40% { box-shadow: 0 0 0 3px var(--ui-ring); } 100% { box-shadow: var(--ui-shadow-sm); } }
+
+.ui-chat__actions {
+    position: absolute; bottom: calc(100% + 6px); z-index: 5;
+    display: flex; align-items: center; gap: 2px; padding: 4px 5px;
+    background: color-mix(in srgb, var(--ui-surface) 88%, transparent);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4); backdrop-filter: blur(12px) saturate(1.4);
+    border: 1px solid var(--ui-border); border-radius: 999px;
+    box-shadow: 0 10px 30px -8px rgba(15, 23, 42, .28), 0 2px 6px rgba(15, 23, 42, .08);
+    animation: ui-chat-actions-in .22s cubic-bezier(.2, 1.3, .4, 1) both;
+}
+.ui-chat__msg:not(.ui-chat__msg--mine) .ui-chat__actions { left: 0; transform-origin: bottom left; }
+.ui-chat__msg--mine .ui-chat__actions { right: 0; transform-origin: bottom right; }
+@keyframes ui-chat-actions-in { from { opacity: 0; transform: translateY(6px) scale(.85); } to { opacity: 1; transform: none; } }
+.ui-chat__actions-emoji {
+    width: 34px; height: 34px; border-radius: 999px; font-size: 1.35rem; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: transform .18s cubic-bezier(.3, 1.6, .5, 1), filter .12s;
+    animation: ui-chat-emoji-in .32s cubic-bezier(.2, 1.5, .4, 1) both; animation-delay: calc(var(--i, 0) * 25ms + 40ms);
+}
+.ui-chat__actions-emoji:hover { transform: translateY(-4px) scale(1.35); filter: drop-shadow(0 4px 6px rgba(15, 23, 42, .25)); }
+.ui-chat__actions-emoji:active { transform: scale(.9); transition-duration: .06s; }
+@keyframes ui-chat-emoji-in { from { opacity: 0; transform: translateY(8px) scale(.4); } to { opacity: 1; transform: none; } }
+.ui-chat__actions-reply { width: 32px; height: 32px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: var(--ui-muted); margin-left: 3px; position: relative; transition: color .12s, background-color .12s; }
+.ui-chat__actions-reply::before { content: ""; position: absolute; left: -3px; top: 7px; bottom: 7px; width: 1px; background: var(--ui-border); }
+.ui-chat__actions-reply:hover { color: var(--ui-accent-text); background: var(--ui-accent-soft); }
+
+/* Цитата (ответ) */
+.ui-chat__quote {
+    display: block; width: 100%; text-align: left; margin: .1rem 0 .3rem; padding: .25rem .5rem;
+    border-left: 3px solid var(--ui-accent); border-radius: 6px; background: var(--ui-accent-soft);
+}
+.ui-chat__msg--mine .ui-chat__quote { border-left-color: rgba(255, 255, 255, .8); background: rgba(255, 255, 255, .16); }
+.ui-chat__quote-author { display: block; font-size: .72rem; font-weight: 700; color: var(--ui-accent-text); }
+.ui-chat__msg--mine .ui-chat__quote-author { color: #fff; }
+.ui-chat__quote-text { display: block; font-size: .75rem; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Картинки */
+.ui-chat__images { display: grid; gap: 3px; margin: .1rem -.35rem .3rem; border-radius: 12px; overflow: hidden; }
+.ui-chat__images--1 { grid-template-columns: 1fr; }
+.ui-chat__images--2 { grid-template-columns: 1fr 1fr; }
+.ui-chat__images--3 { grid-template-columns: 1fr 1fr 1fr; }
+.ui-chat__image { display: block; background: var(--ui-surface-hover); aspect-ratio: 4 / 3; overflow: hidden; }
+.ui-chat__images--1 .ui-chat__image { aspect-ratio: auto; max-height: 260px; }
+.ui-chat__image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ui-chat__images--1 .ui-chat__image img { max-height: 260px; object-fit: contain; }
+
+/* Файлы */
+.ui-chat__file { display: flex; align-items: center; gap: .55rem; margin: .15rem 0 .3rem; padding: .4rem .5rem; border-radius: 10px; background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-text); text-decoration: none; min-width: 200px; }
+.ui-chat__msg--mine .ui-chat__file { background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .22); color: #fff; }
+.ui-chat__file:hover { filter: brightness(1.05); }
+.ui-chat__file-ico { flex-shrink: 0; width: 36px; height: 36px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; font-size: .6rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, #6366f1, #0ea5e9); }
+.ui-chat__file-name { display: block; font-size: .8rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+.ui-chat__file-size { display: block; font-size: .68rem; opacity: .7; }
+
+/* Реакции */
+.ui-chat__reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: -6px; padding: 0 6px; position: relative; z-index: 1; }
+.ui-chat__msg--mine .ui-chat__reactions { justify-content: flex-end; }
+.ui-chat__reaction {
+    position: relative; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px 0 6px;
+    border-radius: 999px; background: var(--ui-surface); border: 1px solid var(--ui-border); color: var(--ui-text-2);
+    box-shadow: 0 2px 6px -1px rgba(15, 23, 42, .14);
+    animation: ui-chat-reaction-in .35s cubic-bezier(.2, 1.6, .4, 1) both;
+    transition: transform .15s cubic-bezier(.3, 1.6, .5, 1), border-color .12s;
+}
+.ui-chat__reaction:hover { transform: translateY(-1px) scale(1.06); border-color: var(--ui-border-strong); }
+.ui-chat__reaction:active { transform: scale(.92); }
+.ui-chat__reaction-emoji { font-size: 1rem; line-height: 1; }
+.ui-chat__reaction-count { font-size: .74rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ui-chat__reaction--mine {
+    background: linear-gradient(135deg, var(--ui-accent), color-mix(in srgb, var(--ui-accent) 70%, #0ea5e9));
+    border-color: transparent; color: #fff;
+    box-shadow: 0 3px 10px -2px color-mix(in srgb, var(--ui-accent) 55%, transparent);
+}
+.ui-chat__reaction--bump { animation: ui-chat-reaction-bump .45s cubic-bezier(.2, 1.6, .4, 1); }
+.ui-chat__reaction-burst {
+    position: absolute; left: 4px; bottom: 50%; font-size: 1.5rem; line-height: 1; pointer-events: none;
+    animation: ui-chat-reaction-burst .75s ease-out forwards;
+}
+@keyframes ui-chat-reaction-in { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
+@keyframes ui-chat-reaction-bump { 0% { transform: scale(1); } 35% { transform: scale(1.28); } 100% { transform: scale(1); } }
+@keyframes ui-chat-reaction-burst {
+    0% { opacity: 0; transform: translateY(0) scale(.6); }
+    20% { opacity: 1; transform: translateY(-10px) scale(1.25); }
+    100% { opacity: 0; transform: translateY(-38px) scale(1.6) rotate(-12deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ui-chat__actions, .ui-chat__actions-emoji, .ui-chat__reaction, .ui-chat__reaction--bump { animation: none; }
+    .ui-chat__reaction-burst { display: none; }
+}
+
+/* «Печатает…» */
+.ui-chat__typing { display: inline-flex; align-items: center; gap: .3rem; color: var(--ui-accent-text); font-weight: 600; }
+.ui-chat__typing-dots { display: inline-flex; gap: 2px; }
+.ui-chat__typing-dots i { width: 4px; height: 4px; border-radius: 999px; background: currentColor; animation: ui-chat-typing 1.2s infinite ease-in-out; }
+.ui-chat__typing-dots i:nth-child(2) { animation-delay: .15s; }
+.ui-chat__typing-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes ui-chat-typing { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+
+/* Полоса ответа и выбранные файлы над полем ввода */
+.ui-chat__compose-bar { display: flex; align-items: center; gap: .5rem; padding: .45rem .6rem .35rem .75rem; border-top: 1px solid var(--ui-border); background: var(--ui-surface); }
+.ui-chat__pending { display: flex; gap: .4rem; padding: .5rem .6rem 0; background: var(--ui-surface); border-top: 1px solid var(--ui-border); overflow-x: auto; }
+.ui-chat__pending-item { position: relative; flex-shrink: 0; width: 56px; height: 56px; border-radius: 10px; overflow: hidden; background: var(--ui-surface-2); border: 1px solid var(--ui-border); display: flex; align-items: center; justify-content: center; }
+.ui-chat__pending-item img { width: 100%; height: 100%; object-fit: cover; }
+.ui-chat__pending-item button { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 999px; font-size: .6rem; color: #fff; background: rgba(15, 23, 42, .7); }
+.ui-chat__attach { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; color: var(--ui-muted); transition: color .15s, background-color .15s; }
+.ui-chat__attach:hover { color: var(--ui-accent-text); background: var(--ui-surface-hover); }
+
+/* Перетаскивание файлов */
+.ui-chat__drop { position: absolute; inset: 8px; z-index: 10; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--ui-accent); border-radius: 14px; background: color-mix(in srgb, var(--ui-surface) 88%, transparent); color: var(--ui-accent-text); font-weight: 700; pointer-events: none; }
+
+/* Просмотр картинки */
+.ui-chat__lightbox { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .75rem; padding: 1rem; background: rgba(2, 6, 23, .88); }
+.ui-chat__lightbox img { max-width: 100%; max-height: calc(100vh - 110px); border-radius: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); cursor: zoom-out; }
+.ui-chat__lightbox-bar { display: flex; align-items: center; gap: .5rem; max-width: 100%; color: #e2e8f0; font-size: .85rem; }

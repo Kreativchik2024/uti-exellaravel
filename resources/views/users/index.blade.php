@@ -42,6 +42,7 @@
                     <th class="p-2 text-left">Имя</th>
                     <th class="p-2 text-left">Email</th>
                     <th class="p-2 text-left">Роль</th>
+                    <th class="p-2 text-left">Участки</th>
                     <th class="p-2 text-left">Статус</th>
                     <th class="p-2 text-left">Вход</th>
                     <th class="p-2 text-left">Действия</th>
@@ -62,6 +63,32 @@
                                     @endforeach
                                 </select>
                             </form>
+                        </td>
+                        <td class="p-2">
+                            {{-- Участки пользователя: список + назначение --}}
+                            <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                <button type="button" @click="open = !open" class="text-left text-xs leading-snug hover:underline" title="Назначить участки">
+                                    @if($u->isAdmin())
+                                        <span style="color: var(--ui-muted)">все (админ)</span>
+                                    @elseif($u->sections->isEmpty())
+                                        <span style="color: var(--ui-bad)">не назначен</span>
+                                    @else
+                                        {{ $u->sections->pluck('name')->implode(', ') }}
+                                    @endif
+                                </button>
+                                <form x-show="open" x-cloak method="POST" action="{{ route('users.sections', $u) }}"
+                                      class="ui-menu absolute left-0 top-full mt-1 z-30 w-64 space-y-1">
+                                    @csrf @method('PATCH')
+                                    <div class="ui-menu__label">Участки: {{ $u->name }}</div>
+                                    @foreach($sections as $sec)
+                                        <label class="ui-menu__item cursor-pointer">
+                                            <input type="checkbox" name="sections[]" value="{{ $sec->id }}" @checked($u->sections->contains('id', $sec->id))>
+                                            <span class="{{ $sec->is_active ? '' : 'line-through opacity-60' }}">{{ $sec->name }}</span>
+                                        </label>
+                                    @endforeach
+                                    <div class="px-1 pt-1"><button class="ui-btn ui-btn--primary ui-btn--sm w-full">Сохранить</button></div>
+                                </form>
+                            </div>
                         </td>
                         <td class="p-2">
                             @if($u->is_active)

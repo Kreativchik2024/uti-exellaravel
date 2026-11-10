@@ -9,7 +9,7 @@ class News extends Model
     protected $table = 'news';
 
     protected $fillable = [
-        'title', 'body', 'is_pinned', 'is_published', 'author_id', 'published_at',
+        'section_id', 'title', 'body', 'is_pinned', 'is_published', 'author_id', 'published_at',
     ];
 
     protected function casts(): array
@@ -29,6 +29,19 @@ class News extends Model
     public function author()
     {
         return $this->belongsTo(User::class, 'author_id');
+    }
+
+    /** Участок новости; NULL — новость для всех участков. */
+    public function section()
+    {
+        return $this->belongsTo(Section::class);
+    }
+
+    /** Новости участка + общие («для всех участков»). */
+    public function scopeForSection($q, ?Section $section)
+    {
+        return $q->where(fn ($w) => $w->whereNull('section_id')
+            ->when($section, fn ($x) => $x->orWhere('section_id', $section->id)));
     }
 
     public function scopePublished($q)

@@ -36,4 +36,16 @@ abstract class TestCase extends BaseTestCase
 
         return $app;
     }
+
+    /**
+     * На сервере каждый запрос обрабатывает «чистое» приложение, а в тестах одно
+     * приложение обслуживает несколько запросов подряд. Сбрасываем scoped-сервисы
+     * (SectionContext, EmployeeDirectory), как это было бы между запросами в бою.
+     */
+    public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
+    {
+        $this->app->forgetScopedInstances();
+
+        return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
+    }
 }

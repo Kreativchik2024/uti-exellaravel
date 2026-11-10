@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Services\EmployeeDirectory;
+use App\Services\SectionContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -14,11 +15,10 @@ class RecordController extends Controller
 {
     private const WORKER_FIELDS = ['worker1', 'worker2', 'worker3', 'worker4', 'worker5'];
 
+    /** Конфиг вкладки с проверкой доступа к её участку (см. SectionContext::sheet). */
     private function cfg(string $sheet): array
     {
-        $cfg = config("sheets.map.$sheet");
-        abort_unless($cfg, 404, "Вкладка {$sheet} не найдена");
-        return $cfg;
+        return app(SectionContext::class)->sheet($sheet);
     }
 
     private function isRecordLocked($record): bool

@@ -2,7 +2,6 @@
 
 namespace App\Exports;
 
-use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -11,16 +10,20 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class StatsExport implements FromArray, WithHeadings, WithStyles, WithTitle
 {
+    /**
+     * @param string $periodLabel подпись периода, как на странице статистики («За всё время», «С … по …»)
+     * @param string $section     название участка
+     */
     public function __construct(
-        protected int $period,
-        protected Carbon $from,
+        protected string $periodLabel,
+        protected string $section,
         protected array $perSheet,
         protected array $totals,
     ) {}
 
     public function title(): string
     {
-        return "Статистика {$this->period} дн.";
+        return 'Статистика';   // имя листа Excel: до 31 символа, без «:», «/» и т.п.
     }
 
     public function headings(): array
@@ -39,7 +42,9 @@ class StatsExport implements FromArray, WithHeadings, WithStyles, WithTitle
     {
         $rows = [];
 
-        $rows[] = ["Период: {$this->period} дн. (с {$this->from->format('d.m.Y')} по " . now()->format('d.m.Y') . ")"];
+        $rows[] = ["Участок: {$this->section}"];
+        $rows[] = ["Период: {$this->periodLabel}"];
+        $rows[] = ['Выгружено: ' . now()->format('d.m.Y H:i')];
         $rows[] = [];
 
         // Сводка

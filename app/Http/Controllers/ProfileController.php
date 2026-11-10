@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Rules\NoEmoji;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -20,7 +21,7 @@ class ProfileController extends Controller
         $user = $request->user();
 
         $data = $request->validate([
-            'name'  => ['required', 'string', 'max:255'],
+            'name'  => ['required', 'string', 'max:255', new NoEmoji()],
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
         ]);
 

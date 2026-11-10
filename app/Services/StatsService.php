@@ -20,6 +20,12 @@ class StatsService
 
     private ?array $workersIndex = null;
 
+    /** Вкладки учёта текущего участка (статистика считается только по ним). */
+    private function sheets(): array
+    {
+        return app(SectionContext::class)->sheets();
+    }
+
     /**
      * Единое правило «что считать браком» для вкладки (используется в сводке,
      * в зоне «Брак по категориям» и её графике — цифры везде совпадают).
@@ -114,7 +120,7 @@ class StatsService
 
     public function forPeriod(?Carbon $from, ?Carbon $to = null, ?User $user = null, ?string $worker = null): array
     {
-        $map = config('sheets.map', []);
+        $map = $this->sheets();
         $result = [];
 
         $workerVariants = [];
@@ -199,7 +205,7 @@ class StatsService
      */
     public function byPosts(?Carbon $from, ?Carbon $to, ?User $user): array
     {
-        $cfg = config('sheets.map.pgp');
+        $cfg = $this->sheets()['pgp'] ?? null;   // детализация по постам — только где есть ПГП
         if (!$cfg || empty($cfg['model'])) return [];
 
         $model = $cfg['model'];
@@ -236,7 +242,7 @@ class StatsService
         if (empty($variants)) return [];
 
         $out = [];
-        foreach (config('sheets.map', []) as $slug => $cfg) {
+        foreach ($this->sheets() as $slug => $cfg) {
             if (empty($cfg['model']) || !class_exists($cfg['model'])) continue;
 
             $meta = $this->metaFor($cfg);
@@ -270,7 +276,7 @@ class StatsService
         ?Carbon $to = null,
         int $limit = 500
     ): array {
-        $cfg = config("sheets.map.$slug");
+        $cfg = $this->sheets()[$slug] ?? null;
         if (!$cfg || empty($cfg['model']) || !class_exists($cfg['model'])) return [];
 
         $variants = $this->variantsForName($worker);
@@ -428,10 +434,11 @@ class StatsService
     {
         if ($this->workersIndex !== null) return $this->workersIndex;
 
-        return $this->workersIndex = Cache::remember('stats.workers_index.v1', 600, function () {
+        $key = 'stats.workers_index.v2.' . app(SectionContext::class)->cacheKey();
+        return $this->workersIndex = Cache::remember($key, 600, function () {
             $index = [];
 
-            foreach (config('sheets.map', []) as $cfg) {
+            foreach ($this->sheets() as $cfg) {
                 if (empty($cfg['model']) || !class_exists($cfg['model'])) continue;
 
                 $fields = $this->metaFor($cfg)['workerFields'];

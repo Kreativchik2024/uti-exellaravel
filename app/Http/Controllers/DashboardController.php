@@ -3,15 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\News;
+use App\Services\SectionContext;
 use App\Services\StatsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request, StatsService $s)
+    public function index(Request $request, StatsService $s, SectionContext $sections)
     {
+        $section = $sections->current();
+
+        // Новости текущего участка + общие
         $news = News::with(['author','images'])
+            ->forSection($section)
             ->published()
             ->orderByDesc('is_pinned')
             ->orderByDesc('published_at')
@@ -33,7 +38,7 @@ class DashboardController extends Controller
 
         // Сводка по 19 таблицам считается дорого — кешируем на минуту
         [$perSheet, $totals] = Cache::remember(
-            'dash.stats.' . $statsPeriod . '.' . now()->toDateString(),
+            'dash.stats.' . $sections->cacheKey() . '.' . $statsPeriod . '.' . now()->toDateString(),
             60,
             function () use ($s, $from) {
                 $perSheet = $s->forPeriod($from, null);
@@ -41,6 +46,6 @@ class DashboardController extends Controller
             }
         );
 
-        return view('dashboard', compact('news', 'perSheet', 'totals', 'statsPeriod'));
+        return view('dashboard', compact('news', 'perSheet', 'totals', 'statsPeriod', 'section'));
     }
 }

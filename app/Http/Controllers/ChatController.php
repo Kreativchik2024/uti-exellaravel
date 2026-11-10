@@ -3,22 +3,52 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActiveWorkerSession;
+use App\Models\ChatAttachment;
 use App\Models\ChatMessage;
 use App\Models\ChatRead;
+use App\Models\ChatReaction;
 use App\Models\User;
+use App\Rules\NoEmoji;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Intervention\Image\Encoders\WebpEncoder;
+use Intervention\Image\Laravel\Facades\Image;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Чат: общий канал (peer = 0) и личные переписки (peer = id собеседника).
+ * Ответы, вложения (картинки и файлы), реакции, «печатает…».
+ * История — 7 дней (ChatMessage::RETENTION_DAYS, очистка: chat:prune).
  * Доставка — опросом с клиента (resources/views/partials/chat-widget.blade.php).
  */
 class ChatController extends Controller
 {
     private const PAGE = 50;
+    private const UNREAD_CONTEXT = 15;     // сколько прочитанных показать над первым непрочитанным
+    private const UNREAD_MAX = 300;
     private const ONLINE_SECONDS = 180;
+    private const TYPING_SECONDS = 6;
+    private const MAX_FILES = 5;
+    private const MAX_FILE_KB = 20480;     // 20 МБ
+    private const IMAGE_MAX_SIDE = 1920;
+    private const THUMB_MAX_SIDE = 480;
+
+    /** Разрешённые расширения вложений (исполняемое и HTML/SVG — нельзя). */
+    private const FILE_EXTENSIONS = [
+        'jpg', 'jpeg', 'png', 'webp', 'gif',
+        'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'rtf', 'txt', 'csv',
+        'zip', '7z', 'rar', 'bin', 'hex', 'log',
+    ];
+    private const RESIZABLE_IMAGES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
     // ---------------------------------------------------------------- helpers
 
@@ -32,7 +62,7 @@ class ChatController extends Controller
             ->whereIn('users.id', $ids)
             ->leftJoin('employees', 'employees.user_id', '=', 'users.id')
             ->get(['users.id', 'users.name', 'employees.short_name'])
-            ->mapWithKeys(fn ($u) => [$u->id => trim((string) ($u->short_name ?: $u->name))])
+            ->mapWithKeys(fn ($u) => [$u->id => NoEmoji::strip((string) ($u->short_name ?: $u->name)) ?: 'Без имени'])
             ->all();
     }
 
@@ -65,16 +95,58 @@ class ChatController extends Controller
         return $peer;
     }
 
+    /** Сообщения канала за последние 7 дней. */
     private function channelQuery(int $me, int $peer)
     {
-        return $peer === 0
+        return ($peer === 0
             ? ChatMessage::query()->general()
-            : ChatMessage::query()->between($me, $peer);
+            : ChatMessage::query()->between($me, $peer)
+        )->recent();
+    }
+
+    /** Ключ канала для «печатает…». */
+    private function channelKey(int $me, int $peer): string
+    {
+        return $peer === 0 ? 'g' : 'd' . min($me, $peer) . '-' . max($me, $peer);
+    }
+
+    /** Короткое описание сообщения для списка и цитат. */
+    private function preview(?ChatMessage $m): string
+    {
+        if (!$m) return '';
+        if (filled($m->body)) return mb_strimwidth($m->body, 0, 90, '…');
+
+        $first = $m->relationLoaded('attachments') ? $m->attachments->first() : $m->attachments()->first();
+        return $first?->isImage() ? '🖼 Фото' : '📎 ' . ($first?->original_name ?? 'Вложение');
+    }
+
+    private function attachmentUrl(ChatAttachment $a, bool $thumb = false): string
+    {
+        return route('chat.attachment', array_filter([$a->id, $thumb ? 'thumb' : null]));
+    }
+
+    /** Сводка реакций сообщения в порядке набора: эмодзи, сколько, моя ли, кто. */
+    private function reactionSummary(Collection $reactions, int $me, array $names): array
+    {
+        return $reactions->groupBy('emoji')
+            ->sortBy(fn ($group, $emoji) => array_search($emoji, ChatMessage::REACTIONS, true))
+            ->map(fn ($group, $emoji) => [
+                'emoji' => $emoji,
+                'count' => $group->count(),
+                'mine'  => $group->contains('user_id', $me),
+                'names' => $group->map(fn ($r) => $names[$r->user_id] ?? '—')->values()->all(),
+            ])->values()->all();
     }
 
     private function present(Collection $messages, int $me): array
     {
-        $names = $this->displayNames($messages->pluck('sender_id'));
+        // collect([...]) — обычная коллекция; для дозагрузки связей нужна коллекция моделей
+        $messages = new EloquentCollection($messages->all());
+        $messages->loadMissing(['attachments', 'reactions', 'replyTo.attachments']);
+
+        $names = $this->displayNames($messages->pluck('sender_id')
+            ->merge($messages->pluck('replyTo.sender_id'))
+            ->merge($messages->pluck('reactions')->flatten()->pluck('user_id')));
 
         return $messages->map(fn (ChatMessage $m) => [
             'id'          => $m->id,
@@ -83,6 +155,22 @@ class ChatController extends Controller
             'sender_id'   => $m->sender_id,
             'sender_name' => $names[$m->sender_id] ?? 'Удалён',
             'mine'        => $m->sender_id === $me,
+            'reply_to'    => $m->replyTo ? [
+                'id'          => $m->replyTo->id,
+                'sender_name' => $names[$m->replyTo->sender_id] ?? 'Удалён',
+                'preview'     => $this->preview($m->replyTo),
+            ] : null,
+            'attachments' => $m->attachments->map(fn (ChatAttachment $a) => [
+                'id'        => $a->id,
+                'kind'      => $a->kind,
+                'name'      => $a->original_name,
+                'size'      => $a->size,
+                'width'     => $a->width,
+                'height'    => $a->height,
+                'url'       => $this->attachmentUrl($a),
+                'thumb_url' => $a->isImage() ? $this->attachmentUrl($a, true) : null,
+            ])->values()->all(),
+            'reactions'   => $this->reactionSummary($m->reactions, $me, $names),
         ])->values()->all();
     }
 
@@ -107,12 +195,23 @@ class ChatController extends Controller
             ->all()];
     }
 
-    /** Непрочитанные: общий канал + личные по собеседникам. */
+    /** Кто печатает в канале (кроме меня). */
+    private function typingNames(int $me, int $peer): array
+    {
+        $now = now()->getTimestamp();
+        $list = Cache::get('chat.typing.' . $this->channelKey($me, $peer), []);
+
+        return collect($list)
+            ->filter(fn ($row, $uid) => (int) $uid !== $me && $row['until'] >= $now)
+            ->pluck('name')->values()->all();
+    }
+
+    /** Непрочитанные: общий канал + личные по собеседникам (за последние 7 дней). */
     private function unread(int $me): array
     {
         $generalRead = (int) ChatRead::where('user_id', $me)->where('peer_id', 0)->value('last_read_id');
 
-        $general = ChatMessage::query()->general()
+        $general = ChatMessage::query()->general()->recent()
             ->where('id', '>', $generalRead)
             ->where('sender_id', '!=', $me)
             ->count();
@@ -120,6 +219,7 @@ class ChatController extends Controller
         $direct = DB::table('chat_messages as m')
             ->leftJoin('chat_reads as r', fn ($j) => $j->on('r.peer_id', '=', 'm.sender_id')->where('r.user_id', '=', $me))
             ->where('m.recipient_id', $me)
+            ->where('m.created_at', '>=', now()->subDays(ChatMessage::RETENTION_DAYS))
             ->whereRaw('m.id > COALESCE(r.last_read_id, 0)')
             ->groupBy('m.sender_id')
             ->selectRaw('m.sender_id as sid, COUNT(*) as c')
@@ -149,15 +249,15 @@ class ChatController extends Controller
         $unread = $this->unread($me);
         $online = array_flip($this->onlineUserIds());
 
-        // Последнее сообщение в общем канале
-        $lastGeneral = ChatMessage::query()->general()->latest('id')->first();
+        $lastGeneral = ChatMessage::query()->general()->recent()->with('attachments')->latest('id')->first();
 
         // Последние сообщения личных переписок — берём свежие и группируем по собеседнику
-        $recent = ChatMessage::query()
+        $recent = ChatMessage::query()->recent()
             ->where(fn ($w) => $w->where('recipient_id', $me)->orWhere(fn ($x) => $x->where('sender_id', $me)->whereNotNull('recipient_id')))
+            ->with('attachments')
             ->latest('id')
             ->limit(1000)
-            ->get(['id', 'sender_id', 'recipient_id', 'body', 'created_at']);
+            ->get();
 
         $byPeer = [];
         foreach ($recent as $m) {
@@ -183,7 +283,7 @@ class ChatController extends Controller
                 'online'   => isset($online[$peer]),
                 'unread'   => $unread['direct'][$peer] ?? 0,
                 'last'     => [
-                    'body' => mb_strimwidth($m->body, 0, 90, '…'),
+                    'body' => $this->preview($m),
                     'at'   => $m->created_at?->toIso8601String(),
                     'mine' => $m->sender_id === $me,
                     'read' => $m->sender_id === $me && (int) ($peerReads[$peer] ?? 0) >= $m->id,
@@ -196,7 +296,7 @@ class ChatController extends Controller
                 'unread' => $unread['general'],
                 'online' => count($online),
                 'last'   => $lastGeneral ? [
-                    'body'   => mb_strimwidth($lastGeneral->body, 0, 90, '…'),
+                    'body'   => $this->preview($lastGeneral),
                     'at'     => $lastGeneral->created_at?->toIso8601String(),
                     'author' => $lastGeneral->sender_id === $me ? 'Вы' : ($names[$lastGeneral->sender_id] ?? ''),
                 ] : null,
@@ -224,30 +324,61 @@ class ChatController extends Controller
             ->get(['users.id', 'users.name', 'employees.short_name']);
 
         $list = $rows->map(function ($u) use ($online) {
-            $name = trim((string) ($u->short_name ?: $u->name));
+            $name = NoEmoji::strip((string) ($u->short_name ?: $u->name)) ?: 'Без имени';
             return ['peer' => $u->id, 'name' => $name, 'initials' => $this->initials($name), 'online' => isset($online[$u->id])];
         })
-            // Сначала те, кто онлайн
-            ->sortBy(fn ($u) => [$u['online'] ? 0 : 1, $u['name']])
+            ->sortBy(fn ($u) => [$u['online'] ? 0 : 1, $u['name']])   // сначала те, кто онлайн
             ->take(30)->values();
 
         return response()->json(['users' => $list]);
     }
 
-    /** Сообщения канала: новые (after) или более ранние (before). */
+    /**
+     * Сообщения канала:
+     *  - initial=1 — при открытии: окно вокруг первого непрочитанного (first_unread_id);
+     *  - after=ID  — новые сообщения + изменившиеся реакции (since — время прошлого опроса);
+     *  - before=ID — более ранние (прокрутка вверх).
+     */
     public function messages(Request $r): JsonResponse
     {
         $me = (int) $r->user()->id;
         $peer = $this->resolvePeer($r);
         $after = (int) $r->query('after', 0);
         $before = (int) $r->query('before', 0);
-
-        $q = $this->channelQuery($me, $peer);
+        $firstUnreadId = null;
+        $updates = [];
 
         if ($after > 0) {
-            $rows = $q->where('id', '>', $after)->orderBy('id')->limit(200)->get();
+            $rows = $this->channelQuery($me, $peer)->where('id', '>', $after)->orderBy('id')->limit(200)->get();
             $hasMore = null;
-        } else {
+
+            // Реакции на уже показанные сообщения, изменившиеся с прошлого опроса
+            if ($since = $r->query('since')) {
+                $changed = $this->channelQuery($me, $peer)
+                    ->where('id', '<=', $after)
+                    ->where('updated_at', '>', Carbon::parse($since))
+                    ->orderBy('id')->limit(200)->get();
+                $updates = collect($this->present($changed, $me))
+                    ->map(fn ($m) => ['id' => $m['id'], 'reactions' => $m['reactions']])->all();
+            }
+        } elseif ($r->boolean('initial') && $before === 0) {
+            $lastRead = (int) ChatRead::where('user_id', $me)->where('peer_id', $peer)->value('last_read_id');
+            $firstUnreadId = $this->channelQuery($me, $peer)
+                ->where('id', '>', $lastRead)->where('sender_id', '!=', $me)->min('id');
+
+            if ($firstUnreadId) {
+                $context = $this->channelQuery($me, $peer)->where('id', '<', $firstUnreadId)
+                    ->orderByDesc('id')->limit(self::UNREAD_CONTEXT)->get()->reverse();
+                $unread = $this->channelQuery($me, $peer)->where('id', '>=', $firstUnreadId)
+                    ->orderBy('id')->limit(self::UNREAD_MAX)->get();
+                $rows = $context->concat($unread)->values();
+                $oldest = $rows->first()?->id;
+                $hasMore = $oldest && $this->channelQuery($me, $peer)->where('id', '<', $oldest)->exists();
+            }
+        }
+
+        if (!isset($rows)) {
+            $q = $this->channelQuery($me, $peer);
             if ($before > 0) $q->where('id', '<', $before);
             $rows = $q->orderByDesc('id')->limit(self::PAGE + 1)->get();
             $hasMore = $rows->count() > self::PAGE;
@@ -255,8 +386,12 @@ class ChatController extends Controller
         }
 
         return response()->json([
-            'messages' => $this->present($rows, $me),
-            'has_more' => $hasMore,
+            'messages'        => $this->present($rows, $me),
+            'has_more'        => $hasMore,
+            'first_unread_id' => $firstUnreadId,
+            'updates'         => $updates,
+            'typing'          => $this->typingNames($me, $peer),
+            'server_time'     => now()->toIso8601String(),
         ] + $this->receipts($me, $peer))->header('Cache-Control', 'no-store');
     }
 
@@ -266,24 +401,146 @@ class ChatController extends Controller
         $peer = $this->resolvePeer($r);
 
         $data = $r->validate([
-            'body' => ['required', 'string', 'max:2000'],
+            'body'        => ['nullable', 'string', 'max:2000', new NoEmoji()],   // смайлы — только реакциями
+            'reply_to_id' => ['nullable', 'integer'],
+            'files'       => ['nullable', 'array', 'max:' . self::MAX_FILES],
+            'files.*'     => ['file', 'max:' . self::MAX_FILE_KB, 'extensions:' . implode(',', self::FILE_EXTENSIONS)],
         ], [
-            'body.required' => 'Введите сообщение.',
-            'body.max'      => 'Сообщение слишком длинное (до 2000 символов).',
+            'body.max'          => 'Сообщение слишком длинное (до 2000 символов).',
+            'files.max'         => 'Не больше ' . self::MAX_FILES . ' файлов в одном сообщении.',
+            'files.*.max'       => 'Файл больше 20 МБ.',
+            'files.*.extensions'=> 'Такой тип файла нельзя отправить.',
+            'files.*.file'      => 'Файл не загрузился — попробуйте ещё раз.',
         ]);
 
-        $body = trim(preg_replace("/\n{3,}/", "\n\n", str_replace("\r\n", "\n", $data['body'])));
-        abort_if($body === '', 422, 'Введите сообщение.');
+        $body = trim(preg_replace("/\n{3,}/", "\n\n", str_replace("\r\n", "\n", (string) ($data['body'] ?? ''))));
+        $files = $r->file('files', []);
+        abort_if($body === '' && empty($files), 422, 'Введите сообщение или прикрепите файл.');
 
-        $message = ChatMessage::create([
-            'sender_id'    => $me,
-            'recipient_id' => $peer ?: null,
-            'body'         => $body,
-        ]);
+        // Ответить можно только на сообщение этого же канала
+        $replyTo = null;
+        if (!empty($data['reply_to_id'])) {
+            $replyTo = $this->channelQuery($me, $peer)->whereKey($data['reply_to_id'])->value('id');
+            abort_unless($replyTo, 422, 'Сообщение, на которое вы отвечаете, не найдено.');
+        }
+
+        $message = DB::transaction(function () use ($me, $peer, $body, $replyTo, $files) {
+            $message = ChatMessage::create([
+                'sender_id'    => $me,
+                'recipient_id' => $peer ?: null,
+                'reply_to_id'  => $replyTo,
+                'body'         => $body !== '' ? $body : null,
+            ]);
+            foreach ($files as $file) {
+                $this->storeAttachment($message, $file);
+            }
+            return $message;
+        });
 
         ChatRead::markRead($me, $peer, $message->id);
+        $this->clearTyping($me, $peer);
 
-        return response()->json(['message' => $this->present(collect([$message]), $me)[0]], 201);
+        return response()->json(['message' => $this->present(collect([$message->fresh()]), $me)[0]], 201);
+    }
+
+    /** Сохранить вложение: картинку — сжатой в WebP с миниатюрой, файл — как есть. */
+    private function storeAttachment(ChatMessage $message, UploadedFile $file): ChatAttachment
+    {
+        $dir = 'chat/' . now()->format('Y/m');
+        $base = Str::uuid()->toString();
+        $name = Str::limit(basename(str_replace('\\', '/', $file->getClientOriginalName())), 200, '');
+        $mime = (string) $file->getMimeType();
+
+        if (in_array($mime, self::RESIZABLE_IMAGES, true)) {
+            try {
+                $image = Image::decode($file->getRealPath());
+                $image->scaleDown(self::IMAGE_MAX_SIDE, self::IMAGE_MAX_SIDE);
+                $w = $image->width(); $h = $image->height();
+                Storage::disk('local')->put("$dir/$base.webp", (string) $image->encode(new WebpEncoder(quality: 82)));
+
+                $image->scaleDown(self::THUMB_MAX_SIDE, self::THUMB_MAX_SIDE);
+                Storage::disk('local')->put("$dir/{$base}_t.webp", (string) $image->encode(new WebpEncoder(quality: 75)));
+
+                return $message->attachments()->create([
+                    'kind' => 'image', 'path' => "$dir/$base.webp", 'thumb_path' => "$dir/{$base}_t.webp",
+                    'original_name' => $name, 'mime' => 'image/webp',
+                    'size' => Storage::disk('local')->size("$dir/$base.webp"), 'width' => $w, 'height' => $h,
+                ]);
+            } catch (\Throwable $e) {
+                report($e);   // не картинка, хоть и с таким расширением — сохраним как файл
+            }
+        }
+
+        $ext = strtolower($file->getClientOriginalExtension()) ?: 'bin';
+        $path = $file->storeAs($dir, "$base.$ext", 'local');
+
+        return $message->attachments()->create([
+            'kind' => 'file', 'path' => $path, 'thumb_path' => null,
+            'original_name' => $name, 'mime' => $mime ?: 'application/octet-stream', 'size' => $file->getSize(),
+        ]);
+    }
+
+    /** Вложение — только тем, кто видит сообщение; картинка показывается, файл скачивается. */
+    public function attachment(Request $r, ChatAttachment $attachment, ?string $variant = null): Response
+    {
+        $message = $attachment->message;
+        abort_unless($message && $message->visibleTo((int) $r->user()->id), 404);
+        abort_if($message->created_at < now()->subDays(ChatMessage::RETENTION_DAYS), 404);
+
+        $path = $variant === 'thumb' && $attachment->thumb_path ? $attachment->thumb_path : $attachment->path;
+        abort_unless(Storage::disk('local')->exists($path), 404);
+
+        $headers = ['X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, max-age=86400'];
+
+        return $attachment->isImage() && !$r->boolean('download')
+            ? Storage::disk('local')->response($path, $attachment->original_name, $headers + ['Content-Type' => $attachment->mime])
+            : Storage::disk('local')->download($path, $attachment->original_name, $headers);
+    }
+
+    /** Поставить/снять реакцию. */
+    public function react(Request $r, ChatMessage $message): JsonResponse
+    {
+        $me = (int) $r->user()->id;
+        abort_unless($message->visibleTo($me), 404);
+        abort_if($message->created_at < now()->subDays(ChatMessage::RETENTION_DAYS), 404);
+
+        $emoji = $r->validate(['emoji' => ['required', 'string', Rule::in(ChatMessage::REACTIONS)]])['emoji'];
+
+        // Одна реакция от человека на сообщение: тот же эмодзи — снять, другой — заменить
+        DB::transaction(function () use ($message, $me, $emoji) {
+            $mine = ChatReaction::where(['message_id' => $message->id, 'user_id' => $me])->lockForUpdate()->get();
+            $same = $mine->firstWhere('emoji', $emoji);
+            ChatReaction::whereIn('id', $mine->pluck('id'))->delete();
+            if (! $same) {
+                ChatReaction::create(['message_id' => $message->id, 'user_id' => $me, 'emoji' => $emoji]);
+            }
+        });
+
+        $message->forceFill(['updated_at' => now()])->saveQuietly();   // чтобы другие забрали изменение опросом
+
+        return response()->json(['id' => $message->id, 'reactions' => $this->present(collect([$message->fresh()]), $me)[0]['reactions']]);
+    }
+
+    /** «Печатает…» — отметка на несколько секунд. */
+    public function typing(Request $r): JsonResponse
+    {
+        $me = (int) $r->user()->id;
+        $peer = $this->resolvePeer($r);
+        $key = 'chat.typing.' . $this->channelKey($me, $peer);
+
+        $list = array_filter(Cache::get($key, []), fn ($row) => $row['until'] >= now()->getTimestamp());
+        $list[$me] = ['name' => $this->displayNames([$me])[$me] ?? '', 'until' => now()->getTimestamp() + self::TYPING_SECONDS];
+        Cache::put($key, $list, self::TYPING_SECONDS * 2);
+
+        return response()->json(['ok' => true]);
+    }
+
+    private function clearTyping(int $me, int $peer): void
+    {
+        $key = 'chat.typing.' . $this->channelKey($me, $peer);
+        $list = Cache::get($key, []);
+        unset($list[$me]);
+        Cache::put($key, $list, self::TYPING_SECONDS * 2);
     }
 
     public function read(Request $r): JsonResponse

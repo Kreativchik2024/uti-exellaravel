@@ -12,6 +12,9 @@ Schedule::command('backup:clean')->daily()->at('01:30');
 Schedule::command('backup:run')->daily()->at('02:00');
 Schedule::command('backup:monitor')->daily()->at('03:00');
 
+// Чат: история хранится 7 дней — старые сообщения и их файлы удаляются
+Schedule::command('chat:prune')->daily()->at('03:30');
+
 /*
 |--------------------------------------------------------------------------
 | Проверка здоровья бэкапов (необязательно)

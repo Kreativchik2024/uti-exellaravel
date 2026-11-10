@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\StatsExport;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\SectionContext;
 use App\Services\StatsService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -14,6 +15,24 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class StatsController extends Controller
 {
+    /** Вкладки учёта текущего участка. */
+    private function sheets(): array
+    {
+        return app(SectionContext::class)->sheets();
+    }
+
+    /** Вкладка текущего участка (чужие вкладки статистики не отдаём). */
+    private function sheetCfg(?string $sheet): ?array
+    {
+        return $this->sheets()[(string) $sheet] ?? null;
+    }
+
+    /** Часть ключа кеша: данные разных участков не смешиваются. */
+    private function sectionKey(): string
+    {
+        return app(SectionContext::class)->cacheKey();
+    }
+
     private function resolveTargetUser(Request $r): ?User
     {
         $user = auth()->user();
@@ -101,7 +120,7 @@ class StatsController extends Controller
         $workersList = $canSeeWorkersStats ? $s->listWorkers() : [];
 
         // Кеш на минуту: расчёт по 19 таблицам — самая дорогая часть страницы
-        $cacheKey = 'stats.index.v2.' . md5(json_encode([
+        $cacheKey = 'stats.index.v2.' . $this->sectionKey() . '.' . md5(json_encode([
             $from?->toDateString(), $to?->toDateString(), $targetUser?->id, $worker,
         ]));
 
@@ -140,7 +159,9 @@ class StatsController extends Controller
 
         $filename = "uti-stats-{$label}-" . now()->format('Ymd-His') . ".xlsx";
 
-        return Excel::download(new StatsExport(0, $from, $perSheet, $totals), $filename);
+        $section = app(SectionContext::class)->current()?->name ?? '—';
+
+        return Excel::download(new StatsExport($this->periodLabel($from, $to), $section, $perSheet, $totals), $filename);
     }
 
     /**
@@ -176,10 +197,10 @@ class StatsController extends Controller
 
     public function zone1()
     {
-        $data = Cache::remember('stats.zone1', 300, function () {
+        $data = Cache::remember('stats.zone1.' . $this->sectionKey(), 300, function () {
             $summary = [];
 
-            foreach (config('sheets.map', []) as $slug => $cfg) {
+            foreach ($this->sheets() as $slug => $cfg) {
                 if (!isset($cfg['model']) || !class_exists($cfg['model'])) continue;
                 $model = $cfg['model'];
                 $summary[] = [
@@ -208,7 +229,7 @@ class StatsController extends Controller
         $from  = $r->input('from');
         $to    = $r->input('to');
 
-        $cfg = config("sheets.map.$sheet");
+        $cfg = $this->sheetCfg($sheet);
         abort_unless($cfg && isset($cfg['model']), 404);
 
         $model = $cfg['model'];
@@ -217,7 +238,7 @@ class StatsController extends Controller
         [$whereSql, $bindings] = $this->sqlDateRange($from, $to);
 
         $unionBindings = array_merge($bindings, $bindings, $bindings, $bindings, $bindings);
-        $cacheKey = "stats.zone2.$sheet.{$from}_{$to}";
+        $cacheKey = "stats.zone2.{$this->sectionKey()}.$sheet.{$from}_{$to}";
 
         $result = Cache::remember($cacheKey, 120, function () use ($table, $whereSql, $bindings, $unionBindings) {
             $sql = "
@@ -275,7 +296,7 @@ class StatsController extends Controller
             return response()->json(['labels' => [], 'values' => []]);
         }
 
-        $cfg = config("sheets.map.$sheet");
+        $cfg = $this->sheetCfg($sheet);
         abort_unless($cfg && isset($cfg['model']), 404);
 
         $model = $cfg['model'];
@@ -335,7 +356,7 @@ class StatsController extends Controller
         $from  = $r->input('from');
         $to    = $r->input('to');
 
-        $cfg = config("sheets.map.$sheet");
+        $cfg = $this->sheetCfg($sheet);
         abort_unless($cfg && isset($cfg['model'], $cfg['fields']['post_number']), 404);
 
         $model = $cfg['model'];
@@ -359,7 +380,7 @@ class StatsController extends Controller
         abort_unless(auth()->user()->isAdmin() || auth()->user()->isMaster(), 403);
 
         $sheet = $r->input('sheet', 'pgp');
-        $cfg   = config("sheets.map.$sheet");
+        $cfg   = $this->sheetCfg($sheet);
         abort_unless($cfg && isset($cfg['model'], $cfg['fields']['post_number']), 404);
 
         $model = $cfg['model'];
@@ -403,7 +424,7 @@ class StatsController extends Controller
         abort_unless(auth()->user()->isAdmin() || auth()->user()->isMaster(), 403);
 
         $sheet = $r->input('sheet', 'pgp');
-        $cfg   = config("sheets.map.$sheet");
+        $cfg   = $this->sheetCfg($sheet);
         abort_unless($cfg && isset($cfg['model'], $cfg['fields']['post_number']), 404);
 
         $post = $r->input('post');
@@ -434,13 +455,13 @@ class StatsController extends Controller
         $to   = $r->input('to');
         $targetUser = $this->resolveTargetUser($r);
         $scopeKey   = $targetUser?->id ?? 'all';
-        $cacheKey = "stats.zone5.v2.{$from}_{$to}.{$scopeKey}";
+        $cacheKey = "stats.zone5.v2.{$this->sectionKey()}.{$from}_{$to}.{$scopeKey}";
 
         $data = Cache::remember($cacheKey, 120, function () use ($from, $to, $targetUser, $s) {
             $summary = [];
             [$dateSql, $dateBindings] = $this->sqlDateRange($from, $to);
 
-            foreach (config('sheets.map', []) as $slug => $cfg) {
+            foreach ($this->sheets() as $slug => $cfg) {
                 if (!isset($cfg['model']) || !class_exists($cfg['model'])) continue;
                 $model = $cfg['model'];
                 $table = (new $model)->getTable();
@@ -494,7 +515,7 @@ class StatsController extends Controller
         $from  = $r->input('from');
         $to    = $r->input('to');
 
-        $cfg = config("sheets.map.$sheet");
+        $cfg = $this->sheetCfg($sheet);
         abort_unless($cfg && isset($cfg['model']), 404);
 
         $model = $cfg['model'];
@@ -555,11 +576,11 @@ class StatsController extends Controller
         $category = $r->input('sheet');
         $targetUser = $this->resolveTargetUser($r);
         $scopeKey   = $targetUser?->id ?? 'all';
-        $cacheKey = "stats.zone6.{$from}_{$to}_{$category}.{$scopeKey}";
+        $cacheKey = "stats.zone6.{$this->sectionKey()}.{$from}_{$to}_{$category}.{$scopeKey}";
 
         $data = Cache::remember($cacheKey, 120, function () use ($from, $to, $category, $targetUser, $s) {
             $rows = [];
-            $sheets = config('sheets.map', []);
+            $sheets = $this->sheets();
             if ($category && isset($sheets[$category])) $sheets = [$category => $sheets[$category]];
 
             foreach ($sheets as $slug => $cfg) {

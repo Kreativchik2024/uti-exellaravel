@@ -2,6 +2,7 @@
 
 namespace App\Imports;
 
+use App\Rules\NoEmoji;
 use App\Models\Employee;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
@@ -58,10 +59,11 @@ class EmployeesImport implements ToCollection, SkipsEmptyRows
         foreach ($dataRows as $row) {
             $cells = array_values($row->toArray());
 
-            $last   = $this->cell($cells, $headerMap, 'last_name');
-            $first  = $this->cell($cells, $headerMap, 'first_name');
-            $middle = $this->cell($cells, $headerMap, 'middle_name');
-            $short  = $this->cell($cells, $headerMap, 'short_name');
+            // Эмодзи в ФИО не допускаем — при импорте просто вычищаем
+            $last   = NoEmoji::strip($this->cell($cells, $headerMap, 'last_name'));
+            $first  = NoEmoji::strip($this->cell($cells, $headerMap, 'first_name'));
+            $middle = NoEmoji::strip($this->cell($cells, $headerMap, 'middle_name'));
+            $short  = NoEmoji::strip($this->cell($cells, $headerMap, 'short_name'));
             $pos    = $this->cell($cells, $headerMap, 'position');
             $dep    = $this->cell($cells, $headerMap, 'department');
             $active = $this->cell($cells, $headerMap, 'is_active');
