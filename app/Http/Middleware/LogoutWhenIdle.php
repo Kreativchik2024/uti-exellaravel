@@ -23,7 +23,7 @@ class LogoutWhenIdle
     private const BACKGROUND = [
         'chat.summary', 'chat.messages', 'chat.conversations', 'chat.typing', 'chat.users',
         'worker-sessions.heartbeat', 'worker-sessions.occupied',
-        'csrf.refresh', 'news.latest',
+        'csrf.refresh', 'news.latest', 'games.battleship.state',
     ];
 
     public function handle(Request $request, Closure $next): Response

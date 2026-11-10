@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role'    => \App\Http\Middleware\RoleMiddleware::class,
             'workers' => \App\Http\Middleware\EnsureWorkersSelected::class,
             'section.feature' => \App\Http\Middleware\EnsureSectionFeature::class,
+            'games'   => \App\Http\Middleware\EnsureGamesEnabled::class,
         ]);
 
         // Single session: применяется ко всем web-запросам.

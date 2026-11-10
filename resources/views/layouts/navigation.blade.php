@@ -193,6 +193,13 @@
                         @endif
 
                         <div class="ui-menu__sep"></div>
+                        @if(\App\Models\Setting::gamesEnabled() || $user->isAdmin())
+                            <a href="{{ route('games.index') }}" class="ui-menu__item {{ request()->routeIs('games.*') ? 'ui-menu__item--active' : '' }}">
+                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"/></svg>
+                                Игры
+                                @unless(\App\Models\Setting::gamesEnabled())<span class="ml-auto text-[11px]" style="color: var(--ui-faint)">выкл.</span>@endunless
+                            </a>
+                        @endif
                         <a href="{{ route('profile.edit') }}" class="ui-menu__item">
                             <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                             Профиль
@@ -293,6 +300,9 @@
             @endif
 
             <div class="ui-menu__sep"></div>
+            @if(\App\Models\Setting::gamesEnabled() || $user->isAdmin())
+                <a href="{{ route('games.index') }}" class="ui-menu__item {{ request()->routeIs('games.*') ? 'ui-menu__item--active' : '' }}">Игры</a>
+            @endif
             <a href="{{ route('profile.edit') }}" class="ui-menu__item">Профиль</a>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf

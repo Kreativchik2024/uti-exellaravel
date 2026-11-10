@@ -63,6 +63,7 @@ abstract class TestCase extends BaseTestCase
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
     {
         $this->app->forgetScopedInstances();
+        \App\Models\Setting::forgetMemo();
 
         return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
     }

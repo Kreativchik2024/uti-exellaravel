@@ -5,6 +5,7 @@
         me: {{ auth()->id() }},
         reactions: @js(\App\Models\ChatMessage::REACTIONS),
         canPin: @js(auth()->user()->canManageContent()),
+        games: @js(\App\Models\Setting::gamesEnabled()),
         mentionName: @js((string) \Illuminate\Support\Str::of(auth()->user()->employee?->short_name ?: auth()->user()->name)->trim()->before(' ')),
         urls: {
             summary: @js(route('chat.summary')),
@@ -16,6 +17,7 @@
             typing: @js(route('chat.typing')),
             react: @js(route('chat.react', ['message' => '__ID__'])),
             pin: @js(route('chat.pin', ['message' => '__ID__'])),
+            battleInvite: @js(route('games.battleship.invite')),
         },
      })"
      @keydown.escape.window="lightbox ? (lightbox = null) : (open && close())"
@@ -174,6 +176,10 @@
                             <span x-show="!typingNames.length" x-text="peer === 0 ? 'все сотрудники' : (peerOnline ? 'в сети' : 'не в сети')"></span>
                         </div>
                     </div>
+                    <button type="button" class="ui-iconbtn" x-show="games && peer !== 0" @click="inviteBattle()" :disabled="inviting"
+                            title="Пригласить в морской бой" aria-label="Пригласить в морской бой">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 17l2 3h14l2-3M5 17V9l7-4 7 4v8M12 5v12"/></svg>
+                    </button>
                     <button type="button" class="ui-iconbtn" @click="close()" aria-label="Закрыть чат">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
@@ -370,6 +376,7 @@ document.addEventListener('alpine:init', () => {
 
         return {
             me: cfg.me, urls: cfg.urls, reactionSet: cfg.reactions, canPin: cfg.canPin, mentionName: cfg.mentionName,
+            games: cfg.games, inviting: false,
             mentions: 0, pinned: null, mentionList: [], mentionIdx: 0, mentionTimer: null,
             notifyOn: false, notifyAfter: null, notifySupported: 'Notification' in window && window.isSecureContext, hiddenTicks: 0,
             open: false, view: 'list',
@@ -487,7 +494,8 @@ document.addEventListener('alpine:init', () => {
             formatBody(text) {
                 const esc = String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
                 const me = (this.mentionName || '').toLowerCase();
-                return esc.replace(/(^|[\s(,.;:!?])@([\p{L}\-]{2,40})/gu, (all, pre, name) => {
+                return esc.replace(/\/games\/battleship\/(\d+)/g, '<a href="/games/battleship/$1" class="ui-chat__game-link">Открыть игру</a>')
+                          .replace(/(^|[\s(,.;:!?])@([\p{L}\-]{2,40})/gu, (all, pre, name) => {
                     const mine = name.toLowerCase() === me || name.toLowerCase() === 'все';
                     return pre + '<span class="ui-chat__mention' + (mine ? ' ui-chat__mention--me' : '') + '">@' + name + '</span>';
                 });
@@ -515,6 +523,17 @@ document.addEventListener('alpine:init', () => {
                 this.draft = t.value = before + t.value.slice(t.selectionStart);
                 this.mentionList = [];
                 this.$nextTick(() => { t.focus(); t.setSelectionRange(before.length, before.length); });
+            },
+
+            // ---- морской бой с собеседником ----
+            async inviteBattle() {
+                if (this.peer === 0 || this.inviting) return;
+                this.inviting = true;
+                try {
+                    const d = await this.post(this.urls.battleInvite, { user_id: this.peer });
+                    if (d.url) window.location.href = d.url;
+                } catch (e) { this.error = e.message; }
+                this.inviting = false;
             },
 
             // ---- закреплённое сообщение ----

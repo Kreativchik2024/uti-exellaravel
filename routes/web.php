@@ -175,6 +175,32 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/stats/zone6',          [StatsController::class, 'zone6'])->name('stats.zone6');
 });
 
+// Игры (меню профиля) — отдельно от рабочей статистики; админ включает и выключает
+Route::middleware(['auth', 'games'])->prefix('games')->name('games.')->group(function () {
+    Route::get('/',                 [\App\Http\Controllers\GameController::class, 'index'])->name('index');
+    Route::post('/toggle',          [\App\Http\Controllers\GameController::class, 'toggle'])->name('toggle');
+
+    Route::get('/minesweeper',      [\App\Http\Controllers\GameController::class, 'minesweeper'])->name('minesweeper');
+    Route::post('/minesweeper',     [\App\Http\Controllers\GameController::class, 'minesweeperStart'])->middleware('throttle:30,1')->name('minesweeper.start');
+    Route::post('/minesweeper/{session}/open', [\App\Http\Controllers\GameController::class, 'minesweeperOpen'])->middleware('throttle:600,1')->name('minesweeper.open');
+
+    Route::get('/snake',            [\App\Http\Controllers\GameController::class, 'snake'])->name('snake');
+    Route::post('/snake',           [\App\Http\Controllers\GameController::class, 'snakeStart'])->middleware('throttle:30,1')->name('snake.start');
+    Route::post('/snake/{session}/finish', [\App\Http\Controllers\GameController::class, 'snakeFinish'])->middleware('throttle:30,1')->name('snake.finish');
+
+    Route::post('/battleship/bot',      [\App\Http\Controllers\BattleshipController::class, 'vsBot'])->middleware('throttle:20,1')->name('battleship.bot');
+    Route::post('/battleship/invite',   [\App\Http\Controllers\BattleshipController::class, 'invite'])->middleware('throttle:10,1')->name('battleship.invite');
+    Route::get('/battleship/{game}',    [\App\Http\Controllers\BattleshipController::class, 'show'])->name('battleship.show');
+    Route::get('/battleship/{game}/state', [\App\Http\Controllers\BattleshipController::class, 'state'])->name('battleship.state');
+    Route::post('/battleship/{game}/accept',   [\App\Http\Controllers\BattleshipController::class, 'accept'])->name('battleship.accept');
+    Route::post('/battleship/{game}/decline',  [\App\Http\Controllers\BattleshipController::class, 'decline'])->name('battleship.decline');
+    Route::post('/battleship/{game}/shuffle',  [\App\Http\Controllers\BattleshipController::class, 'shuffle'])->middleware('throttle:60,1')->name('battleship.shuffle');
+    Route::post('/battleship/{game}/place',    [\App\Http\Controllers\BattleshipController::class, 'place'])->middleware('throttle:60,1')->name('battleship.place');
+    Route::post('/battleship/{game}/ready',    [\App\Http\Controllers\BattleshipController::class, 'ready'])->name('battleship.ready');
+    Route::post('/battleship/{game}/shoot',    [\App\Http\Controllers\BattleshipController::class, 'shoot'])->middleware('throttle:200,1')->name('battleship.shoot');
+    Route::post('/battleship/{game}/surrender', [\App\Http\Controllers\BattleshipController::class, 'surrender'])->name('battleship.surrender');
+});
+
 // Чат: общий канал и личные сообщения (опрос с клиента)
 Route::middleware('auth')->prefix('chat')->name('chat.')->group(function () {
     Route::get('/summary',       [ChatController::class, 'summary'])->name('summary');

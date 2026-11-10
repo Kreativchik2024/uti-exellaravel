@@ -812,3 +812,83 @@ html.dark .ui-badge-warn { color: #fcd34d; }
     .ui-print-blocked { display: block !important; padding: 40px; font: 600 18px/1.5 sans-serif; color: #000; text-align: center; }
 }
 
+
+/* ===================================================== Игры */
+.ui-games-switch { display: inline-flex; align-items: center; gap: .55rem; height: 38px; padding: 0 .9rem 0 .4rem; border-radius: 999px; font-size: .85rem; font-weight: 600;
+    background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-text-2); }
+.ui-games-switch__knob { width: 40px; height: 24px; border-radius: 999px; background: var(--ui-border-strong); position: relative; transition: background .2s; }
+.ui-games-switch__knob::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 999px; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.ui-games-switch.is-on { color: var(--ui-good); }
+.ui-games-switch.is-on .ui-games-switch__knob { background: var(--ui-good); }
+.ui-games-switch.is-on .ui-games-switch__knob::after { transform: translateX(16px); }
+
+.ui-game-card { display: flex; flex-direction: column; align-items: flex-start; padding: 1.1rem; border-radius: 16px; background: var(--ui-surface); border: 1px solid var(--ui-border);
+    box-shadow: var(--ui-shadow-sm); transition: transform .15s, box-shadow .15s; color: var(--ui-text); }
+a.ui-game-card:hover { transform: translateY(-2px); box-shadow: var(--ui-shadow); }
+.ui-game-card__icon { width: 52px; height: 52px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; color: #fff; margin-bottom: .7rem; }
+.ui-game-card__title { font-size: 1.05rem; font-weight: 700; }
+.ui-game-card__text { font-size: .83rem; color: var(--ui-muted); margin-top: .2rem; }
+
+.ui-board-row { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: .6rem; padding: .45rem 1rem; border-top: 1px solid var(--ui-border); font-size: .875rem; }
+.ui-board-row.is-me { background: var(--ui-accent-soft); }
+.ui-board-row__place { width: 24px; height: 24px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 800; background: var(--ui-surface-2); color: var(--ui-muted); }
+.ui-board-row__place--1 { background: #facc15; color: #713f12; }
+.ui-board-row__place--2 { background: #cbd5e1; color: #334155; }
+.ui-board-row__place--3 { background: #fdba74; color: #7c2d12; }
+.ui-board-row__name { color: var(--ui-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-board-row__value { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ui-text); }
+
+/* Сапёр */
+.ui-ms-bar { font-size: .9rem; color: var(--ui-text-2); }
+.ui-ms-face { width: 40px; height: 40px; border-radius: 12px; font-size: 1.1rem; font-weight: 800; background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-text); }
+.ui-ms-grid { --ms-cell: 30px; display: grid; gap: 2px; width: max-content; margin: 0 auto; }
+@media (max-width: 640px) { .ui-ms-grid { --ms-cell: 28px; } }
+.ui-ms-cell { width: var(--ms-cell); height: var(--ms-cell); border-radius: 5px; font-weight: 800; font-size: .9rem; line-height: 1;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--ui-accent) 22%, var(--ui-surface)), color-mix(in srgb, var(--ui-accent) 32%, var(--ui-surface)));
+    color: var(--ui-text); touch-action: manipulation; }
+.ui-ms-cell:hover:not(.is-open) { filter: brightness(1.08); }
+.ui-ms-cell.is-open { background: var(--ui-surface-2); cursor: default; }
+.ui-ms-cell.is-flag { color: var(--ui-bad); }
+.ui-ms-cell.is-mine { background: color-mix(in srgb, var(--ui-bad) 22%, var(--ui-surface)); color: var(--ui-text); }
+.ui-ms-cell.is-boom { background: var(--ui-bad); color: #fff; }
+.ui-ms-cell.n1 { color: #2563eb; } .ui-ms-cell.n2 { color: #16a34a; } .ui-ms-cell.n3 { color: #dc2626; } .ui-ms-cell.n4 { color: #7c3aed; }
+.ui-ms-cell.n5 { color: #b45309; } .ui-ms-cell.n6 { color: #0891b2; } .ui-ms-cell.n7 { color: #111827; } .ui-ms-cell.n8 { color: #6b7280; }
+html.dark .ui-ms-cell.n1 { color: #60a5fa; } html.dark .ui-ms-cell.n2 { color: #4ade80; } html.dark .ui-ms-cell.n3 { color: #f87171; } html.dark .ui-ms-cell.n4 { color: #c4b5fd; } html.dark .ui-ms-cell.n7 { color: #e5e7eb; }
+
+/* Змейка */
+.ui-snake { display: block; width: 100%; max-width: 420px; aspect-ratio: 1; margin: 0 auto; border-radius: 12px; border: 1px solid var(--ui-border); touch-action: none; }
+.ui-snake__overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem; text-align: center; padding: 1rem;
+    border-radius: 12px; background: color-mix(in srgb, var(--ui-surface) 82%, transparent); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); color: var(--ui-text); }
+
+/* Морской бой */
+.ui-bs-status { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .6rem; padding: .7rem .9rem; border-radius: 12px; font-weight: 600; font-size: .9rem;
+    background: var(--ui-surface-2); color: var(--ui-text); }
+.ui-bs-status.is-go { background: var(--ui-accent-soft); color: var(--ui-accent-text); }
+.ui-bs-status.is-good { background: var(--ui-good-soft); color: var(--ui-good); }
+.ui-bs-status.is-bad { background: var(--ui-bad-soft); color: var(--ui-bad); }
+.ui-bs-title { font-size: .8rem; font-weight: 600; color: var(--ui-muted); margin-bottom: .4rem; }
+.ui-bs-board { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; padding: 4px; border-radius: 12px; max-width: 380px; aspect-ratio: 1;
+    background: color-mix(in srgb, #0ea5e9 18%, var(--ui-surface)); }
+.ui-bs-board--enemy.is-active { box-shadow: 0 0 0 3px var(--ui-accent); }
+.ui-bs-cell { border-radius: 3px; background: color-mix(in srgb, #0ea5e9 10%, var(--ui-surface)); position: relative; padding: 0; }
+.ui-bs-board--enemy.is-active .ui-bs-cell:not(.is-hit):not(.is-miss):hover { background: color-mix(in srgb, var(--ui-accent) 35%, var(--ui-surface)); cursor: crosshair; }
+.ui-bs-cell.is-ship { background: #64748b; }
+.ui-bs-cell.is-miss::after { content: ""; position: absolute; inset: 40%; border-radius: 999px; background: var(--ui-muted); }
+.ui-bs-cell.is-hit { background: #f97316; }
+.ui-bs-cell.is-hit::after { content: "✕"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: .8rem; }
+.ui-bs-cell.is-sunk, .ui-bs-cell.is-hit.is-sunk { background: var(--ui-bad); }
+
+.ui-chat__game-link { display: inline-flex; align-items: center; margin-top: .3rem; padding: .25rem .7rem; border-radius: 999px; font-weight: 700; font-size: .8rem;
+    background: var(--ui-accent); color: #fff !important; text-decoration: none; }
+.ui-chat__msg--mine .ui-chat__game-link { background: #fff; color: var(--ui-accent) !important; }
+
+/* Морской бой: ручная расстановка */
+.ui-bs-editor { margin-bottom: .6rem; padding: .6rem; border-radius: 12px; background: var(--ui-surface-2); border: 1px solid var(--ui-border); }
+.ui-bs-pick { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .55rem; border-radius: 10px; border: 1px solid var(--ui-border); background: var(--ui-surface); font-size: .8rem; font-weight: 700; color: var(--ui-text); }
+.ui-bs-pick.is-active { border-color: var(--ui-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent) 30%, transparent); }
+.ui-bs-pick:disabled { opacity: .35; }
+.ui-bs-pick__ship { display: inline-flex; gap: 2px; }
+.ui-bs-pick__ship i { width: 10px; height: 10px; border-radius: 2px; background: #64748b; }
+.ui-bs-board.is-editing .ui-bs-cell { cursor: pointer; }
+.ui-bs-cell.is-preview { background: color-mix(in srgb, var(--ui-good) 55%, var(--ui-surface)); }
+.ui-bs-cell.is-bad { background: color-mix(in srgb, var(--ui-bad) 45%, var(--ui-surface)); }
