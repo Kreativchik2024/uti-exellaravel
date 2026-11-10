@@ -5,6 +5,11 @@
 
 @include('records._draft')
 
+@unless(isset($record))
+    {{-- Одноразовый номер формы: повторная отправка той же формы не создаст вторую запись --}}
+    <input type="hidden" name="_submit_token" value="{{ old('_submit_token', (string) \Illuminate\Support\Str::uuid()) }}">
+@endunless
+
 @php
     $workerFields          = ['worker1','worker2','worker3','worker4','worker5'];
     $hasWorkers            = collect($workerFields)->contains(fn($f) => isset($cfg['fields'][$f]));

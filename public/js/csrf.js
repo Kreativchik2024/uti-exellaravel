@@ -78,21 +78,55 @@
     setInterval(function () { refreshIfOld(REFRESH_EVERY_MS - 1000); }, REFRESH_EVERY_MS);
 
     // ---- 3) Отправка форм ----
+    // Повторное нажатие, пока форма уже отправляется, игнорируется — иначе двойной клик
+    // или нетерпеливое нажатие создавали вторую одинаковую запись.
+    function lockForm(form) {
+        form.dataset.submitting = '1';
+        Array.prototype.forEach.call(form.querySelectorAll('button[type="submit"], button:not([type]), input[type="submit"]'), function (b) {
+            if (b.form !== form || b.disabled) return;
+            b.dataset.wasDisabled = '0';
+            b.disabled = true;
+            if (b.tagName === 'BUTTON' && !b.dataset.label) { b.dataset.label = b.innerHTML; b.textContent = 'Сохранение…'; }
+        });
+        // Если ответа нет (обрыв связи) — через 20 с можно нажать снова
+        clearTimeout(form._unlockTimer);
+        form._unlockTimer = setTimeout(function () { unlockForm(form); }, 20000);
+    }
+    function unlockForm(form) {
+        delete form.dataset.submitting;
+        Array.prototype.forEach.call(form.querySelectorAll('[data-was-disabled]'), function (b) {
+            b.disabled = false;
+            if (b.dataset.label) { b.innerHTML = b.dataset.label; delete b.dataset.label; }
+            delete b.dataset.wasDisabled;
+        });
+    }
+    // Вернулись кнопкой «Назад» — форму снова можно отправить
+    window.addEventListener('pageshow', function (e) {
+        if (e.persisted) Array.prototype.forEach.call(document.querySelectorAll('form[data-submitting]'), unlockForm);
+    });
+
     document.addEventListener('submit', function (e) {
         var form = e.target;
         if (!(form instanceof HTMLFormElement)) return;
         if ((form.getAttribute('method') || 'get').toLowerCase() !== 'post') return;
         if (!form.querySelector('input[name="_token"]')) return;
 
-        if (form.dataset.csrfFresh === '1') { delete form.dataset.csrfFresh; return; }
-        if (Date.now() - lastRefresh <= STALE_AFTER_MS) return;
+        if (form.dataset.csrfFresh === '1') { delete form.dataset.csrfFresh; setTimeout(function () { lockForm(form); }, 0); return; }
+        if (form.dataset.submitting === '1') { e.preventDefault(); e.stopImmediatePropagation(); return; }
+        if (Date.now() - lastRefresh <= STALE_AFTER_MS) {
+            // lockForm после остальных обработчиков: они могут отменить отправку (проверка полей)
+            setTimeout(function () { if (!e.defaultPrevented) lockForm(form); }, 0);
+            return;
+        }
 
         // Страница «старая»: сначала обновляем токен, потом отправляем заново
         e.preventDefault();
         e.stopImmediatePropagation();
+        form.dataset.submitting = '1';   // пока обновляется токен — повторные нажатия игнорируются
         var submitter = e.submitter || null;
 
         refresh().then(function () {
+            delete form.dataset.submitting;
             form.dataset.csrfFresh = '1';
             if (typeof form.requestSubmit === 'function') {
                 form.requestSubmit(submitter && submitter.form === form ? submitter : undefined);

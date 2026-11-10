@@ -9,6 +9,7 @@ use App\Services\SectionContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -532,14 +533,34 @@ class RecordController extends Controller
         $data['created_by'] = auth()->id();
         $this->applyLookupSnapshots($cfg, $data);
 
+        // --- Защита от дублей ---
+        // 1) Та же форма отправлена второй раз (двойной клик, «Назад» + отправить): номер формы уже использован
+        $token = preg_replace('/[^a-f0-9-]/i', '', (string) $r->input('_submit_token'));
+        $tokenKey = $token !== '' ? "record-submit:{$sheet}:{$token}" : null;
+        if ($tokenKey && ! Cache::add($tokenKey, 0, now()->addHours(12))) {
+            $existingId = (int) Cache::get($tokenKey);
+            return $existingId
+                ? redirect()->route('records.show', [$sheet, $existingId])->with('ok', 'Эта запись уже сохранена — повторная отправка не создала дубль.')
+                : redirect()->route('records.index', $sheet)->with('ok', 'Запись уже сохраняется — повторная отправка не создала дубль.');
+        }
+        // 2) Точно такая же запись от того же человека меньше минуты назад
+        $hashKey = 'record-hash:' . auth()->id() . ":{$sheet}:" . md5(json_encode(\Illuminate\Support\Arr::except($data, ['work_end', 'work_start'])));
+        if (! Cache::add($hashKey, 1, now()->addMinute())) {
+            if ($tokenKey) Cache::forget($tokenKey);
+            return back()->withInput()->withErrors(['general' => 'Точно такая же запись сохранена меньше минуты назад — это похоже на повторную отправку. Если нужна ещё одна такая же запись, подождите минуту и сохраните снова.']);
+        }
+
         try {
             $record = $cfg['model']::create($data);
         } catch (QueryException $e) {
+            if ($tokenKey) Cache::forget($tokenKey);
+            Cache::forget($hashKey);
             if ($this->isDuplicate($e)) {
                 return back()->withInput()->withErrors(['general' => 'Такая запись уже существует.']);
             }
             throw $e;
         }
+        if ($tokenKey) Cache::put($tokenKey, $record->id, now()->addHours(12));
         $this->savePhotos($r, $sheet, $record);
 
         return redirect()->route('records.index', $sheet)->with('ok', 'Запись добавлена');
