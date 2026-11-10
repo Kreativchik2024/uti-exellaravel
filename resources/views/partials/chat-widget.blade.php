@@ -68,7 +68,17 @@
                                 <span class="ui-chat__conv-time" x-text="conv.general.last ? timeShort(conv.general.last.at) : ''"></span>
                             </span>
                             <span class="ui-chat__conv-bottom">
-                                <span class="ui-chat__conv-last" x-text="conv.general.last ? (conv.general.last.author + ': ' + conv.general.last.body) : 'Сообщение всем сотрудникам'"></span>
+                                <span class="ui-chat__conv-last">
+                                    <template x-if="conv.general.last">
+                                        <span class="ui-chat__conv-preview">
+                                            <span x-text="conv.general.last.author + ':'"></span>
+                                            <img x-show="conv.general.last.media && conv.general.last.media.thumb_url" :src="conv.general.last.media && conv.general.last.media.thumb_url" class="ui-chat__mini-thumb" alt="" loading="lazy">
+                                            <span x-show="conv.general.last.media && !conv.general.last.body" class="ui-chat__media-label" x-text="conv.general.last.media && conv.general.last.media.label"></span>
+                                            <span x-show="conv.general.last.body" x-text="conv.general.last.body"></span>
+                                        </span>
+                                    </template>
+                                    <span x-show="!conv.general.last" class="ui-chat__media-label">Сообщение всем сотрудникам</span>
+                                </span>
                                 <span x-show="conv.general.unread" class="ui-chat__count" x-text="conv.general.unread"></span>
                             </span>
                         </span>
@@ -93,7 +103,10 @@
                                             <svg x-show="!c.last.read" class="ui-chat__tick-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                             <svg x-show="c.last.read" class="ui-chat__tick-ico ui-chat__tick-ico--double" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1.5 8.5l3 3 6-7M8.5 11.5l1 0 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                         </span>
-                                        <span x-text="(c.last.mine ? 'Вы: ' : '') + c.last.body"></span>
+                                        <span x-show="c.last.mine">Вы:</span>
+                                        <img x-show="c.last.media && c.last.media.thumb_url" :src="c.last.media && c.last.media.thumb_url" class="ui-chat__mini-thumb" alt="" loading="lazy">
+                                        <span x-show="c.last.media && !c.last.body" class="ui-chat__media-label" x-text="c.last.media && c.last.media.label"></span>
+                                        <span x-show="c.last.body" x-text="c.last.body"></span>
                                     </span>
                                     <span x-show="c.unread" class="ui-chat__count" x-text="c.unread"></span>
                                 </span>
@@ -175,7 +188,8 @@
                     <button type="button" x-show="canPin" class="ui-iconbtn" style="width: 28px; height: 28px" @click="togglePin(pinned)" title="Открепить" aria-label="Открепить">✕</button>
                 </div>
 
-                <div class="ui-chat__scroll ui-chat__messages" x-ref="list" @scroll.passive="onScroll()" @click.self="actionsFor = null">
+                <div class="ui-chat__scroll ui-chat__messages ui-nocopy" x-ref="list" @scroll.passive="onScroll()" @click.self="actionsFor = null"
+                     @copy.prevent @cut.prevent @contextmenu.prevent @dragstart.prevent>
                     <div class="text-center py-2" x-show="hasMore">
                         <button type="button" class="ui-chat__link" @click="loadOlder()" :disabled="loadingOlder"
                                 x-text="loadingOlder ? 'Загрузка…' : 'Показать ранние сообщения'"></button>
@@ -207,8 +221,14 @@
 
                                         {{-- Цитата --}}
                                         <button type="button" x-show="m.reply_to" class="ui-chat__quote" @click.stop="scrollToMessage(m.reply_to && m.reply_to.id)">
-                                            <span class="ui-chat__quote-author" x-text="m.reply_to && m.reply_to.sender_name"></span>
-                                            <span class="ui-chat__quote-text" x-text="m.reply_to && m.reply_to.preview"></span>
+                                            <img x-show="m.reply_to && m.reply_to.media && m.reply_to.media.thumb_url" :src="m.reply_to && m.reply_to.media && m.reply_to.media.thumb_url" class="ui-chat__quote-thumb" alt="" loading="lazy">
+                                            <span class="min-w-0">
+                                                <span class="ui-chat__quote-author" x-text="m.reply_to && m.reply_to.sender_name"></span>
+                                                <span class="ui-chat__quote-text">
+                                                    <span x-show="m.reply_to && m.reply_to.body" x-text="m.reply_to && m.reply_to.body"></span>
+                                                    <span x-show="m.reply_to && !m.reply_to.body && m.reply_to.media" class="ui-chat__media-label" x-text="m.reply_to && m.reply_to.media && m.reply_to.media.label"></span>
+                                                </span>
+                                            </span>
                                         </button>
 
                                         {{-- Картинки --}}
@@ -270,17 +290,21 @@
 
                 {{-- Ответ и выбранные файлы --}}
                 <div x-show="replyTo" class="ui-chat__compose-bar">
+                    <img x-show="replyTo && replyTo.media && replyTo.media.thumb_url" :src="replyTo && replyTo.media && replyTo.media.thumb_url" class="ui-chat__quote-thumb" alt="">
                     <svg class="w-4 h-4 flex-shrink-0" style="color: var(--ui-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
                     <div class="flex-1 min-w-0">
                         <div class="ui-chat__quote-author" x-text="replyTo && ('Ответ ' + replyTo.sender_name)"></div>
-                        <div class="ui-chat__quote-text" x-text="replyTo && replyTo.preview"></div>
+                        <div class="ui-chat__quote-text">
+                            <span x-show="replyTo && replyTo.body" x-text="replyTo && replyTo.body"></span>
+                            <span x-show="replyTo && !replyTo.body && replyTo.media" class="ui-chat__media-label" x-text="replyTo && replyTo.media && replyTo.media.label"></span>
+                        </div>
                     </div>
                     <button type="button" class="ui-iconbtn" style="width: 28px; height: 28px" @click="replyTo = null" aria-label="Отменить ответ">✕</button>
                 </div>
                 <div x-show="pendingFiles.length" class="ui-chat__pending">
                     <template x-for="f in pendingFiles" :key="f.key">
                         <div class="ui-chat__pending-item" :title="f.name">
-                            <img x-show="f.preview" :src="f.preview" alt="">
+                            <img x-show="f.preview" :src="f.preview" alt="" @click="lightbox = { url: f.preview, name: f.name }" style="cursor: zoom-in">
                             <span x-show="!f.preview" class="ui-chat__file-ico" x-text="fileExt(f.name)"></span>
                             <button type="button" @click="removeFile(f.key)" aria-label="Убрать файл">✕</button>
                         </div>
@@ -331,7 +355,7 @@
         <img :src="lightbox && lightbox.url" :alt="lightbox && lightbox.name" @click="lightbox = null">
         <div class="ui-chat__lightbox-bar">
             <span class="truncate" x-text="lightbox && lightbox.name"></span>
-            <a :href="lightbox && (lightbox.url + '?download=1')" class="ui-btn ui-btn--ghost ui-btn--sm">Скачать</a>
+            <a x-show="lightbox && !String(lightbox.url).startsWith('blob:')" :href="lightbox && (lightbox.url + '?download=1')" class="ui-btn ui-btn--ghost ui-btn--sm">Скачать</a>
             <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="lightbox = null">Закрыть</button>
         </div>
     </div>
@@ -764,9 +788,12 @@ document.addEventListener('alpine:init', () => {
             },
             startReply(m) {
                 this.actionsFor = null;
+                const imgs = this.images(m), files = this.files(m);
                 this.replyTo = {
                     id: m.id, sender_name: m.mine ? 'себе' : m.sender_name,
-                    preview: m.body ? m.body.slice(0, 90) : (this.images(m).length ? '🖼 Фото' : '📎 ' + ((this.files(m)[0] || {}).name || 'Вложение')),
+                    body: m.body ? m.body.slice(0, 90) : '',
+                    media: imgs.length ? { label: imgs.length > 1 ? 'Фото (' + imgs.length + ')' : 'Фото', thumb_url: imgs[0].thumb_url }
+                         : (files.length ? { label: 'Файл: ' + files[0].name, thumb_url: null } : null),
                 };
                 this.$nextTick(() => this.el("input") && this.el("input").focus());
             },

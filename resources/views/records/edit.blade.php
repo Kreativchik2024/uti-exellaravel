@@ -16,7 +16,7 @@
     </x-slot>
 
     <div class="py-8 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <form method="POST" action="{{ route('records.update', [$sheet, $record->id]) }}"
+        <form method="POST" action="{{ route('records.update', [$sheet, $record->id]) }}" enctype="multipart/form-data"
               class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             @csrf
             @method('PUT')

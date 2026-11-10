@@ -17,7 +17,7 @@
 
     <div class="py-8 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           
-        <form method="POST" action="{{ route('records.store', $sheet) }}"
+        <form method="POST" action="{{ route('records.store', $sheet) }}" enctype="multipart/form-data"
               class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
             @error('general')

@@ -72,6 +72,14 @@
                 inp.maxLength = 255;
                 inp.className = 'flex-1 border rounded px-2 py-1 text-sm';
 
+                // Превью выбранного фото
+                var thumb = document.createElement('img');
+                thumb.src = URL.createObjectURL(file);
+                thumb.alt = '';
+                thumb.style.cssText = 'width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid var(--ui-border)';
+                thumb.onload = function () { URL.revokeObjectURL(thumb.src); };
+
+                row.appendChild(thumb);
                 row.appendChild(name);
                 row.appendChild(inp);
                 container.appendChild(row);

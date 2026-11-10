@@ -150,6 +150,7 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/reports/shift',   [\App\Http\Controllers\ReportController::class, 'shift'])->middleware('role:admin,master')->name('reports.shift');
     Route::get('/reports/defects', [\App\Http\Controllers\ReportController::class, 'defects'])->middleware('role:admin,master')->name('reports.defects');
 
+    Route::get('/records/photo/{photo}/{variant?}', [RecordController::class, 'photo'])->whereIn('variant', ['thumb'])->name('records.photo');
     Route::get('/records/{sheet}',           [RecordController::class, 'index'])->name('records.index');
     Route::get('/records/{sheet}/create',    [RecordController::class, 'create'])->name('records.create');
     Route::post('/records/{sheet}',          [RecordController::class, 'store'])->name('records.store');

@@ -117,8 +117,33 @@ class ChatController extends Controller
         if (!$m) return '';
         if (filled($m->body)) return mb_strimwidth(CleanText::strip($m->body), 0, 90, '…');
 
-        $first = $m->relationLoaded('attachments') ? $m->attachments->first() : $m->attachments()->first();
-        return $first?->isImage() ? '🖼 Фото' : '📎 ' . ($first?->original_name ?? 'Вложение');
+        return $this->media($m)['label'] ?? '';
+    }
+
+    /**
+     * Вложение для превью (цитата ответа, список разговоров): подпись и миниатюра фото.
+     * @return array{label: string, thumb_url: ?string}|null
+     */
+    private function media(ChatMessage $m): ?array
+    {
+        $atts = $m->relationLoaded('attachments') ? $m->attachments : $m->attachments()->get();
+        $first = $atts->first();
+        if (! $first) return null;
+        $images = $atts->filter(fn ($a) => $a->isImage());
+
+        return [
+            'label'     => $first->isImage() ? ($images->count() > 1 ? 'Фото (' . $images->count() . ')' : 'Фото') : 'Файл: ' . $first->original_name,
+            'thumb_url' => $images->isNotEmpty() ? $this->attachmentUrl($images->first(), true) : null,
+        ];
+    }
+
+    /** Превью сообщения: текст + вложение отдельно (подпись вложения — не текст сообщения). */
+    private function previewParts(ChatMessage $m): array
+    {
+        return [
+            'body'  => filled($m->body) ? mb_strimwidth(CleanText::strip($m->body), 0, 90, '…') : '',
+            'media' => $this->media($m),
+        ];
     }
 
     private function attachmentUrl(ChatAttachment $a, bool $thumb = false): string
@@ -160,7 +185,7 @@ class ChatController extends Controller
                 'id'          => $m->replyTo->id,
                 'sender_name' => $names[$m->replyTo->sender_id] ?? 'Удалён',
                 'preview'     => $this->preview($m->replyTo),
-            ] : null,
+            ] + $this->previewParts($m->replyTo) : null,
             'attachments' => $m->attachments->map(fn (ChatAttachment $a) => [
                 'id'        => $a->id,
                 'kind'      => $a->kind,
@@ -352,8 +377,7 @@ class ChatController extends Controller
                 'initials' => $this->initials($name),
                 'online'   => isset($online[$peer]),
                 'unread'   => $unread['direct'][$peer] ?? 0,
-                'last'     => [
-                    'body' => $this->preview($m),
+                'last'     => $this->previewParts($m) + [
                     'at'   => $m->created_at?->toIso8601String(),
                     'mine' => $m->sender_id === $me,
                     'read' => $m->sender_id === $me && (int) ($peerReads[$peer] ?? 0) >= $m->id,
@@ -365,8 +389,7 @@ class ChatController extends Controller
             'general' => [
                 'unread' => $unread['general'],
                 'online' => count($online),
-                'last'   => $lastGeneral ? [
-                    'body'   => $this->preview($lastGeneral),
+                'last'   => $lastGeneral ? $this->previewParts($lastGeneral) + [
                     'at'     => $lastGeneral->created_at?->toIso8601String(),
                     'author' => $lastGeneral->sender_id === $me ? 'Вы' : ($names[$lastGeneral->sender_id] ?? ''),
                 ] : null,
