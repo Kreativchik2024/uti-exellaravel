@@ -790,3 +790,10 @@ html:not(.dark) :is(.app-main, .ui-page-header) textarea { border-color: var(--u
 /* Кнопка-ссылка внутри форм страницы входа (там кнопки перекрашены в основной цвет) */
 .auth button.ui-linkbtn, button.ui-linkbtn { background: none !important; color: var(--ui-muted) !important; height: auto !important; padding: 0 !important; box-shadow: none !important; font-size: .875rem; font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
 .auth button.ui-linkbtn:hover, button.ui-linkbtn:hover { color: var(--ui-text) !important; }
+
+.ui-syscheck__actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .55rem; }
+.ui-systask { padding: .85rem 1rem; }
+.ui-systask__icon { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--ui-accent-soft); color: var(--ui-accent-text); }
+.ui-systask--done .ui-systask__icon { background: var(--ui-good-soft); color: var(--ui-good); }
+.ui-systask--failed .ui-systask__icon { background: var(--ui-bad-soft); color: var(--ui-bad); }
+.ui-systask__out { margin-top: .6rem; padding: .55rem .7rem; border-radius: 10px; background: var(--ui-surface-2); color: var(--ui-text-2); font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow-y: auto; }

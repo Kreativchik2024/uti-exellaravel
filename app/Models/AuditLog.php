@@ -27,6 +27,7 @@ class AuditLog extends Model
         'profile'   => 'Профиль',
         'auth'      => 'Вход в систему',
         'chat'      => 'Чат',
+        'system'    => 'Обслуживание',
     ];
 
     public const ACTIONS = [
@@ -46,6 +47,8 @@ class AuditLog extends Model
         'status'       => 'смена статуса',
         'two_factor'   => 'двухфакторная защита',
         'pinned'       => 'закреплено',
+        'run'          => 'запуск',
+        'download'     => 'скачивание',
         'unpinned'     => 'откреплено',
     ];
 

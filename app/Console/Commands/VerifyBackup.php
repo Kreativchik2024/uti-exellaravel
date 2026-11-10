@@ -14,7 +14,9 @@ use ZipArchive;
 /**
  * Проверка, что последняя резервная копия пригодна для восстановления.
  *
- *  1. Копия свежая (не старше 30 часов) — на каждом диске из config/backup.php.
+ *  1. Копия свежая — на каждом диске из config/backup.php. Сервер работает 08:00–20:00,
+ *     поэтому ночной перерыв (с 19:50 до утра) нормален; проблема — если копии нет дольше FRESH_HOURS.
+ *     С --full проверяется последняя ПОЛНАЯ копия (база + файлы, 19:50), а не утренняя копия базы.
  *  2. Архив открывается (с паролем, если задан) и все файлы читаются без ошибок CRC.
  *  3. Дамп базы дописан до конца и содержит все таблицы рабочей базы.
  *  4. С --restore: дамп загружается в отдельную проверочную базу (BACKUP_VERIFY_DATABASE),
@@ -24,7 +26,12 @@ use ZipArchive;
  */
 class VerifyBackup extends Command
 {
-    protected $signature = 'backup:verify {--restore : Пробное восстановление в проверочную базу}';
+    protected $signature = 'backup:verify
+        {--full : Проверить последнюю полную копию (база + файлы), а не самую свежую}
+        {--restore : Пробное восстановление в проверочную базу}';
+
+    /** Самая свежая копия не старше стольких часов (ночной перерыв 19:50 → 08:05 ≈ 12 ч). */
+    public const FRESH_HOURS = 14;
 
     protected $description = 'Проверить, что последняя резервная копия целая и восстанавливается';
 
@@ -51,13 +58,22 @@ class VerifyBackup extends Command
             $latest = $files->first();
             $age = now()->diffInHours(\Carbon\Carbon::createFromTimestamp($disk->lastModified($latest)));
             $this->note("Диск «{$diskName}»: {$files->count()} коп., последняя " . basename($latest) . ' (' . self::size($disk->size($latest)) . ')');
-            if ($age > 30) {
-                $this->problem("Диск «{$diskName}»: последней копии {$age} ч — ночной бэкап не выполнялся");
+            if ($age > self::FRESH_HOURS) {
+                $this->problem("Диск «{$diskName}»: последней копии {$age} ч — бэкапы не выполняются");
             }
 
-            // Полную проверку содержимого делаем по одной (первой) копии — архивы одинаковые
+            // Полную проверку содержимого делаем по одной копии — на всех дисках архивы одинаковые
             if ($checked++ === 0) {
-                $this->checkArchive($disk->path($latest));
+                $target = $latest;
+                if ($this->option('full')) {
+                    $target = $files->first(fn ($f) => self::hasFiles($disk->path($f)));
+                    if (! $target) {
+                        $this->problem("Диск «{$diskName}»: полной копии (с файлами) нет — она делается в 19:50");
+                        continue;
+                    }
+                    $this->note('Полная копия: ' . basename($target) . ' (' . self::size($disk->size($target)) . ')');
+                }
+                $this->checkArchive($disk->path($target));
             }
         }
 
@@ -68,6 +84,7 @@ class VerifyBackup extends Command
             'problems' => $this->problems,
             'notes'    => $this->notes,
             'restore'  => (bool) $this->option('restore'),
+            'full'     => (bool) $this->option('full'),
         ]);
 
         if ($ok) {
@@ -78,6 +95,20 @@ class VerifyBackup extends Command
         $this->error('Найдены проблемы с резервной копией.');
 
         return self::FAILURE;
+    }
+
+    /** В архиве есть не только дамп базы (это полная копия). */
+    public static function hasFiles(string $path): bool
+    {
+        $zip = new ZipArchive();
+        if ($zip->open($path) !== true) return false;
+        $files = 0;
+        for ($i = 0; $i < $zip->numFiles && $files < 2; $i++) {
+            if (! str_ends_with(str_replace('\\', '/', $zip->getNameIndex($i)), '/')) $files++;
+        }
+        $zip->close();
+
+        return $files > 1;
     }
 
     private function checkArchive(string $path): void

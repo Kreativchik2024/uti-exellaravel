@@ -129,13 +129,15 @@ return [
 
     'cleanup' => [
         'strategy' => \Spatie\Backup\Tasks\Cleanup\Strategies\DefaultStrategy::class,
+        // Хранится неделя: все копии за последние 7 дней, более старые удаляются (backup:clean).
+        // Страховка для SD-карты: если копии займут больше 3 ГБ — удаляются самые старые.
         'default_strategy' => [
-            'keep_all_backups_for_days' => 14,
-            'keep_daily_backups_for_days' => 14,
-            'keep_weekly_backups_for_weeks' => 8,
-            'keep_monthly_backups_for_months' => 6,
-            'keep_yearly_backups_for_years' => 2,
-            'delete_oldest_backups_when_using_more_megabytes_than' => 5000,
+            'keep_all_backups_for_days' => 7,
+            'keep_daily_backups_for_days' => 0,
+            'keep_weekly_backups_for_weeks' => 0,
+            'keep_monthly_backups_for_months' => 0,
+            'keep_yearly_backups_for_years' => 0,
+            'delete_oldest_backups_when_using_more_megabytes_than' => 3000,
         ],
     ],
 

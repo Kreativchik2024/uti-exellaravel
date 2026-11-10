@@ -91,6 +91,11 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 
     Route::get('/audit', [\App\Http\Controllers\AuditController::class, 'index'])->name('audit.index');
     Route::get('/system', [\App\Http\Controllers\SystemController::class, 'index'])->name('system.index');
+    Route::get('/system/status', [\App\Http\Controllers\SystemController::class, 'status'])->name('system.status');
+    Route::post('/system/run/{task}', [\App\Http\Controllers\SystemController::class, 'run'])->middleware('throttle:10,1')->name('system.run');
+    Route::get('/system/backup/download', [\App\Http\Controllers\SystemController::class, 'downloadBackup'])->middleware('password.confirm')->name('system.backup.download');
+    Route::get('/system/logs/download', [\App\Http\Controllers\SystemController::class, 'downloadLog'])->name('system.logs.download');
+    Route::post('/system/logs/clear', [\App\Http\Controllers\SystemController::class, 'clearLogs'])->name('system.logs.clear');
 
     Route::get('/sections',              [SectionController::class, 'index'])->name('sections.index');
     Route::post('/sections',             [SectionController::class, 'store'])->name('sections.store');
