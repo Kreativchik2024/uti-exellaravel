@@ -42,7 +42,9 @@ class AppServiceProvider extends ServiceProvider
             \App\Models\AuditLog::write('auth', 'login_failed', 'Неверный пароль для ' . $email . ($e->user ? '' : ' (такой учётки нет)'), ['section_id' => null]);
         });
         \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Logout::class, function ($e) {
-            if ($e->user) \App\Models\AuditLog::write('auth', 'logout', 'Выход: ' . $e->user->email, ['user' => $e->user, 'section_id' => null]);
+            if (! $e->user) return;
+            $why = request()->input('reason') === 'idle' ? 'Автовыход (бездействие ' . config('auth.idle_logout_minutes') . ' мин): ' : 'Выход: ';
+            \App\Models\AuditLog::write('auth', 'logout', $why . $e->user->email, ['user' => $e->user, 'section_id' => null]);
         });
 
         // Вкладки учёта (config/sheets.php): политика доступа, журнал изменений, короткое имя для связей.

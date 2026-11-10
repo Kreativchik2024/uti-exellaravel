@@ -188,6 +188,34 @@ class SecurityTest extends TestCase
         $this->get('/profile')->assertRedirect('/login');   // больше 30 — выход
     }
 
+    public function test_server_reports_idle_time_for_all_tabs_and_logout_reason_is_logged(): void
+    {
+        config(['auth.idle_logout_minutes' => 30]);
+        $user = User::factory()->admin()->create();
+
+        $this->actingAs($user)->get('/profile');
+        $this->travel(5)->minutes();
+        $idle = $this->getJson('/session/status')->assertOk()->json('idle_seconds');
+        $this->assertEqualsWithDelta(300, $idle, 2, 'запрос статуса сам не считается действием');
+
+        // Другая вкладка что-то сделала — бездействие сбрасывается для всех
+        $this->getJson('/session/ping');
+        $this->assertLessThan(3, $this->getJson('/session/status')->json('idle_seconds'));
+
+        $this->travel(31)->minutes();
+        $this->get('/profile')->assertRedirect('/login');
+        $this->assertTrue(\App\Models\AuditLog::where('summary', 'like', 'Автовыход:%')->exists(), 'причина выхода — в журнале');
+    }
+
+    public function test_second_device_logout_reason_is_logged(): void
+    {
+        $user = User::factory()->create(['role' => 'executor']);
+        $user->forceFill(['session_id' => 'другое-устройство'])->saveQuietly();
+
+        $this->actingAs($user)->withSession(['workstation_workers' => []])->get('/profile')->assertRedirect('/login');
+        $this->assertTrue(\App\Models\AuditLog::where('summary', 'like', '%на другом устройстве%')->exists());
+    }
+
     public function test_ping_keeps_session_alive_while_user_works(): void
     {
         config(['auth.idle_logout_minutes' => 15]);

@@ -17,13 +17,13 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class LogoutWhenIdle
 {
-    private const KEY = 'last_activity_at';
+    public const KEY = 'last_activity_at';
 
     /** Фоновые запросы — не продлевают сессию. */
     private const BACKGROUND = [
         'chat.summary', 'chat.messages', 'chat.conversations', 'chat.typing', 'chat.users',
         'worker-sessions.heartbeat', 'worker-sessions.occupied',
-        'csrf.refresh', 'news.latest', 'games.battleship.state',
+        'csrf.refresh', 'news.latest', 'games.battleship.state', 'session.status',
     ];
 
     public function handle(Request $request, Closure $next): Response
@@ -37,6 +37,7 @@ class LogoutWhenIdle
         $last = (int) $session->get(self::KEY, 0);
 
         if ($last && now()->getTimestamp() - $last > $minutes * 60 && ! $request->routeIs('logout')) {
+            \App\Models\AuditLog::write('auth', 'logout', "Автовыход: не было действий {$minutes} мин", ['section_id' => null]);
             Auth::guard('web')->logout();
             $session->invalidate();
             $session->regenerateToken();

@@ -30,7 +30,13 @@ Route::post('/consent', [ConsentController::class, 'accept'])->middleware('throt
 
 // Пользователь активен (public/js/idle.js) — продлевает сессию при автовыходе по бездействию
 Route::get('/session/ping', fn () => response()->json(['ok' => true])->header('Cache-Control', 'no-store'))
-    ->middleware(['auth', 'throttle:10,1'])->name('session.ping');
+    ->middleware(['auth', 'throttle:20,1'])->name('session.ping');
+
+// Сколько секунд пользователь бездействует по данным сервера (все вкладки и устройства) — перед автовыходом
+Route::get('/session/status', fn () => response()->json([
+    'idle_seconds'  => max(0, now()->getTimestamp() - (int) session(\App\Http\Middleware\LogoutWhenIdle::KEY, now()->getTimestamp())),
+    'limit_seconds' => (int) config('auth.idle_logout_minutes') * 60,
+])->header('Cache-Control', 'no-store'))->middleware(['auth', 'throttle:30,1'])->name('session.status');
 
 // Выбор текущего участка (в шапке)
 Route::post('/section/switch', [SectionController::class, 'switch'])->middleware('auth')->name('section.switch');

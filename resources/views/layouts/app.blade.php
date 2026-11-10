@@ -15,7 +15,7 @@
         {{-- Шрифт Inter (с кириллицей) подключается из resources/css/app.css --}}
         @include('partials.pwa-head')
         @auth
-            <meta name="idle-logout" content="{{ (int) config('auth.idle_logout_minutes') }}" data-ping="{{ route('session.ping') }}" data-logout="{{ route('logout') }}">
+            <meta name="idle-logout" content="{{ (int) config('auth.idle_logout_minutes') }}" data-ping="{{ route('session.ping') }}" data-status="{{ route('session.status') }}" data-logout="{{ route('logout') }}">
             <script src="{{ asset('js/idle.js') }}?v={{ filemtime(public_path('js/idle.js')) }}" defer></script>
         @endauth
         @vite(['resources/css/app.css', 'resources/js/app.js'])
