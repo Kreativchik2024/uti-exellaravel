@@ -21,6 +21,8 @@
                 <x-input-label for="password" value="Пароль" />
                 @if (Route::has('password.request'))
                     <a class="text-sm font-medium hover:underline" href="{{ route('password.request') }}">Забыли пароль?</a>
+                @else
+                    <span class="text-xs" style="color: var(--ui-muted)" title="Пароль сбрасывает администратор">Забыли пароль? — к администратору</span>
                 @endif
             </div>
             <x-text-input id="password" class="block mt-1.5 w-full" type="password" name="password"

@@ -19,39 +19,59 @@ class SecurityTest extends TestCase
 
     public function test_first_visit_shows_consent_and_rules_page_is_public(): void
     {
-        $this->get('/login')->assertOk()->assertSee('Cookie и персональные данные')->assertSee(route('consent.accept'), false);
+        $this->withoutConsentCookie();
+
+        $this->get('/login')->assertOk()->assertSee('Cookie и персональные данные')->assertSee(route('consent.accept'), false)
+            ->assertDontSee('name="password"', false);   // вместо страницы — только окно согласия
         $this->get('/rules')->assertOk()->assertSee('152-ФЗ')->assertSee('id="cookies"', false);
     }
 
-    public function test_accepting_sets_cookie_and_hides_popup(): void
+    public function test_site_cannot_be_used_without_consent_even_bypassing_popup(): void
     {
+        $this->withoutConsentCookie();
+        $user = User::factory()->admin()->create(['consent_version' => null, 'consent_at' => null]);
+
+        // Страницы — только окно согласия
+        $this->actingAs($user)->get('/')->assertOk()->assertSee('Cookie и персональные данные')->assertDontSee('ui-chat');
+        // Запросы данных и действия — 403, даже если окно скрыли в браузере
+        $this->actingAs($user)->getJson('/chat/messages?peer=0')->assertForbidden()->assertJsonPath('consent_required', true);
+        $this->actingAs($user)->postJson('/chat/messages', ['peer' => 0, 'body' => 'обход'])->assertForbidden();
+        $this->actingAs($user)->post('/login', ['email' => 'x', 'password' => 'y'])->assertForbidden();
+        $this->assertSame(0, \App\Models\ChatMessage::count());
+
+        // Выйти можно и без согласия
+        $this->actingAs($user)->post('/logout')->assertRedirect();
+    }
+
+    public function test_accepting_sets_cookie_and_opens_site(): void
+    {
+        $this->withoutConsentCookie();
         $this->post('/consent', [])->assertSessionHasErrors('accept');
 
         $res = $this->from('/login')->post('/consent', ['accept' => '1'])->assertRedirect('/login');
         $res->assertCookie(config('legal.cookie'), config('legal.version'));
 
         $this->withCookie(config('legal.cookie'), config('legal.version'))
-            ->get('/login')->assertOk()->assertDontSee('Cookie и персональные данные');
+            ->get('/login')->assertOk()->assertDontSee('Cookie и персональные данные')->assertSee('name="password"', false);
     }
 
     public function test_logged_in_user_consent_is_recorded_and_new_edition_asks_again(): void
     {
-        $user = User::factory()->admin()->create();
+        $user = User::factory()->admin()->create(['consent_version' => null, 'consent_at' => null]);
 
-        $this->actingAs($user)->withCookie(config('legal.cookie'), config('legal.version'))
-            ->get('/profile')->assertSee('Cookie и персональные данные');   // согласие браузера не переносится на учётку
+        // Согласие, данное в браузере до входа, на учётку не переносится
+        $this->actingAs($user)->get('/profile')->assertSee('Cookie и персональные данные')->assertSee('Не согласен — выйти');
 
         $this->actingAs($user)->post('/consent', ['accept' => '1']);
         $user->refresh();
         $this->assertSame(config('legal.version'), $user->consent_version);
         $this->assertNotNull($user->consent_at);
 
-        $this->actingAs($user)->withCookie(config('legal.cookie'), config('legal.version'))
-            ->get('/profile')->assertDontSee('Cookie и персональные данные');
+        $this->actingAs($user)->get('/profile')->assertOk()->assertDontSee('Cookie и персональные данные');
 
         config(['legal.version' => '2099-01-01']);   // новая редакция правил
-        $this->actingAs($user)->withCookie(config('legal.cookie'), '2026-11-10')
-            ->get('/profile')->assertSee('Cookie и персональные данные');
+        $this->actingAs($user)->get('/profile')->assertSee('Cookie и персональные данные');
+        $this->actingAs($user)->getJson('/chat/summary')->assertForbidden();
     }
 
     public function test_registration_requires_consent(): void
@@ -71,7 +91,50 @@ class SecurityTest extends TestCase
         $this->get('/login')
             ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
             ->assertHeader('X-Content-Type-Options', 'nosniff')
-            ->assertHeader('Referrer-Policy', 'same-origin');
+            ->assertHeader('Referrer-Policy', 'same-origin')
+            ->assertHeaderMissing('Strict-Transport-Security');   // по HTTP HSTS не шлём
+
+        $this->get('https://localhost/login')->assertHeader('Strict-Transport-Security', 'max-age=2592000');
+    }
+
+    // ---------------------------------------------------------------- прочее
+
+    public function test_cannot_mark_foreign_employee_busy_without_pin(): void
+    {
+        $owner = User::factory()->create(['role' => 'executor', 'is_active' => true]);
+        $emp = Employee::create(['last_name' => 'Орлов', 'first_name' => 'Иван', 'short_name' => 'Орлов И.', 'is_active' => true, 'user_id' => $owner->id]);
+        $stranger = User::factory()->create(['role' => 'executor', 'is_active' => true]);
+
+        $this->actingAs($stranger)->postJson('/worker-sessions/claim', ['short_name' => 'Орлов И.', 'sheet' => 'pgp'])->assertForbidden();
+        $stranger->forceFill(['session_id' => null])->saveQuietly();   // «один вход на устройство» у исполнителей
+        $this->actingAs($stranger)->withSession(['verified_workers' => [$emp->id => now()->addHour()->timestamp]])
+            ->postJson('/worker-sessions/claim', ['short_name' => 'Орлов И.', 'sheet' => 'pgp'])->assertJsonPath('ok', true);
+    }
+
+    public function test_unpublished_news_hidden_from_regular_users(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $news = \App\Models\News::create(['title' => 'Черновик', 'body' => 'текст', 'is_published' => false, 'author_id' => $admin->id]);
+        $worker = User::factory()->create(['role' => 'executor', 'is_active' => true]);
+
+        $this->actingAs($worker)->withSession(['workstation_workers' => []])->get("/news/{$news->id}")->assertNotFound();
+        $this->actingAs($admin)->get("/news/{$news->id}")->assertOk();
+    }
+
+    public function test_role_and_pin_cannot_be_mass_assigned(): void
+    {
+        $u = new User(['name' => 'X', 'email' => 'x@x', 'password' => 'secret', 'role' => 'admin', 'is_active' => true, 'pin_hash' => 'h']);
+        $this->assertNull($u->role);
+        $this->assertNull($u->is_active);
+        $this->assertNull($u->pin_hash);
+    }
+
+    public function test_last_admin_cannot_delete_own_account(): void
+    {
+        $admin = User::factory()->admin()->create(['password' => 'Secret123!']);
+
+        $this->actingAs($admin)->delete('/profile', ['password' => 'Secret123!'])->assertSessionHasErrorsIn('userDeletion', 'password');
+        $this->assertNotNull($admin->fresh());
     }
 
     // ---------------------------------------------------------------- подбор ПИН сотрудника

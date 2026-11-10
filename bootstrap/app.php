@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\EnsureUserIsActive::class,
             \App\Http\Middleware\EnsureSingleSession::class,
+            \App\Http\Middleware\EnsureConsent::class,   // без согласия с правилами — только окно согласия
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -88,6 +88,14 @@ class WorkerSessionController extends Controller
         $employee = Employee::where('short_name', $shortName)->active()->first();
         if (!$employee) return response()->json(['ok' => false]);
 
+        // Отметить «работает» можно себя, сотрудника, подтверждённого ПИН в этой сессии,
+        // или любого — мастеру/админу. Иначе любой мог бы пометить чужих занятыми.
+        $verifiedUntil = (int) ($r->session()->get('verified_workers', [])[$employee->id] ?? 0);
+        $allowed = $employee->user_id === $user->id
+            || $user->canManageContent()
+            || $verifiedUntil >= now()->timestamp;
+        if (!$allowed) return response()->json(['ok' => false, 'error' => 'Подтвердите ПИН сотрудника'], 403);
+
         $sessionId = $r->session()->getId();
         $cutoff = now()->subSeconds(self::OFFLINE_AFTER_SECONDS);
 

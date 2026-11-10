@@ -114,4 +114,7 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    // Восстановление пароля по email (routes/auth.php). Без настроенной почты — выключено.
+    'password_reset_by_email' => (bool) env('PASSWORD_RESET_EMAIL', false),
+
 ];

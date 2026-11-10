@@ -40,13 +40,14 @@ class RegisteredUserController extends Controller
             'accept_rules' => ['accepted'],
         ], ['accept_rules.accepted' => 'Без согласия с правилами и на обработку персональных данных регистрация невозможна.']);
 
-        $user = User::create([
+        $user = (new User)->forceFill([
             'name'      => $request->name,
             'email'     => $request->email,
             'password'  => Hash::make($request->password),
             'role'      => 'executor',
             'is_active' => false,
         ]);
+        $user->save();
         ConsentController::record($user, $request);
 
         // Письмо-подтверждение email для внутренней системы не нужно.

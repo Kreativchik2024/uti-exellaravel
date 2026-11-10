@@ -33,11 +33,18 @@
             @error('accept') <p class="ui-consent__error">{{ $message }}</p> @enderror
 
             <div class="ui-consent__actions">
+                @auth
+                    {{-- Не согласен — можно только выйти (form= — кнопка вне вложенной формы) --}}
+                    <button type="submit" form="consent-logout" class="ui-btn ui-btn--ghost" formnovalidate>Не согласен — выйти</button>
+                @endauth
                 @unless ($onRules)
                     <a href="{{ route('legal.rules') }}" class="ui-btn ui-btn--ghost">Прочитать правила</a>
                 @endunless
                 <button type="submit" class="ui-btn ui-btn--primary">Принять</button>
             </div>
         </form>
+        @auth
+            <form id="consent-logout" method="POST" action="{{ route('logout') }}" class="hidden">@csrf</form>
+        @endauth
     </div>
 @endif

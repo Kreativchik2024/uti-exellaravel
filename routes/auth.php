@@ -24,20 +24,29 @@ Route::middleware('guest')->group(function () {
     Route::post('login', [AuthenticatedSessionController::class, 'store'])
         ->middleware('throttle:login');
 
-    Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
-        ->name('password.request');
-
-    // Rate limiting и на восстановление пароля — защита от спама писем
-    Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
-        ->middleware('throttle:6,1')
-        ->name('password.email');
-
-    Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
-        ->name('password.reset');
-
-    Route::post('reset-password', [NewPasswordController::class, 'store'])
-        ->name('password.store');
 });
+
+// Восстановление пароля по почте. Выключено по умолчанию: в изолированной сети почты нет,
+// ссылки сброса писались бы в лог, а форма подсказывала бы, какие email зарегистрированы.
+// Пароль сбрасывает администратор (Пользователи → «Сбросить»).
+// Включить, когда будет настроена почта: PASSWORD_RESET_EMAIL=true в .env.
+if (config('auth.password_reset_by_email')) {
+    Route::middleware('guest')->group(function () {
+        Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
+            ->name('password.request');
+
+        Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+            ->middleware('throttle:6,1')
+            ->name('password.email');
+
+        Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
+            ->name('password.reset');
+
+        Route::post('reset-password', [NewPasswordController::class, 'store'])
+            ->middleware('throttle:6,1')
+            ->name('password.store');
+    });
+}
 
 Route::middleware('auth')->group(function () {
     Route::get('verify-email', EmailVerificationPromptController::class)

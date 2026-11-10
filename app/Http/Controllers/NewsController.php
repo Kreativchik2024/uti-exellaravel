@@ -57,8 +57,9 @@ class NewsController extends Controller
 
     public function show(News $news)
     {
-        // Гости могут смотреть только опубликованные
-        if (!$news->is_published && !auth()->check()) {
+        // Черновики и отложенные новости видят только мастер/админ
+        $published = $news->is_published && (!$news->published_at || $news->published_at->lte(now()));
+        if (!$published && !auth()->user()?->canManageContent()) {
             abort(404);
         }
         abort_unless($this->canSee($news), 404);

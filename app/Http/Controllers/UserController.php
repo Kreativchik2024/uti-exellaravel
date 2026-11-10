@@ -46,17 +46,18 @@ class UserController extends Controller
             return back()->withErrors(['role' => 'Нельзя снять роль админа с самого себя.']);
         }
 
-        $user->update(['role' => $data['role']]);
+        $user->forceFill(['role' => $data['role']])->save();
         return back()->with('ok', "Роль пользователя {$user->name} изменена на {$data['role']}");
     }
 
     public function approve(User $user)
     {
-        $user->update([
+        // forceFill: approved_by/approved_at раньше молча не сохранялись (не были в $fillable)
+        $user->forceFill([
             'is_active'   => true,
             'approved_by' => auth()->id(),
             'approved_at' => now(),
-        ]);
+        ])->save();
 
         // Без участка пользователь ничего не увидит — назначаем текущий участок админа
         if (!$user->isAdmin() && $user->sections()->doesntExist() && ($section = app(SectionContext::class)->current())) {
@@ -70,7 +71,7 @@ class UserController extends Controller
         if ($user->id === auth()->id()) {
             return back()->withErrors(['general' => 'Нельзя деактивировать самого себя.']);
         }
-        $user->update(['is_active' => false]);
+        $user->forceFill(['is_active' => false])->save();
         return back()->with('ok', "Пользователь {$user->name} деактивирован");
     }
 

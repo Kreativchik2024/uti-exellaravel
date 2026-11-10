@@ -33,6 +33,9 @@ class UserFactory extends Factory
             // Правила приложения: по умолчанию — активный исполнитель
             'role' => 'executor',
             'is_active' => true,
+            // Согласие с действующей редакцией правил (без него сайт отдаёт только окно согласия)
+            'consent_version' => config('legal.version'),
+            'consent_at' => now(),
         ];
     }
 

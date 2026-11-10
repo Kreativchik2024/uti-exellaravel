@@ -11,9 +11,10 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
+    // role, is_active, pin_hash, session_id — только явно (forceFill), чтобы их нельзя было
+    // подставить через данные формы, если где-то по ошибке передадут $request->all()
     protected $fillable = [
-        'name', 'email', 'password', 'pin_hash', 'role',
-        'is_active', 'session_id', 'last_login_at',
+        'name', 'email', 'password', 'last_login_at',
     ];
 
     protected $hidden = [

@@ -38,6 +38,24 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
+     * Браузер в тестах уже принял правила (cookie согласия). Тесты самого согласия
+     * убирают её: $this->withoutConsentCookie().
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withCookie(config('legal.cookie'), config('legal.version'));
+        $this->withCredentials();   // JSON-запросы тоже несут cookie, как fetch() в браузере
+    }
+
+    protected function withoutConsentCookie(): static
+    {
+        unset($this->defaultCookies[config('legal.cookie')]);
+
+        return $this;
+    }
+
+    /**
      * На сервере каждый запрос обрабатывает «чистое» приложение, а в тестах одно
      * приложение обслуживает несколько запросов подряд. Сбрасываем scoped-сервисы
      * (SectionContext, EmployeeDirectory), как это было бы между запросами в бою.

@@ -12,8 +12,7 @@
         "laravel/tinker": "^3.0",
         "maatwebsite/excel": "^4.0",
         "phpoffice/phpspreadsheet": "^5.10",
-        "spatie/laravel-backup": "^10.3",
-        "umii/laravel-advance-validator-package": "^1.0"
+        "spatie/laravel-backup": "^10.3"
     },
     "require-dev": {
         "andreapollastri/checkpoint": "^1.2",

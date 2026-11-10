@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Rules\CleanText;
 use App\Rules\NoEmoji;
 use Illuminate\Http\Request;
@@ -85,6 +86,10 @@ class ProfileController extends Controller
         ]);
 
         $user = $request->user();
+
+        if ($user->isAdmin() && User::where('role', 'admin')->where('is_active', true)->count() <= 1) {
+            return back()->withErrors(['password' => 'Нельзя удалить последнего администратора — сначала назначьте другого.'], 'userDeletion');
+        }
 
         Auth::logout();
 
