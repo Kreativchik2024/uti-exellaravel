@@ -19,7 +19,6 @@ class User extends Authenticatable
 
     protected $hidden = [
         'password', 'remember_token', 'pin_hash', 'session_id',
-        'two_factor_secret', 'two_factor_recovery_codes',
     ];
 
     protected function casts(): array
@@ -30,10 +29,6 @@ class User extends Authenticatable
             'password'          => 'hashed',
             'is_active'         => 'boolean',
             'consent_at'        => 'datetime',
-            // Секрет и резервные коды хранятся зашифрованными (ключ APP_KEY)
-            'two_factor_secret'         => 'encrypted',
-            'two_factor_recovery_codes' => 'encrypted:array',
-            'two_factor_confirmed_at'   => 'datetime',
         ];
     }
 
@@ -53,12 +48,6 @@ class User extends Authenticatable
     public function isExecutor(): bool { return $this->role === 'executor'; }
 
     public function canManageContent(): bool { return $this->isAdmin() || $this->isMaster(); }
-
-    /** Вход с кодом из приложения включён. */
-    public function hasTwoFactor(): bool { return $this->two_factor_confirmed_at !== null && filled($this->two_factor_secret); }
-
-    /** Для роли вход с кодом обязателен (auth.two_factor_roles). */
-    public function requiresTwoFactor(): bool { return in_array($this->role, (array) config('auth.two_factor_roles'), true); }
     public function canManageUsers(): bool   { return $this->isAdmin(); }
     public function canViewFullStats(): bool { return $this->isAdmin() || $this->isMaster(); }
 

@@ -132,14 +132,6 @@
                                 </form>
                             @endif
 
-                            @if($u->hasTwoFactor() && $u->id !== auth()->id())
-                                <form method="POST" action="{{ route('users.two-factor', $u) }}"
-                                      onsubmit="return confirm('Сбросить вход с кодом из телефона? Пользователь настроит его заново.')" class="inline">
-                                    @csrf @method('PATCH')
-                                    <button class="text-blue-700 underline">Сбросить 2FA</button>
-                                </form>
-                            @endif
-
                             @if($u->id !== auth()->id())
                                 <form method="POST" action="{{ route('users.destroy', $u) }}"
                                       onsubmit="return confirm('Удалить пользователя?')" class="inline">

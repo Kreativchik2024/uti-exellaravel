@@ -114,9 +114,6 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
-    // Роли, которым обязателен вход с кодом из приложения на телефоне (через запятую; пусто — никому)
-    'two_factor_roles' => array_values(array_filter(array_map('trim', explode(',', (string) env('TWO_FACTOR_ROLES', 'admin'))))),
-
     // Автовыход при бездействии, минут (0 — выключен). App\Http\Middleware\LogoutWhenIdle
     'idle_logout_minutes' => (int) env('IDLE_LOGOUT_MINUTES', 15),
 

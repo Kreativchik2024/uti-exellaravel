@@ -46,8 +46,6 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
         $this->withCookie(config('legal.cookie'), config('legal.version'));
         $this->withCredentials();   // JSON-запросы тоже несут cookie, как fetch() в браузере
-        // Обязательный вход с кодом проверяется в TwoFactorTest; в остальных тестах — выключен
-        config(['auth.two_factor_roles' => []]);
     }
 
     protected function withoutConsentCookie(): static

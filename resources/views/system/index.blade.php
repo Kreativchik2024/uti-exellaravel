@@ -33,7 +33,7 @@
                 <div class="text-xs" style="color: var(--ui-muted)">Время сервера</div>
                 <div class="text-lg font-bold mt-1" style="color: var(--ui-text)">{{ $serverTime->format('d.m.Y H:i:s') }}</div>
                 <div class="text-xs mt-0.5" :style="Math.abs(drift) > 60 ? 'color: var(--ui-bad)' : 'color: var(--ui-muted)'"
-                     x-text="Math.abs(drift) > 60 ? 'Расходится с вашим компьютером на ' + Math.abs(drift) + ' с — коды входа (2FA) могут не приниматься' : 'Совпадает с вашим компьютером'"></div>
+                     x-text="Math.abs(drift) > 60 ? 'Расходится с вашим компьютером на ' + Math.abs(drift) + ' с — время в записях будет неточным' : 'Совпадает с вашим компьютером'"></div>
             </div>
         </div>
 

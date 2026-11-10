@@ -32,16 +32,6 @@ Route::post('/consent', [ConsentController::class, 'accept'])->middleware('throt
 Route::get('/session/ping', fn () => response()->json(['ok' => true])->header('Cache-Control', 'no-store'))
     ->middleware(['auth', 'throttle:10,1'])->name('session.ping');
 
-// Вход с кодом из приложения на телефоне (App\Http\Middleware\EnsureTwoFactor)
-Route::middleware('auth')->prefix('two-factor')->name('two-factor.')->controller(\App\Http\Controllers\TwoFactorController::class)->group(function () {
-    Route::get('/',            'setup')->name('setup');
-    Route::post('/confirm',    'confirm')->middleware('throttle:10,1')->name('confirm');
-    Route::get('/challenge',   'challenge')->name('challenge');
-    Route::post('/challenge',  'verify')->middleware('throttle:10,1')->name('verify');
-    Route::post('/recovery',   'regenerate')->middleware('throttle:5,1')->name('regenerate');
-    Route::post('/disable',    'disable')->middleware('throttle:5,1')->name('disable');
-});
-
 // Выбор текущего участка (в шапке)
 Route::post('/section/switch', [SectionController::class, 'switch'])->middleware('auth')->name('section.switch');
 
@@ -85,7 +75,6 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::patch('/users/{user}/deactivate', [UserController::class, 'deactivate'])->name('users.deactivate');
     Route::patch('/users/{user}/password',   [UserController::class, 'resetPassword'])->name('users.password');
     Route::patch('/users/{user}/pin',        [UserController::class, 'resetPin'])->name('users.pin');
-    Route::patch('/users/{user}/two-factor', [UserController::class, 'resetTwoFactor'])->name('users.two-factor');
     Route::delete('/users/{user}',           [UserController::class, 'destroy'])->name('users.destroy');
 
     Route::get('/employees/export',   [EmployeeController::class, 'export'])->name('employees.export');

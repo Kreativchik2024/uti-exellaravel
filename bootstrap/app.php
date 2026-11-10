@@ -27,7 +27,6 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\EnsureUserIsActive::class,
             \App\Http\Middleware\EnsureSingleSession::class,
             \App\Http\Middleware\EnsureConsent::class,   // без согласия с правилами — только окно согласия
-            \App\Http\Middleware\EnsureTwoFactor::class, // код из приложения на телефоне (админы — обязательно)
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

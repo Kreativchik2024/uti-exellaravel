@@ -98,15 +98,6 @@ class UserController extends Controller
         return back()->with('ok', "ПИН пользователя {$user->name} сброшен. Пусть задаст новый в профиле.");
     }
 
-    /** Сброс входа с кодом (потерян телефон): пользователь заново настроит его при входе. */
-    public function resetTwoFactor(User $user)
-    {
-        $user->forceFill(['two_factor_secret' => null, 'two_factor_recovery_codes' => null, 'two_factor_confirmed_at' => null])->save();
-        \App\Models\AuditLog::write('users', 'two_factor', "Сброшен вход с кодом у {$user->name} ({$user->email})", ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null]);
-
-        return back()->with('ok', "Вход с кодом у {$user->name} сброшен. При входе он настроит его заново.");
-    }
-
     public function destroy(User $user)
     {
         if ($user->id === auth()->id()) {
