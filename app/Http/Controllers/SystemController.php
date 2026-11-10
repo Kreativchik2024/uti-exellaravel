@@ -30,6 +30,23 @@ class SystemController extends Controller
         $run = fn (string $task, string $label, ?string $confirm = null) => ['type' => 'run', 'task' => $task, 'label' => $label, 'confirm' => $confirm];
         $copy = fn (string $text, string $label = 'Скопировать команду') => ['type' => 'copy', 'text' => $text, 'label' => $label];
         $external = in_array('backup_external', (array) config('backup.backup.destination.disks'), true);
+        // ---------------------------------------------------------------- железо
+        $metrics = app(\App\Services\ServerMetrics::class)->all();
+        if ($metrics['temp']) {
+            $t = $metrics['temp']['max'];
+            $add('Железо', $t >= \App\Services\ServerMetrics::TEMP_BAD ? 'bad' : ($t >= \App\Services\ServerMetrics::TEMP_WARN ? 'warn' : 'ok'),
+                'Температура процессора', "{$t} °C" . ($t >= \App\Services\ServerMetrics::TEMP_WARN ? ' — проверьте охлаждение (радиатор, вентилятор, корпус не на солнце)' : ''));
+        }
+        if ($metrics['cpu']) {
+            $u = $metrics['cpu']['usage'];
+            $add('Железо', $u >= 90 ? 'warn' : 'ok', 'Загрузка процессора', "{$u}%, ядер: {$metrics['cpu']['count']}"
+                . ($metrics['cpu']['load'] ? ', средняя нагрузка: ' . implode(' / ', $metrics['cpu']['load']) : ''));
+        }
+        if ($metrics['memory']) {
+            $m = $metrics['memory'];
+            $add('Железо', $m['percent'] >= 90 ? 'warn' : 'ok', 'Оперативная память',
+                'Занято ' . VerifyBackup::size($m['used']) . ' из ' . VerifyBackup::size($m['total']) . " ({$m['percent']}%)");
+        }
 
         // ---------------------------------------------------------------- диск
         foreach (array_filter(['Сервер (сайт и копии)' => base_path(), 'Второй носитель копий' => $external ? config('filesystems.disks.backup_external.root') : null]) as $label => $path) {
@@ -161,7 +178,14 @@ class SystemController extends Controller
             'online'     => $online,
             'serverTime' => now(),
             'task'       => Cache::get(SystemTask::CACHE_KEY),
+            'metrics'    => $metrics,
         ]);
+    }
+
+    /** Температура, процессор, память — для живого обновления на странице (раз в 5 с). */
+    public function metrics(\App\Services\ServerMetrics $m)
+    {
+        return response()->json($m->all())->header('Cache-Control', 'no-store');
     }
 
     // ================================================================ действия

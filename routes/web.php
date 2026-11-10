@@ -98,6 +98,7 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::delete('/fault-codes/{faultCode}', [\App\Http\Controllers\FaultCodeController::class, 'destroy'])->name('fault-codes.destroy');
     Route::get('/system', [\App\Http\Controllers\SystemController::class, 'index'])->name('system.index');
     Route::get('/system/status', [\App\Http\Controllers\SystemController::class, 'status'])->name('system.status');
+    Route::get('/system/metrics', [\App\Http\Controllers\SystemController::class, 'metrics'])->middleware('throttle:60,1')->name('system.metrics');
     Route::get('/system/errors', [\App\Http\Controllers\SystemController::class, 'errors'])->name('system.errors');
     Route::post('/system/run/{task}', [\App\Http\Controllers\SystemController::class, 'run'])->middleware('throttle:10,1')->name('system.run');
     Route::get('/system/backup/download', [\App\Http\Controllers\SystemController::class, 'downloadBackup'])->middleware('password.confirm')->name('system.backup.download');

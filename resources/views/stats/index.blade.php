@@ -348,12 +348,71 @@
                             <select x-model="selectedCategory" @change="onCategoryChange()" class="border rounded px-3 py-2 text-sm bg-white w-full">
                                 <option value="">— Все категории —</option>
                                 <template x-for="row in zone5Rows" :key="row.slug">
-                                    <option :value="row.slug" x-text="row.title + ' (' + row.percent + '%)'"></option>
+                                    <option :value="row.slug" x-text="row.title + ' — брак ' + row.defects + ' из ' + row.total + (row.total ? ' (' + row.percent + '%)' : '')"></option>
                                 </template>
                             </select>
                         </div>
                     </div>
-                    <div class="relative h-96"><canvas id="zone5Chart"></canvas></div>
+                    {{-- Итог по выбранному (всем категориям или одной) --}}
+                    <div class="grid gap-2 grid-cols-2 md:grid-cols-4 mb-4">
+                        <div class="z5-kpi"><span>Записей</span><strong x-text="z5Sum().total"></strong></div>
+                        <div class="z5-kpi"><span>Брак</span><strong style="color: var(--ui-bad)" x-text="z5Sum().defects"></strong></div>
+                        <div class="z5-kpi"><span>% брака</span><strong x-text="z5Pct(z5Sum().defects, z5Sum().total)"></strong></div>
+                        <div class="z5-kpi"><span>Исправили на посту</span><strong style="color: var(--ui-good)" x-text="z5Sum().fixed + ' (' + z5Pct(z5Sum().fixed, z5Sum().total) + ')'"></strong></div>
+                    </div>
+
+                    <div x-show="!selectedCategory && !z5ChartRows().length" class="text-center text-sm py-10" style="color: var(--ui-muted)">За период записей нет</div>
+                    <div x-show="selectedCategory || z5ChartRows().length" class="relative"
+                         :style="'height:' + (selectedCategory ? 384 : Math.max(220, z5ChartRows().length * 38 + 70)) + 'px'">
+                        <canvas id="zone5Chart"></canvas>
+                    </div>
+
+                    <div x-show="selectedCategory" class="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                        <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="selectedCategory = ''; onCategoryChange()">← Все категории</button>
+                        @if(auth()->user()->canManageContent())
+                            <a :href="'{{ route('reports.defects') }}?sheet=' + selectedCategory + (dateFrom5 ? '&from=' + dateFrom5 : '') + (dateTo5 ? '&to=' + dateTo5 : '')"
+                               class="ui-btn ui-btn--ghost ui-btn--sm">Причины брака в этой категории →</a>
+                        @endif
+                    </div>
+
+                    {{-- Таблица по всем категориям: полные названия и цифры --}}
+                    <div x-show="!selectedCategory" class="mt-5 overflow-x-auto">
+                        <table class="ui-table z5-table">
+                            <thead>
+                                <tr>
+                                    <th>Категория</th>
+                                    <th class="text-right">Записей</th>
+                                    <th class="text-right">Брак</th>
+                                    <th class="text-right">% брака</th>
+                                    <th class="text-right">Исправили</th>
+                                    <th style="width: 22%"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="row in zone5Rows" :key="'t' + row.slug">
+                                    <tr @click="row.total && (selectedCategory = row.slug, onCategoryChange())" :class="row.total ? 'cursor-pointer' : 'z5-empty'"
+                                        :title="row.total ? 'Показать по дням' : 'За период записей нет'">
+                                        <td class="font-medium" x-text="row.title"></td>
+                                        <td class="text-right tabular-nums" x-text="row.total"></td>
+                                        <td class="text-right tabular-nums" :style="row.defects ? 'color: var(--ui-bad); font-weight: 600' : ''" x-text="row.defects"></td>
+                                        <td class="text-right tabular-nums" x-text="row.total ? row.percent + '%' : '—'"></td>
+                                        <td class="text-right tabular-nums" :style="row.fixed ? 'color: var(--ui-good)' : ''" x-text="row.fixed"></td>
+                                        <td><div class="ui-meter"><span :style="'width:' + Math.min(100, row.percent) + '%; background: var(--ui-bad)'"></span></div></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                            <tfoot>
+                                <tr class="font-semibold">
+                                    <td>Итого</td>
+                                    <td class="text-right tabular-nums" x-text="z5Sum(true).total"></td>
+                                    <td class="text-right tabular-nums" style="color: var(--ui-bad)" x-text="z5Sum(true).defects"></td>
+                                    <td class="text-right tabular-nums" x-text="z5Pct(z5Sum(true).defects, z5Sum(true).total)"></td>
+                                    <td class="text-right tabular-nums" style="color: var(--ui-good)" x-text="z5Sum(true).fixed"></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -545,7 +604,6 @@
                     zone5Rows: [], selectedCategory: '',
                     dateFrom5: opts.initialFrom || '',
                     dateTo5: opts.initialTo || '',
-                    zone5ChartObj: null,
 
                     loaded6: false, loading6: false,
                     zone6Rows: [], selectedCategory6: '',
@@ -819,6 +877,15 @@
                         this.loading5 = false;
                     },
 
+                    // Категории с записями за период — только они на диаграмме
+                    z5ChartRows() { return this.zone5Rows.filter(r => r.total > 0); },
+                    // Итог: по всем категориям или по выбранной (all = всегда по всем)
+                    z5Sum(all = false) {
+                        const rows = !all && this.selectedCategory ? this.zone5Rows.filter(r => r.slug === this.selectedCategory) : this.zone5Rows;
+                        return rows.reduce((s, r) => ({ total: s.total + r.total, defects: s.defects + r.defects, fixed: s.fixed + (r.fixed || 0) }), { total: 0, defects: 0, fixed: 0 });
+                    },
+                    z5Pct(part, total) { return total ? (Math.round(part / total * 1000) / 10) + '%' : '—'; },
+
                     onZone5FiltersChange() { this.loadZone5(); },
                     onCategoryChange() { this.renderZone5Chart(); },
                     resetDates5() { this.dateFrom5 = ''; this.dateTo5 = ''; this.loadZone5(); },
@@ -827,28 +894,60 @@
                         if (typeof Chart === 'undefined') return;
                         const ctx = document.getElementById('zone5Chart');
                         if (!ctx) return;
-                        if (this.zone5ChartObj) this.zone5ChartObj.destroy();
+                        // График ищем по canvas, а не храним в данных Alpine: реактивная обёртка
+                        // ломает Chart.js при изменении размера блока (getContext of null)
+                        const old = Chart.getChart(ctx);
+                        if (old) old.destroy();
 
                         if (!this.selectedCategory) {
-                            this.zone5ChartObj = new Chart(ctx, {
+                            const rows = this.z5ChartRows();
+                            if (!rows.length) return;
+                            const maxPct = Math.max(5, ...rows.map(r => Math.max(r.percent, r.fixed_percent || 0)));
+                            // Подпись «брак N из M» справа от полосы
+                            const barValues = {
+                                id: 'z5Values',
+                                afterDatasetsDraw: (chart) => {
+                                    const c = chart.ctx, meta = chart.getDatasetMeta(0), metaFix = chart.getDatasetMeta(1);
+                                    c.save();
+                                    c.font = '600 12px ' + Chart.defaults.font.family;
+                                    c.fillStyle = Chart.defaults.color;
+                                    c.textBaseline = 'middle';
+                                    meta.data.forEach((bar, i) => {
+                                        const r = rows[i];
+                                        const x = Math.max(bar.x, metaFix.hidden ? 0 : metaFix.data[i].x) + 6;
+                                        const fixedTxt = r.fixed ? ', испр. ' + r.fixed : '';
+                                        c.fillText(r.defects + ' из ' + r.total + ' (' + r.percent + '%)' + fixedTxt, x, (bar.y + metaFix.data[i].y) / 2);
+                                    });
+                                    c.restore();
+                                },
+                            };
+                            new Chart(ctx, {
                                 type: 'bar',
                                 data: {
-                                    labels: this.zone5Rows.map(r => r.title),
+                                    labels: rows.map(r => r.title),
                                     datasets: [
-                                        { label: '% брака', data: this.zone5Rows.map(r => r.percent), backgroundColor: 'rgba(239,68,68,0.75)', borderColor: '#dc2626', borderWidth: 1 },
-                                        { label: '% исправили на посту', data: this.zone5Rows.map(r => r.fixed_percent || 0), backgroundColor: 'rgba(16,185,129,0.75)', borderColor: '#059669', borderWidth: 1 },
+                                        { label: '% брака', data: rows.map(r => r.percent), backgroundColor: 'rgba(239,68,68,0.75)', borderColor: '#dc2626', borderWidth: 1, barPercentage: .9, categoryPercentage: .8 },
+                                        { label: '% исправили на посту', data: rows.map(r => r.fixed_percent || 0), backgroundColor: 'rgba(16,185,129,0.75)', borderColor: '#059669', borderWidth: 1, barPercentage: .9, categoryPercentage: .8 },
                                     ]
                                 },
+                                plugins: [barValues],
                                 options: {
                                     indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                                    scales: { x: { beginAtZero: true, ticks: { callback: v => v + '%' } } },
+                                    layout: { padding: { right: 8 } },
+                                    // место справа под подписи «N из M»
+                                    scales: {
+                                        x: { beginAtZero: true, suggestedMax: Math.min(100, Math.ceil(maxPct * 1.6)), ticks: { callback: v => v + '%' } },
+                                        y: { ticks: { autoSkip: false, font: { size: 12 } } },
+                                    },
+                                    onClick: (e, els) => { if (els.length) { this.selectedCategory = rows[els[0].index].slug; this.onCategoryChange(); } },
+                                    onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
                                     plugins: {
                                         legend: { position: 'bottom' },
                                         tooltip: { callbacks: { label: (item) => {
-                                            const r = this.zone5Rows[item.dataIndex];
+                                            const r = rows[item.dataIndex];
                                             if (item.datasetIndex === 0) return 'Брак: ' + r.defects + ' из ' + r.total + ' (' + r.percent + '%)';
-                                            return 'Исправили: ' + r.fixed + ' из ' + r.total + ' (' + (r.fixed_percent || 0) + '%)';
-                                        }}}
+                                            return 'Исправили на посту: ' + r.fixed + ' из ' + r.total + ' (' + (r.fixed_percent || 0) + '%)';
+                                        }, footer: () => 'Нажмите — график по дням' }}
                                     }
                                 }
                             });
@@ -863,7 +962,7 @@
                             const res = await fetch('{{ route("stats.zone5Chart") }}?' + params.toString());
                             if (!res.ok) throw new Error('zone5Chart HTTP ' + res.status);
                             const data = await res.json();
-                            this.zone5ChartObj = new Chart(ctx, {
+                            new Chart(ctx, {
                                 type: 'bar',
                                 data: {
                                     labels: data.labels,

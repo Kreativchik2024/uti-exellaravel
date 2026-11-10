@@ -28,8 +28,9 @@ class ShiftReport
 
     public function build(Carbon $from, Carbon $to): array
     {
-        $workers = [];   // ФИО => [total, items, defect, sheets => [slug => [total, defect]]]
+        $workers = [];   // ключ исполнителя => [total, items, defect, sheets => [slug => [total, defect]]]
         $sheets = [];    // slug => [title, total, items, defect]
+        $names = new \App\Support\WorkerNames();   // разные написания одного ФИО — один исполнитель
 
         foreach ($this->sections->sheets() as $slug => $cfg) {
             if (empty($cfg['model'])) continue;
@@ -55,8 +56,13 @@ class ShiftReport
                 $s['items'] += $items;
                 $s['defect'] += $isDefect;
 
-                $names = array_unique(array_filter(array_map(fn ($f) => trim((string) $row->{$f}), $wf)));
-                foreach ($names as $name) {
+                $ids = [];
+                foreach ($wf as $f) {
+                    foreach (\App\Support\WorkerNames::split((string) $row->{$f}) as $raw) {
+                        if ($id = $names->id($raw)) $ids[$id] = true;
+                    }
+                }
+                foreach (array_keys($ids) as $name) {
                     $w = &$workers[$name];
                     $w ??= ['total' => 0, 'items' => 0, 'defect' => 0, 'sheets' => []];
                     $w['total']++;
@@ -72,6 +78,11 @@ class ShiftReport
         }
 
         uasort($workers, fn ($a, $b) => $b['items'] <=> $a['items']);
+        $labelled = [];
+        foreach ($workers as $id => $w) {
+            $labelled[$names->label($id)] = $w + ['known' => $names->known($id), 'variants' => $names->variants($id)];
+        }
+        $workers = $labelled;
 
         return [
             'workers' => $workers,

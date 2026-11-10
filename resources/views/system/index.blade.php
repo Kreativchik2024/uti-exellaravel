@@ -43,6 +43,53 @@
             <pre x-show="task && task.output" class="ui-systask__out" x-text="task && task.output"></pre>
         </div>
 
+        {{-- Железо: обновляется само каждые 5 секунд --}}
+        <div x-data="serverMetrics(@js($metrics), @js(route('system.metrics')), {{ \App\Services\ServerMetrics::TEMP_WARN }}, {{ \App\Services\ServerMetrics::TEMP_BAD }})"
+             class="grid gap-3 grid-cols-2 lg:grid-cols-4">
+            <div class="ui-card p-4">
+                <div class="text-xs" style="color: var(--ui-muted)">Температура процессора</div>
+                <template x-if="m.temp">
+                    <div>
+                        <div class="text-2xl font-bold mt-1 tabular-nums" :style="'color:' + tempColor()" x-text="m.temp.max + ' °C'"></div>
+                        <div class="ui-meter mt-2"><span :style="'width:' + Math.min(100, m.temp.max) + '%; background:' + tempColor()"></span></div>
+                        <div class="text-xs mt-1" style="color: var(--ui-muted)" x-text="m.temp.max >= bad ? 'Перегрев! Проверьте охлаждение' : (m.temp.max >= warn ? 'Горячо — проверьте охлаждение' : 'Норма')"></div>
+                    </div>
+                </template>
+                <div x-show="!m.temp" class="text-sm mt-2" style="color: var(--ui-faint)">недоступно</div>
+            </div>
+            <div class="ui-card p-4">
+                <div class="text-xs" style="color: var(--ui-muted)">Загрузка процессора</div>
+                <template x-if="m.cpu">
+                    <div>
+                        <div class="text-2xl font-bold mt-1 tabular-nums" :style="'color:' + (m.cpu.usage >= 90 ? 'var(--ui-bad)' : 'var(--ui-text)')" x-text="Math.round(m.cpu.usage) + '%'"></div>
+                        <div class="flex gap-1 mt-2" :title="'По ядрам: ' + m.cpu.cores.join('%, ') + '%'">
+                            <template x-for="(c, i) in m.cpu.cores" :key="i">
+                                <div class="ui-meter flex-1"><span :style="'width:' + c + '%'"></span></div>
+                            </template>
+                        </div>
+                        <div class="text-xs mt-1" style="color: var(--ui-muted)" x-text="m.cpu.count + ' ядер' + (m.cpu.mhz ? ' · ' + m.cpu.mhz + ' МГц' : '')"></div>
+                    </div>
+                </template>
+                <div x-show="!m.cpu" class="text-sm mt-2" style="color: var(--ui-faint)">недоступно</div>
+            </div>
+            <div class="ui-card p-4">
+                <div class="text-xs" style="color: var(--ui-muted)">Оперативная память</div>
+                <template x-if="m.memory">
+                    <div>
+                        <div class="text-2xl font-bold mt-1 tabular-nums" x-text="m.memory.percent + '%'"></div>
+                        <div class="ui-meter mt-2"><span :style="'width:' + m.memory.percent + '%'"></span></div>
+                        <div class="text-xs mt-1" style="color: var(--ui-muted)" x-text="size(m.memory.used) + ' из ' + size(m.memory.total)"></div>
+                    </div>
+                </template>
+                <div x-show="!m.memory" class="text-sm mt-2" style="color: var(--ui-faint)">недоступно</div>
+            </div>
+            <div class="ui-card p-4">
+                <div class="text-xs" style="color: var(--ui-muted)">Работает без перерыва</div>
+                <div class="text-2xl font-bold mt-1" x-text="m.uptime ? uptime(m.uptime) : '—'"></div>
+                <div class="text-xs mt-1" style="color: var(--ui-muted)" x-text="'обновлено ' + updated"></div>
+            </div>
+        </div>
+
         <div class="grid gap-3 sm:grid-cols-3">
             <div class="ui-card p-4">
                 <div class="text-xs" style="color: var(--ui-muted)">Итог</div>
@@ -124,6 +171,26 @@
             });
         };
         document.addEventListener('alpine:init', function () {
+            Alpine.data('serverMetrics', function (initial, url, warn, bad) {
+                return {
+                    m: initial, warn, bad, updated: 'только что',
+                    init() {
+                        setInterval(async () => {
+                            if (document.hidden) return;
+                            try {
+                                const r = await fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+                                if (r.ok) { this.m = await r.json(); this.updated = new Date().toLocaleTimeString('ru-RU'); }
+                            } catch (e) {}
+                        }, 5000);
+                    },
+                    tempColor() { const t = this.m.temp ? this.m.temp.max : 0; return t >= this.bad ? 'var(--ui-bad)' : (t >= this.warn ? '#d97706' : 'var(--ui-good)'); },
+                    size(b) { const u = ['Б', 'КБ', 'МБ', 'ГБ']; let i = 0; while (b >= 1024 && i < 3) { b /= 1024; i++; } return (Math.round(b * 10) / 10) + ' ' + u[i]; },
+                    uptime(s) {
+                        const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+                        return d ? d + ' д ' + h + ' ч' : (h ? h + ' ч ' + m + ' мин' : m + ' мин');
+                    },
+                };
+            });
             Alpine.data('systemTask', function (initial, url) {
                 return {
                     task: initial, timer: null,

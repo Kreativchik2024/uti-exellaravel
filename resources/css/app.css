@@ -776,3 +776,19 @@ html:not(.dark) :is(.app-main, .ui-page-header) textarea { border-color: var(--u
 .ui-errlog__body code { font-size: .78rem; padding: .05rem .35rem; border-radius: 5px; background: var(--ui-surface-2); }
 .ui-errlog__trace { margin: 0; padding: .6rem .75rem; border-radius: 10px; background: var(--ui-surface-2); color: var(--ui-text-2); font-size: .72rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 340px; overflow: auto; }
 @media (max-width: 640px) { .ui-errlog__body { padding-left: 1rem; } }
+
+/* Полоска-индикатор (температура, процессор, память) */
+.ui-meter { height: 6px; border-radius: 999px; background: var(--ui-surface-2); overflow: hidden; }
+.ui-meter > span { display: block; height: 100%; border-radius: 999px; background: var(--ui-accent); transition: width .6s ease; }
+
+/* Статистика, зона 5: итог и таблица категорий */
+.z5-kpi { display: flex; flex-direction: column; gap: .15rem; padding: .6rem .8rem; border-radius: 12px; background: var(--ui-surface-2); border: 1px solid var(--ui-border); }
+.z5-kpi span { font-size: .72rem; color: var(--ui-muted); }
+.z5-kpi strong { font-size: 1.2rem; font-variant-numeric: tabular-nums; color: var(--ui-text); }
+.z5-table tbody tr.cursor-pointer:hover { background: var(--ui-surface-hover); }
+.z5-table .z5-empty td { color: var(--ui-faint); }
+.z5-table tfoot td { border-top: 2px solid var(--ui-border); }
+
+.ui-badge-warn { display: inline-block; margin-left: .35rem; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 600; vertical-align: middle;
+    background: rgba(245, 158, 11, .15); color: #b45309; }
+html.dark .ui-badge-warn { color: #fcd34d; }

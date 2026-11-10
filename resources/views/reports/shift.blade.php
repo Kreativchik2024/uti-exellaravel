@@ -54,7 +54,11 @@
                         <tbody>
                             @foreach($data['workers'] as $name => $w)
                                 <tr>
-                                    <td class="font-medium">{{ $name }}</td>
+                                    <td class="font-medium">
+                                        {{ $name }}
+                                        @if(empty($w['known']))<span class="ui-badge-warn" title="Такого сотрудника нет в справочнике — проверьте написание в записях">нет в справочнике</span>@endif
+                                        @if(!empty($w['variants']))<div class="text-xs font-normal" style="color: var(--ui-muted)">также записан: {{ implode(', ', array_slice($w['variants'], 0, 4)) }}@if(count($w['variants']) > 4) и ещё {{ count($w['variants']) - 4 }}@endif</div>@endif
+                                    </td>
                                     <td class="text-right">{{ $w['total'] }}</td>
                                     <td class="text-right">{{ $w['items'] }}</td>
                                     <td class="text-right" style="{{ $w['defect'] ? 'color: var(--ui-bad); font-weight: 600' : '' }}">{{ $w['defect'] }}</td>

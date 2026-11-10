@@ -20,6 +20,7 @@ class DefectAnalysis
         $reasons = $codes = $parts = $workers = $weeks = [];
         $total = $defects = 0;
         $bySheet = [];
+        $names = new \App\Support\WorkerNames();   // разные написания одного ФИО — один исполнитель
 
         foreach ($this->sections->sheets() as $slug => $cfg) {
             if (empty($cfg['model']) || ($only && $only !== $slug)) continue;
@@ -48,10 +49,10 @@ class DefectAnalysis
                 $weeks[$week] ??= ['total' => 0, 'defect' => 0];
                 $weeks[$week]['total']++;
 
-                foreach (array_unique(array_filter(array_map(fn ($f) => trim((string) $row->{$f}), $wf))) as $name) {
-                    $workers[$name] ??= ['total' => 0, 'defect' => 0];
-                    $workers[$name]['total']++;
-                    if ($isDefect) $workers[$name]['defect']++;
+                foreach ($this->workerIds($row, $wf, $names) as $id) {
+                    $workers[$id] ??= ['total' => 0, 'defect' => 0];
+                    $workers[$id]['total']++;
+                    if ($isDefect) $workers[$id]['defect']++;
                 }
 
                 if (! $isDefect) continue;
@@ -78,6 +79,7 @@ class DefectAnalysis
         ksort($weeks);
         $workers = array_filter($workers, fn ($w) => $w['defect'] > 0);
         uasort($workers, fn ($a, $b) => [$b['defect'] / max(1, $b['total']), $b['defect']] <=> [$a['defect'] / max(1, $a['total']), $a['defect']]);
+        $workers = $this->labelled($workers, $names);
 
         return [
             'total'   => $total,
@@ -89,6 +91,30 @@ class DefectAnalysis
             'weeks'   => $weeks,
             'sheets'  => $bySheet,
         ];
+    }
+
+    /** Исполнители записи (без повторов): каждое поле может содержать несколько ФИО. */
+    private function workerIds($row, array $fields, \App\Support\WorkerNames $names): array
+    {
+        $ids = [];
+        foreach ($fields as $f) {
+            foreach (\App\Support\WorkerNames::split((string) $row->{$f}) as $raw) {
+                if ($id = $names->id($raw)) $ids[$id] = true;
+            }
+        }
+
+        return array_keys($ids);
+    }
+
+    /** [ключ => данные] → [ФИО для показа => данные + known (есть в справочнике) + variants (другие написания)]. */
+    private function labelled(array $workers, \App\Support\WorkerNames $names): array
+    {
+        $out = [];
+        foreach ($workers as $id => $w) {
+            $out[$names->label($id)] = $w + ['known' => $names->known($id), 'variants' => $names->variants($id)];
+        }
+
+        return $out;
     }
 
     /** Один и тот же текст в разном регистре и с разными пробелами — одна причина. */

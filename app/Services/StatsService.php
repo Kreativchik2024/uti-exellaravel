@@ -411,20 +411,13 @@ class StatsService
 
     private function parseWorkers(string $value): array
     {
-        $parts = preg_split('/[,;\/\n\r]+|\s+и\s+/u', $value) ?: [];
-        $parts = array_map('trim', $parts);
-        $parts = array_filter($parts, fn($p) => $p !== '');
-        return array_values($parts);
+        return \App\Support\WorkerNames::split($value);
     }
 
+    /** Одно ФИО в разных написаниях → один ключ (App\Support\WorkerNames). */
     private function normalizeName(string $name): string
     {
-        $name = str_replace(["\xC2\xA0", "\t", "\n", "\r"], ' ', $name);
-        $name = trim($name);
-        $name = function_exists('mb_strtolower') ? mb_strtolower($name, 'UTF-8') : strtolower($name);
-        $name = str_replace('ё', 'е', $name);
-        $name = preg_replace('/\s+/u', ' ', $name) ?? '';
-        return trim(rtrim($name, '.,;:'));
+        return \App\Support\WorkerNames::key($name);
     }
 
     /**
@@ -434,7 +427,7 @@ class StatsService
     {
         if ($this->workersIndex !== null) return $this->workersIndex;
 
-        $key = 'stats.workers_index.v2.' . app(SectionContext::class)->cacheKey();
+        $key = 'stats.workers_index.v3.' . app(SectionContext::class)->cacheKey();
         return $this->workersIndex = Cache::remember($key, 600, function () {
             $index = [];
 
