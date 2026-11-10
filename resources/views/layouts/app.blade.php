@@ -59,7 +59,7 @@
 
 
         {{-- ПАНЕЛЬ ОНЛАЙН --}}
-        @include('partials.online-footer')
+        @include('partials.presence')
 
         {{-- ЧАТ (правый нижний угол) --}}
         @include('partials.chat-widget')
