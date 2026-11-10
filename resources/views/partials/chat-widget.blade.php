@@ -74,7 +74,16 @@
                                     <span class="ui-chat__conv-time" x-text="timeShort(c.last.at)"></span>
                                 </span>
                                 <span class="ui-chat__conv-bottom">
-                                    <span class="ui-chat__conv-last" x-text="(c.last.mine ? 'Вы: ' : '') + c.last.body"></span>
+                                    <span class="ui-chat__conv-last">
+                                        <span x-show="c.last.mine" class="ui-chat__tick" :class="c.last.read ? 'ui-chat__tick--read' : 'ui-chat__tick--sent'"
+                                              :title="c.last.read ? 'Прочитано' : 'Отправлено, не прочитано'">
+                                            <svg x-show="(c.last.read ? 'read' : 'sent') === 'pending'" class="ui-chat__tick-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5" stroke-linecap="round"/></svg>
+                                            <svg x-show="(c.last.read ? 'read' : 'sent') === 'sent'" class="ui-chat__tick-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            <svg x-show="(c.last.read ? 'read' : 'sent') === 'read'" class="ui-chat__tick-ico ui-chat__tick-ico--double" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1.5 8.5l3 3 6-7M8.5 11.5l1 0 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            <svg x-show="(c.last.read ? 'read' : 'sent') === 'failed'" class="ui-chat__tick-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.8v3.6M8 10.9v.1" stroke-linecap="round"/></svg>
+                                        </span>
+                                        <span x-text="(c.last.mine ? 'Вы: ' : '') + c.last.body"></span>
+                                    </span>
                                     <span x-show="c.unread" class="ui-chat__count" x-text="c.unread"></span>
                                 </span>
                             </span>
@@ -153,8 +162,20 @@
                                 <div class="ui-chat__bubble">
                                     <div x-show="!m.mine && peer === 0 && showAuthor(i)" class="ui-chat__author" x-text="m.sender_name"></div>
                                     <div class="ui-chat__text" x-text="m.body"></div>
-                                    <div class="ui-chat__time" x-text="timeOnly(m.at)"></div>
+                                    <div class="ui-chat__meta">
+                                        <span x-text="timeOnly(m.at)"></span>
+                                        <span x-show="m.mine" class="ui-chat__tick" :class="'ui-chat__tick--' + status(m)"
+                                              :title="statusTitle(m)" :aria-label="statusTitle(m)">
+                                            <svg x-show="status(m) === 'pending'" class="ui-chat__tick-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5" stroke-linecap="round"/></svg>
+                                            <svg x-show="status(m) === 'sent'" class="ui-chat__tick-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            <svg x-show="status(m) === 'read'" class="ui-chat__tick-ico ui-chat__tick-ico--double" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1.5 8.5l3 3 6-7M8.5 11.5l1 0 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            <svg x-show="status(m) === 'failed'" class="ui-chat__tick-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.8v3.6M8 10.9v.1" stroke-linecap="round"/></svg>
+                                        </span>
+                                    </div>
                                 </div>
+                            </div>
+                            <div x-show="m.failed" class="ui-chat__retry">
+                                <button type="button" @click="retry(m)">Не отправлено — нажмите, чтобы повторить</button>
                             </div>
                         </div>
                     </template>
@@ -169,7 +190,7 @@
                               placeholder="Сообщение…" aria-label="Текст сообщения"
                               @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); send(); }"
                               @input="autoGrow($event.target)"></textarea>
-                    <button type="submit" class="ui-chat__send" :disabled="sending || !draft.trim()" aria-label="Отправить">
+                    <button type="submit" class="ui-chat__send" :disabled="!draft.trim()" aria-label="Отправить">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                     </button>
                 </form>
@@ -190,6 +211,7 @@ document.addEventListener('alpine:init', () => {
         peer: 0, peerName: '', peerOnline: false,
         messages: [], hasMore: false, loading: false, loadingOlder: false,
         draft: '', sending: false, error: '',
+        peerReadId: 0, generalReads: [], tmpSeq: 0,
         timer: null, ticks: 0, stickToBottom: true,
 
         init() {
@@ -261,6 +283,7 @@ document.addEventListener('alpine:init', () => {
             try {
                 const data = await this.api(this.withParams(this.urls.messages, { peer }));
                 this.messages = data.messages; this.hasMore = data.has_more;
+                this.applyReceipts(data);
                 this.stickToBottom = true;
                 this.scrollBottom();
                 this.markRead();
@@ -270,13 +293,53 @@ document.addEventListener('alpine:init', () => {
         },
 
         // ---- сообщения ----
-        lastId() { return this.messages.length ? this.messages[this.messages.length - 1].id : 0; },
+        /** id последнего сообщения с сервера (временные — строки, их пропускаем). */
+        lastId() {
+            for (let i = this.messages.length - 1; i >= 0; i--) {
+                if (typeof this.messages[i].id === 'number') return this.messages[i].id;
+            }
+            return 0;
+        },
+
+        // ---- отметки «отправлено / прочитано» ----
+        applyReceipts(data) {
+            if (typeof data.peer_read_id === 'number') this.peerReadId = data.peer_read_id;
+            if (Array.isArray(data.reads)) this.generalReads = data.reads;
+        },
+        /** Сколько других пользователей прочитали сообщение id (reads отсортированы по возрастанию). */
+        readCount(id) {
+            const r = this.generalReads; let lo = 0, hi = r.length;
+            while (lo < hi) { const mid = (lo + hi) >> 1; if (r[mid] >= id) hi = mid; else lo = mid + 1; }
+            return r.length - lo;
+        },
+        status(m) {
+            if (m.failed) return 'failed';
+            if (m.pending) return 'pending';
+            const read = this.peer === 0 ? this.readCount(m.id) > 0 : this.peerReadId >= m.id;
+            return read ? 'read' : 'sent';
+        },
+        statusTitle(m) {
+            switch (this.status(m)) {
+                case 'failed':  return 'Не отправлено';
+                case 'pending': return 'Отправляется…';
+                case 'read':    return this.peer === 0 ? 'Прочитали: ' + this.readCount(m.id) : 'Прочитано';
+                default:        return this.peer === 0 ? 'Отправлено, пока никто не прочитал' : 'Отправлено, не прочитано';
+            }
+        },
         async fetchNew() {
             if (this.loading) return;
             try {
                 const data = await this.api(this.withParams(this.urls.messages, { peer: this.peer, after: this.lastId() }));
+                this.applyReceipts(data);
                 const known = new Set(this.messages.map(m => m.id));
-                const fresh = data.messages.filter(m => !known.has(m.id));
+                const fresh = [];
+                for (const m of data.messages) {
+                    if (known.has(m.id)) continue;
+                    // своё сообщение пришло опросом раньше ответа на отправку — заменяем временное
+                    const tmp = m.mine && this.messages.find(x => x.pending && x.body === m.body);
+                    if (tmp) { Object.assign(tmp, m, { pending: false, failed: false }); continue; }
+                    fresh.push(m);
+                }
                 if (fresh.length) {
                     this.messages.push(...fresh);
                     if (this.stickToBottom) this.scrollBottom();
@@ -292,24 +355,45 @@ document.addEventListener('alpine:init', () => {
                 const data = await this.api(this.withParams(this.urls.messages, { peer: this.peer, before: this.messages[0].id }));
                 this.messages.unshift(...data.messages);
                 this.hasMore = data.has_more;
+                this.applyReceipts(data);
                 this.$nextTick(() => { if (list) list.scrollTop = list.scrollHeight - prevHeight; });
             } catch (e) {}
             this.loadingOlder = false;
         },
         async send() {
             const body = this.draft.trim();
-            if (!body || this.sending) return;
-            this.sending = true; this.error = '';
+            if (!body) return;
+            this.error = '';
+            const tmp = { id: 'tmp-' + (++this.tmpSeq), body, at: new Date().toISOString(),
+                          mine: true, sender_id: this.me, sender_name: '', pending: true, failed: false };
+            this.messages.push(tmp);
+            // Важно: менять нужно реактивную обёртку Alpine из массива, а не исходный объект
+            const live = this.messages[this.messages.length - 1];
+            this.draft = '';
+            this.$nextTick(() => { if (this.$refs.input) { this.$refs.input.style.height = ''; this.$refs.input.focus(); } });
+            this.stickToBottom = true; this.scrollBottom();
+            await this.deliver(live);
+        },
+        async deliver(tmp) {
+            const peer = this.peer;
             try {
-                const data = await this.post(this.urls.send, { peer: this.peer, body });
-                if (!this.messages.some(m => m.id === data.message.id)) this.messages.push(data.message);
-                this.draft = '';
-                this.$nextTick(() => { if (this.$refs.input) { this.$refs.input.style.height = ''; this.$refs.input.focus(); } });
-                this.stickToBottom = true; this.scrollBottom();
+                const data = await this.post(this.urls.send, { peer, body: tmp.body });
+                if (peer !== this.peer) return;                    // пользователь уже ушёл в другую переписку
+                const real = this.messages.find(x => x.id === data.message.id);
+                if (real && real !== tmp) this.messages.splice(this.messages.indexOf(tmp), 1);
+                else Object.assign(tmp, data.message, { pending: false, failed: false });
             } catch (e) {
-                this.error = e.status === 429 ? 'Слишком часто — подождите немного.' : e.message;
+                tmp.pending = false; tmp.failed = true;
+                // e.status есть только у ответа сервера; без него — сеть недоступна
+                this.error = e.status === 429 ? 'Слишком часто — подождите немного.'
+                           : e.status ? e.message
+                           : 'Нет связи с сервером. Проверьте сеть и повторите.';
+                if (this.stickToBottom) this.scrollBottom();
             }
-            this.sending = false;
+        },
+        retry(m) {
+            m.failed = false; m.pending = true; this.error = '';
+            this.deliver(m);
         },
         markRead() {
             const id = this.lastId();

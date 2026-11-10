@@ -86,6 +86,27 @@ class ChatController extends Controller
         ])->values()->all();
     }
 
+    /**
+     * Докуда прочитано другими — для галочек ✓ / ✓✓ у своих сообщений.
+     * Личный: id последнего прочитанного собеседником. Общий: отметки всех
+     * остальных (по возрастанию) — клиент считает «прочитали: N».
+     */
+    private function receipts(int $me, int $peer): array
+    {
+        if ($peer !== 0) {
+            return ['peer_read_id' => (int) ChatRead::where('user_id', $peer)->where('peer_id', $me)->value('last_read_id')];
+        }
+
+        return ['reads' => ChatRead::query()
+            ->where('peer_id', 0)
+            ->where('user_id', '!=', $me)
+            ->where('last_read_id', '>', 0)
+            ->orderBy('last_read_id')
+            ->pluck('last_read_id')
+            ->map(fn ($id) => (int) $id)
+            ->all()];
+    }
+
     /** Непрочитанные: общий канал + личные по собеседникам. */
     private function unread(int $me): array
     {
@@ -145,6 +166,13 @@ class ChatController extends Controller
         }
         $names = $this->displayNames(array_keys($byPeer) + [-1 => $lastGeneral?->sender_id]);
 
+        // Докуда собеседники прочитали мои сообщения
+        $peerReads = ChatRead::query()
+            ->whereIn('user_id', array_keys($byPeer))
+            ->where('peer_id', $me)
+            ->pluck('last_read_id', 'user_id')
+            ->all();
+
         $direct = [];
         foreach ($byPeer as $peer => $m) {
             $name = $names[$peer] ?? 'Удалён';
@@ -154,7 +182,12 @@ class ChatController extends Controller
                 'initials' => $this->initials($name),
                 'online'   => isset($online[$peer]),
                 'unread'   => $unread['direct'][$peer] ?? 0,
-                'last'     => ['body' => mb_strimwidth($m->body, 0, 90, '…'), 'at' => $m->created_at?->toIso8601String(), 'mine' => $m->sender_id === $me],
+                'last'     => [
+                    'body' => mb_strimwidth($m->body, 0, 90, '…'),
+                    'at'   => $m->created_at?->toIso8601String(),
+                    'mine' => $m->sender_id === $me,
+                    'read' => $m->sender_id === $me && (int) ($peerReads[$peer] ?? 0) >= $m->id,
+                ],
             ];
         }
 
@@ -224,7 +257,7 @@ class ChatController extends Controller
         return response()->json([
             'messages' => $this->present($rows, $me),
             'has_more' => $hasMore,
-        ])->header('Cache-Control', 'no-store');
+        ] + $this->receipts($me, $peer))->header('Cache-Control', 'no-store');
     }
 
     public function send(Request $r): JsonResponse

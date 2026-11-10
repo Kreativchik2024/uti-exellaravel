@@ -72,6 +72,49 @@ class ChatTest extends TestCase
         $this->actingAs($b)->getJson('/chat/summary')->assertJsonPath('unread', 1);
     }
 
+    public function test_direct_read_receipt(): void
+    {
+        [$a, $b] = [$this->user(), $this->user()];
+
+        $id = $this->actingAs($a)->postJson('/chat/messages', ['peer' => $b->id, 'body' => 'Привет'])->json('message.id');
+
+        // Пока получатель не открыл переписку — «отправлено», не прочитано
+        $this->actingAs($a)->getJson("/chat/messages?peer={$b->id}")->assertJsonPath('peer_read_id', 0);
+        $this->actingAs($a)->getJson('/chat/conversations')->assertJsonPath('direct.0.last.read', false);
+
+        // Получатель прочитал — у отправителя «прочитано»
+        $this->actingAs($b)->postJson('/chat/read', ['peer' => $a->id, 'last_id' => $id])->assertOk();
+        $this->actingAs($a)->getJson("/chat/messages?peer={$b->id}&after={$id}")->assertJsonPath('peer_read_id', $id);
+        $this->actingAs($a)->getJson('/chat/conversations')->assertJsonPath('direct.0.last.read', true);
+    }
+
+    public function test_general_read_receipts_exclude_own_reads(): void
+    {
+        [$a, $b, $c] = [$this->user(), $this->user(), $this->user()];
+
+        $id = $this->actingAs($a)->postJson('/chat/messages', ['peer' => 0, 'body' => 'Всем'])->json('message.id');
+
+        // Собственная отметка отправителя не считается
+        $this->actingAs($a)->getJson('/chat/messages?peer=0')->assertJsonPath('reads', []);
+
+        $this->actingAs($b)->postJson('/chat/read', ['peer' => 0, 'last_id' => $id]);
+        $this->actingAs($c)->postJson('/chat/read', ['peer' => 0, 'last_id' => $id]);
+
+        $this->actingAs($a)->getJson('/chat/messages?peer=0')->assertJsonPath('reads', [$id, $id]);
+    }
+
+    public function test_read_mark_never_moves_backwards(): void
+    {
+        [$a, $b] = [$this->user(), $this->user()];
+        $first = $this->actingAs($a)->postJson('/chat/messages', ['peer' => $b->id, 'body' => '1'])->json('message.id');
+        $second = $this->actingAs($a)->postJson('/chat/messages', ['peer' => $b->id, 'body' => '2'])->json('message.id');
+
+        $this->actingAs($b)->postJson('/chat/read', ['peer' => $a->id, 'last_id' => $second]);
+        $this->actingAs($b)->postJson('/chat/read', ['peer' => $a->id, 'last_id' => $first]); // старая вкладка
+
+        $this->actingAs($a)->getJson("/chat/messages?peer={$b->id}")->assertJsonPath('peer_read_id', $second);
+    }
+
     public function test_cannot_write_to_self_or_inactive_user(): void
     {
         $a = $this->user();
