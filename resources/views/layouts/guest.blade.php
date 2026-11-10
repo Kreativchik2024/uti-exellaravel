@@ -118,5 +118,6 @@
             </main>
         </div>
 
+        @include('partials.consent')
     </body>
 </html>

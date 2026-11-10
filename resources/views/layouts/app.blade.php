@@ -58,6 +58,7 @@
 
         {{-- ЧАТ (правый нижний угол) --}}
         @include('partials.chat-widget')
+        @include('partials.consent')
 
         {{-- ГЛОБАЛЬНЫЙ ТАЙМЕР ПИН --}}
         <script>

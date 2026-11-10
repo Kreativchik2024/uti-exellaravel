@@ -2,6 +2,7 @@
 
 namespace App\Imports;
 
+use App\Rules\CleanText;
 use App\Rules\NoEmoji;
 use App\Models\Employee;
 use Illuminate\Support\Collection;
@@ -60,10 +61,10 @@ class EmployeesImport implements ToCollection, SkipsEmptyRows
             $cells = array_values($row->toArray());
 
             // Эмодзи в ФИО не допускаем — при импорте просто вычищаем
-            $last   = NoEmoji::strip($this->cell($cells, $headerMap, 'last_name'));
-            $first  = NoEmoji::strip($this->cell($cells, $headerMap, 'first_name'));
-            $middle = NoEmoji::strip($this->cell($cells, $headerMap, 'middle_name'));
-            $short  = NoEmoji::strip($this->cell($cells, $headerMap, 'short_name'));
+            $last   = CleanText::strip(NoEmoji::strip($this->cell($cells, $headerMap, 'last_name')));
+            $first  = CleanText::strip(NoEmoji::strip($this->cell($cells, $headerMap, 'first_name')));
+            $middle = CleanText::strip(NoEmoji::strip($this->cell($cells, $headerMap, 'middle_name')));
+            $short  = CleanText::strip(NoEmoji::strip($this->cell($cells, $headerMap, 'short_name')));
             $pos    = $this->cell($cells, $headerMap, 'position');
             $dep    = $this->cell($cells, $headerMap, 'department');
             $active = $this->cell($cells, $headerMap, 'is_active');

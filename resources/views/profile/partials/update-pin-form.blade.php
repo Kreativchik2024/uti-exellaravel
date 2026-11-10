@@ -6,7 +6,7 @@
 
         <p class="mt-1 text-sm text-gray-600">
             @if(auth()->user()->hasPin())
-                {{ __('ПИН установлен. Введите новый, чтобы сменить.') }}
+                {{ __('ПИН установлен. Чтобы сменить его, введите текущий ПИН и новый. Забыли ПИН — обратитесь к администратору, он его сбросит.') }}
             @else
                 {{ __('ПИН ещё не задан. Без ПИНа нельзя создавать или редактировать записи.') }}
             @endif
@@ -21,6 +21,15 @@
 
     <form method="post" action="{{ route('profile.pin') }}" class="mt-6 space-y-6">
         @csrf
+
+        @if(auth()->user()->hasPin())
+            <div>
+                <x-input-label for="current_pin" :value="__('Текущий ПИН')" />
+                <x-text-input id="current_pin" name="current_pin" type="password" inputmode="numeric" pattern="\d{4,6}"
+                              class="mt-1 block w-40" required autocomplete="current-password" />
+                <x-input-error :messages="$errors->get('current_pin')" class="mt-2" />
+            </div>
+        @endif
 
         <div>
             <x-input-label for="pin" :value="__('Новый ПИН (4–6 цифр)')" />

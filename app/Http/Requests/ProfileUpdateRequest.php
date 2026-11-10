@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\User;
+use App\Rules\CleanText;
 use App\Rules\NoEmoji;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -18,7 +19,7 @@ class ProfileUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255', new NoEmoji()],
+            'name' => ['required', 'string', 'max:255', new NoEmoji(), new CleanText()],
             'email' => [
                 'required',
                 'string',

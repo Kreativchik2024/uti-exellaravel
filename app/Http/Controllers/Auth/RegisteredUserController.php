@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Http\Controllers\ConsentController;
+use App\Rules\CleanText;
 use App\Rules\NoEmoji;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -32,10 +34,11 @@ class RegisteredUserController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'name'     => ['required', 'string', 'max:255', new NoEmoji()],
+            'name'     => ['required', 'string', 'max:255', new NoEmoji(), new CleanText()],
             'email'    => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-        ]);
+            'accept_rules' => ['accepted'],
+        ], ['accept_rules.accepted' => 'Без согласия с правилами и на обработку персональных данных регистрация невозможна.']);
 
         $user = User::create([
             'name'      => $request->name,
@@ -44,6 +47,7 @@ class RegisteredUserController extends Controller
             'role'      => 'executor',
             'is_active' => false,
         ]);
+        ConsentController::record($user, $request);
 
         // Письмо-подтверждение email для внутренней системы не нужно.
         // event(new Registered($user));

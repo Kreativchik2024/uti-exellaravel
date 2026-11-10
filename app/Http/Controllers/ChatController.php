@@ -8,6 +8,7 @@ use App\Models\ChatMessage;
 use App\Models\ChatRead;
 use App\Models\ChatReaction;
 use App\Models\User;
+use App\Rules\CleanText;
 use App\Rules\NoEmoji;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
@@ -62,7 +63,7 @@ class ChatController extends Controller
             ->whereIn('users.id', $ids)
             ->leftJoin('employees', 'employees.user_id', '=', 'users.id')
             ->get(['users.id', 'users.name', 'employees.short_name'])
-            ->mapWithKeys(fn ($u) => [$u->id => NoEmoji::strip((string) ($u->short_name ?: $u->name)) ?: 'Без имени'])
+            ->mapWithKeys(fn ($u) => [$u->id => CleanText::strip(NoEmoji::strip((string) ($u->short_name ?: $u->name))) ?: 'Без имени'])
             ->all();
     }
 
@@ -114,7 +115,7 @@ class ChatController extends Controller
     private function preview(?ChatMessage $m): string
     {
         if (!$m) return '';
-        if (filled($m->body)) return mb_strimwidth($m->body, 0, 90, '…');
+        if (filled($m->body)) return mb_strimwidth(CleanText::strip($m->body), 0, 90, '…');
 
         $first = $m->relationLoaded('attachments') ? $m->attachments->first() : $m->attachments()->first();
         return $first?->isImage() ? '🖼 Фото' : '📎 ' . ($first?->original_name ?? 'Вложение');
@@ -150,7 +151,7 @@ class ChatController extends Controller
 
         return $messages->map(fn (ChatMessage $m) => [
             'id'          => $m->id,
-            'body'        => $m->body,
+            'body'        => $m->body === null ? null : CleanText::strip($m->body),
             'at'          => $m->created_at?->toIso8601String(),
             'sender_id'   => $m->sender_id,
             'sender_name' => $names[$m->sender_id] ?? 'Удалён',
@@ -324,7 +325,7 @@ class ChatController extends Controller
             ->get(['users.id', 'users.name', 'employees.short_name']);
 
         $list = $rows->map(function ($u) use ($online) {
-            $name = NoEmoji::strip((string) ($u->short_name ?: $u->name)) ?: 'Без имени';
+            $name = CleanText::strip(NoEmoji::strip((string) ($u->short_name ?: $u->name))) ?: 'Без имени';
             return ['peer' => $u->id, 'name' => $name, 'initials' => $this->initials($name), 'online' => isset($online[$u->id])];
         })
             ->sortBy(fn ($u) => [$u['online'] ? 0 : 1, $u['name']])   // сначала те, кто онлайн
@@ -401,7 +402,7 @@ class ChatController extends Controller
         $peer = $this->resolvePeer($r);
 
         $data = $r->validate([
-            'body'        => ['nullable', 'string', 'max:2000', new NoEmoji()],   // смайлы — только реакциями
+            'body'        => ['nullable', 'string', 'max:2000', new NoEmoji(), new CleanText()],   // смайлы — только реакциями
             'reply_to_id' => ['nullable', 'integer'],
             'files'       => ['nullable', 'array', 'max:' . self::MAX_FILES],
             'files.*'     => ['file', 'max:' . self::MAX_FILE_KB, 'extensions:' . implode(',', self::FILE_EXTENSIONS)],

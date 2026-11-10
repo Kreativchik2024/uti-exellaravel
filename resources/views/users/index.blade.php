@@ -124,6 +124,14 @@
                                 <button class="text-blue-700 underline">Сбросить</button>
                             </form>
 
+                            @if($u->hasPin())
+                                <form method="POST" action="{{ route('users.pin', $u) }}"
+                                      onsubmit="return confirm('Сбросить ПИН? Пользователь задаст новый в профиле.')" class="inline">
+                                    @csrf @method('PATCH')
+                                    <button class="text-blue-700 underline">Сбросить ПИН</button>
+                                </form>
+                            @endif
+
                             @if($u->id !== auth()->id())
                                 <form method="POST" action="{{ route('users.destroy', $u) }}"
                                       onsubmit="return confirm('Удалить пользователя?')" class="inline">

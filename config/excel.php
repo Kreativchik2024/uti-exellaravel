@@ -239,7 +239,7 @@ return [
     |
     */
     'value_binder' => [
-        'default' => DefaultValueBinder::class,
+        'default' => \App\Exports\SafeValueBinder::class,   // строки «=…» — текст, не формулы
     ],
 
     'cache' => [

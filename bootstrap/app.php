@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Single session: применяется ко всем web-запросам.
         // Внутри middleware — проверка: только для role=executor.
         $middleware->web(append: [
+            \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\EnsureUserIsActive::class,
             \App\Http\Middleware\EnsureSingleSession::class,
         ]);

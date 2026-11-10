@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\ConsentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\FirmwareCategoryController;
@@ -22,6 +23,10 @@ Route::get('/csrf-token', fn () => response()
     ->header('Cache-Control', 'no-store, private'))
     ->middleware('throttle:60,1')
     ->name('csrf.refresh');
+
+// Правила пользования, cookie и согласие на обработку персональных данных (доступно и гостям)
+Route::get('/rules', [ConsentController::class, 'rules'])->name('legal.rules');
+Route::post('/consent', [ConsentController::class, 'accept'])->middleware('throttle:20,1')->name('consent.accept');
 
 // Выбор текущего участка (в шапке)
 Route::post('/section/switch', [SectionController::class, 'switch'])->middleware('auth')->name('section.switch');
@@ -65,6 +70,7 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::patch('/users/{user}/approve',    [UserController::class, 'approve'])->name('users.approve');
     Route::patch('/users/{user}/deactivate', [UserController::class, 'deactivate'])->name('users.deactivate');
     Route::patch('/users/{user}/password',   [UserController::class, 'resetPassword'])->name('users.password');
+    Route::patch('/users/{user}/pin',        [UserController::class, 'resetPin'])->name('users.pin');
     Route::delete('/users/{user}',           [UserController::class, 'destroy'])->name('users.destroy');
 
     Route::get('/employees/export',   [EmployeeController::class, 'export'])->name('employees.export');

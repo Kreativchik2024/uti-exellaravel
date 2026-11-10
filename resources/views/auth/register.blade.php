@@ -39,6 +39,16 @@
             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
         </div>
 
+        <!-- Согласие с правилами и на обработку персональных данных -->
+        <div class="mt-4">
+            <label class="flex items-start gap-2 text-sm" style="color: var(--ui-text-2)">
+                <input type="checkbox" name="accept_rules" value="1" required class="mt-0.5" @checked(old('accept_rules'))>
+                <span>Принимаю <a href="{{ route('legal.rules') }}" target="_blank">правила пользования</a>
+                    и даю согласие на <a href="{{ route('legal.rules') }}#personal-data" target="_blank">обработку персональных данных</a></span>
+            </label>
+            <x-input-error :messages="$errors->get('accept_rules')" class="mt-2" />
+        </div>
+
         <div class="flex items-center justify-end mt-4">
             <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" href="{{ route('login') }}">
                 {{ __('Already registered?') }}

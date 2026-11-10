@@ -7,6 +7,7 @@ use App\Services\EmployeeDirectory;
 use App\Services\SectionContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -646,7 +647,19 @@ class RecordController extends Controller
         if (!$employee)                       return response()->json(['ok' => false, 'error' => 'Сотрудник не найден.'], 404);
         if (!$employee->user)                 return response()->json(['ok' => false, 'error' => 'Сотрудник не привязан к учётной записи.'], 422);
         if (!$employee->user->hasPin())       return response()->json(['ok' => false, 'error' => 'У сотрудника не установлен ПИН.'], 422);
-        if (!$employee->user->checkPin($pin)) return response()->json(['ok' => false, 'error' => 'Неверный ПИН.'], 422);
+
+        // Подбор ПИН конкретного сотрудника: после 5 ошибок подряд — пауза 15 минут,
+        // с какой бы учётки и с какого компьютера ни вводили
+        $lockKey = 'pin-employee:' . $employee->id;
+        if (RateLimiter::tooManyAttempts($lockKey, 5)) {
+            $min = (int) ceil(RateLimiter::availableIn($lockKey) / 60);
+            return response()->json(['ok' => false, 'error' => "Слишком много неверных попыток ПИН этого сотрудника. Подождите {$min} мин."], 429);
+        }
+        if (!$employee->user->checkPin($pin)) {
+            RateLimiter::hit($lockKey, 900);
+            return response()->json(['ok' => false, 'error' => 'Неверный ПИН.'], 422);
+        }
+        RateLimiter::clear($lockKey);
 
         $expiresAt = now()->addHours(3)->timestamp;
 

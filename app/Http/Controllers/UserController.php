@@ -84,6 +84,13 @@ class UserController extends Controller
         return back()->with('ok', "Пароль пользователя {$user->name} изменён");
     }
 
+    /** Сброс забытого ПИН: сотрудник задаст новый в профиле (старый вводить не нужно). */
+    public function resetPin(User $user)
+    {
+        $user->forceFill(['pin_hash' => null])->saveQuietly();
+        return back()->with('ok', "ПИН пользователя {$user->name} сброшен. Пусть задаст новый в профиле.");
+    }
+
     public function destroy(User $user)
     {
         if ($user->id === auth()->id()) {

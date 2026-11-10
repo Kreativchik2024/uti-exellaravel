@@ -94,6 +94,38 @@ class SiteSmokeTest extends TestCase
 
     // ---------------------------------------------------------------- профиль и ПИН
 
+    public function test_changing_pin_requires_current_pin_and_locks_after_failures(): void
+    {
+        $user = User::factory()->admin()->create();
+        $user->setPin('1111');
+
+        $this->asUser($user)->post('/profile/pin', ['pin' => '2222', 'pin_confirm' => '2222'])->assertSessionHasErrors('current_pin');
+        $this->asUser($user)->post('/profile/pin', ['current_pin' => '9999', 'pin' => '2222', 'pin_confirm' => '2222'])->assertSessionHasErrors('current_pin');
+        $this->asUser($user)->post('/profile/pin', ['current_pin' => '1111', 'pin' => '2222', 'pin_confirm' => '2222'])->assertSessionHasNoErrors();
+        $this->assertTrue($user->fresh()->checkPin('2222'));
+
+        // После 5 неверных попыток даже верный ПИН не принимается (защита от подбора)
+        foreach (range(1, 5) as $i) {
+            $this->asUser($user)->post('/profile/pin', ['current_pin' => '0000', 'pin' => '3333', 'pin_confirm' => '3333']);
+        }
+        $this->asUser($user)->post('/profile/pin', ['current_pin' => '2222', 'pin' => '3333', 'pin_confirm' => '3333'])->assertSessionHasErrors('current_pin');
+        $this->assertTrue($user->fresh()->checkPin('2222'));
+    }
+
+    public function test_admin_can_reset_forgotten_pin(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $user = User::factory()->admin()->create();
+        $user->setPin('1111');
+
+        $this->asUser($this->worker())->patch("/users/{$user->id}/pin")->assertForbidden();
+        $this->asUser($admin)->patch("/users/{$user->id}/pin")->assertSessionHasNoErrors();
+        $this->assertFalse($user->fresh()->hasPin());
+
+        // После сброса новый ПИН задаётся без старого
+        $this->asUser($user->fresh())->post('/profile/pin', ['pin' => '4444', 'pin_confirm' => '4444'])->assertSessionHasNoErrors();
+    }
+
     public function test_pin_can_be_set_and_is_validated(): void
     {
         $user = User::factory()->admin()->create();

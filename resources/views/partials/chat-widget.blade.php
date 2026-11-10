@@ -566,16 +566,28 @@ document.addEventListener('alpine:init', () => {
                 for (const f of this.pendingFiles) this.removeFile(f.key);
                 this.pendingFiles = [];
             },
-            // Смайлы в тексте запрещены (ставятся только реакциями); тот же набор, что в App\Rules\NoEmoji
+            // Чистый текст: без смайлов (они — реакциями), «залго», рисунков из символов и невидимых знаков.
+            // Те же наборы, что в App\Rules\NoEmoji и App\Rules\CleanText
             stripEmoji(t) {
-                const re = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{3030}\u{303D}\u{3297}\u{3299}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu;
-                if (!re.test(t.value)) return;
-                const before = t.value.slice(0, t.selectionStart).replace(re, '').length;
-                this.draft = t.value = t.value.replace(re, '');
-                t.setSelectionRange(before, before);
-                this.error = 'Смайлы в сообщениях не разрешены — поставьте реакцию на сообщение';
+                const rules = [
+                    [/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{3030}\u{303D}\u{3297}\u{3299}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '', 'Смайлы в сообщениях не разрешены — поставьте реакцию на сообщение'],
+                    [/(\p{M})\p{M}+/gu, '$1', '«Наслоенные» символы (залго) не разрешены'],
+                    [/[\u{2800}-\u{28FF}\u{2500}-\u{25FF}]/gu, '', 'Рисунки из символов не разрешены'],
+                    [/[\u{200B}-\u{200F}\u{202A}-\u{202E}\u{2060}-\u{206F}\u{FEFF}\u{00AD}\u{180E}]/gu, '', 'Невидимые символы убраны'],
+                ];
+                let value = t.value, caret = t.selectionStart, hint = '';
+                for (const [re, to, text] of rules) {
+                    if (!value.match(re)) continue;
+                    caret = value.slice(0, caret).replace(re, to).length;
+                    value = value.replace(re, to);
+                    hint = hint || text;
+                }
+                if (!hint) return;
+                this.draft = t.value = value;
+                t.setSelectionRange(caret, caret);
+                this.error = hint;
                 clearTimeout(this._emojiT);
-                this._emojiT = setTimeout(() => { if ((this.error || '').startsWith('Смайлы')) this.error = ''; }, 3500);
+                this._emojiT = setTimeout(() => { if (this.error === hint) this.error = ''; }, 3500);
             },
             onPaste(e) {
                 const files = Array.from(e.clipboardData && e.clipboardData.files || []);

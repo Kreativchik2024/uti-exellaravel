@@ -23,6 +23,7 @@ class RegistrationTest extends TestCase
             'email' => 'test@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
+            'accept_rules' => '1',
         ]);
 
         // Новый пользователь ждёт подтверждения админа: не входит и не активен

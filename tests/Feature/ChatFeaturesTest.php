@@ -83,6 +83,34 @@ class ChatFeaturesTest extends TestCase
         $this->actingAs($a)->postJson('/chat/messages', ['peer' => 0, 'body' => 'Пост 5 → борт #12, 3*4'])->assertCreated();
     }
 
+    public function test_zalgo_symbol_art_and_invisible_chars_are_rejected(): void
+    {
+        $a = $this->user();
+        $bad = [
+            'в̷͍̙̠̠͈̥͇͙͓̯̜̲͆̈̏̿͑̽с̸̝̥͚̤͖̐̊͒̈́̎̈̉̚е҈͎̤̤̘͎̟̠̰̲͙̎͗̽̃̌̄͛ͅм̵͇̝̲͎̈͊̂͒̾͗̔́̀̚ привет',   // залго
+            '⣿⣿⣿⣿⣿⣿⣿⠿⠿⢛⣋⣙⣋⣩⣭⣭⣭⣭⣍⣉⡛⠻⢿⣿⣿⣿⣿',                                 // Брайль-арт
+            "╔══╗\n║ok║\n╚══╝",                                                // псевдографика
+            "Иванов\u{202E}вонави",                                            // разворот текста
+            "при\u{200B}вет",                                                  // невидимый пробел
+        ];
+        foreach ($bad as $text) {
+            $this->actingAs($a)->postJson('/chat/messages', ['peer' => 0, 'body' => $text])->assertStatus(422);
+        }
+
+        // Обычный текст с ё/й, ударением, знаками и стрелками проходит
+        $this->actingAs($a)->postJson('/chat/messages', ['peer' => 0, 'body' => 'Ёжик, йод, café — пост 5 → борт #12 (100%)'])->assertCreated();
+    }
+
+    public function test_garbage_already_in_db_is_shown_cleaned(): void
+    {
+        $a = $this->user();
+        ChatMessage::create(['sender_id' => $a->id, 'body' => 'в̷͍̙̠̠͈̥с̸̝̥͚ем ⣿⣿⠿ привет']);
+
+        $body = $this->actingAs($this->user())->getJson('/chat/messages?peer=0')->json('messages.0.body');
+        $this->assertDoesNotMatchRegularExpression('/\p{M}{3,}|[\x{2800}-\x{28FF}]/u', $body);
+        $this->assertStringContainsString('привет', $body);
+    }
+
     public function test_emoji_in_names_rejected_and_hidden_in_chat(): void
     {
         $a = $this->user();

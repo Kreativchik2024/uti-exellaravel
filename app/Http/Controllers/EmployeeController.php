@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Rules\CleanText;
 use App\Rules\NoEmoji;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -91,9 +92,9 @@ class EmployeeController extends Controller
     public function store(Request $r)
     {
         $data = $r->validate([
-            'last_name'   => ['required', 'string', 'max:100', new NoEmoji()],
-            'first_name'  => ['required', 'string', 'max:100', new NoEmoji()],
-            'middle_name' => ['nullable', 'string', 'max:100', new NoEmoji()],
+            'last_name'   => ['required', 'string', 'max:100', new NoEmoji(), new CleanText()],
+            'first_name'  => ['required', 'string', 'max:100', new NoEmoji(), new CleanText()],
+            'middle_name' => ['nullable', 'string', 'max:100', new NoEmoji(), new CleanText()],
             'position'    => 'nullable|string|max:150',
             'department'  => 'nullable|string|max:150',
             'is_active'   => 'boolean',
@@ -137,9 +138,9 @@ class EmployeeController extends Controller
     public function update(Request $r, Employee $employee)
     {
         $data = $r->validate([
-            'last_name'   => ['required', 'string', 'max:100', new NoEmoji()],
-            'first_name'  => ['required', 'string', 'max:100', new NoEmoji()],
-            'middle_name' => ['nullable', 'string', 'max:100', new NoEmoji()],
+            'last_name'   => ['required', 'string', 'max:100', new NoEmoji(), new CleanText()],
+            'first_name'  => ['required', 'string', 'max:100', new NoEmoji(), new CleanText()],
+            'middle_name' => ['nullable', 'string', 'max:100', new NoEmoji(), new CleanText()],
             'position'    => 'nullable|string|max:150',
             'department'  => 'nullable|string|max:150',
             'is_active'   => 'boolean',
