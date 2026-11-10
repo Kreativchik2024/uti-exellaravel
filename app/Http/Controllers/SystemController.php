@@ -135,7 +135,8 @@ class SystemController extends Controller
         }
 
         // ---------------------------------------------------------------- настройки
-        $add('Настройки', config('app.debug') ? 'bad' : 'ok', 'Режим отладки', config('app.debug') ? 'Включён: посетители видят пароли и пути при ошибке. APP_DEBUG=false' : 'Выключен');
+        $add('Настройки', config('app.debug') ? 'bad' : 'ok', 'Режим отладки', config('app.debug') ? 'Включён: посетители видят пароли и пути при ошибке. Выполните команду на сервере' : 'Выключен',
+            config('app.debug') ? [$copy("cd " . base_path() . " && sudo sed -i 's/^APP_DEBUG=.*/APP_DEBUG=false/' .env && sudo -u www-data php artisan optimize:clear && sudo -u www-data php artisan optimize", 'Скопировать команду выключения')] : []);
         if (request()->isSecure() && ! config('session.secure')) {
             $add('Настройки', 'warn', 'Cookie входа', 'Сайт на HTTPS, но SESSION_SECURE_COOKIE=false');
         }
