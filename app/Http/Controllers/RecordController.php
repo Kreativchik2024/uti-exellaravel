@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Services\EmployeeDirectory;
-use App\Models\RecordPhoto;
 use App\Services\SectionContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -465,9 +464,8 @@ class RecordController extends Controller
                 ->orderByDesc('id')->limit(30)->get()
             : collect();
         $historyLabels = \App\Http\Controllers\AuditController::fieldLabels();
-        $photos = RecordPhoto::of($sheet, $record->id)->get();
 
-        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups', 'isTimeLocked', 'history', 'historyLabels', 'photos'));
+        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups', 'isTimeLocked', 'history', 'historyLabels'));
     }
 
     public function create(Request $r, string $sheet)
@@ -522,7 +520,6 @@ class RecordController extends Controller
         $rules = $this->withSnapshotRules($cfg, $rules);
 
         $data = $r->validate($rules, $this->fieldMessages($cfg), $this->attributeNames($cfg));
-        $this->validatePhotos($r);
 
         $exempt = array_filter(
             array_intersect_key($defaults, array_flip(self::WORKER_FIELDS)),
@@ -561,7 +558,6 @@ class RecordController extends Controller
             throw $e;
         }
         if ($tokenKey) Cache::put($tokenKey, $record->id, now()->addHours(12));
-        $this->savePhotos($r, $sheet, $record);
 
         return redirect()->route('records.index', $sheet)->with('ok', 'Запись добавлена');
     }
@@ -590,13 +586,11 @@ class RecordController extends Controller
         $serverNow    = now()->timestamp;
         $comboOptions = $this->comboOptions($cfg);
 
-        $photos = RecordPhoto::of($sheet, $record->id)->get();
-
         return view('records.edit', compact(
             'sheet', 'cfg', 'record', 'employeesList', 'lookups',
             'canManageWorkers', 'verifiedWorkersMap', 'currentEmployeeName',
             'employeesRequiringPin', 'employeesWithoutPin', 'originalWorkers',
-            'isTimeLocked', 'serverNow', 'comboOptions', 'photos'
+            'isTimeLocked', 'serverNow', 'comboOptions'
         ));
     }
 
@@ -626,7 +620,6 @@ class RecordController extends Controller
         $rules = $this->withSnapshotRules($cfg, $rules);
 
         $data = $r->validate($rules, $this->fieldMessages($cfg), $this->attributeNames($cfg));
-        $this->validatePhotos($r, $sheet, $record->id);
 
         $existing = $this->recordWorkerValues($record, $cfg);
         $this->validateWorkers($data, $existing);
@@ -642,8 +635,6 @@ class RecordController extends Controller
             }
             throw $e;
         }
-        $this->deletePhotos($r, $sheet, $record);
-        $this->savePhotos($r, $sheet, $record);
 
         return redirect()->route('records.index', $sheet)->with('ok', 'Запись обновлена');
     }
@@ -663,78 +654,8 @@ class RecordController extends Controller
                 ->withErrors(['general' => 'Удаление запрещено: прошло более 24 часов с момента создания записи.']);
         }
 
-        RecordPhoto::of($sheet, $record->id)->get()->each->delete();   // вместе с файлами
         $record->delete();
         return redirect()->route('records.index', $sheet)->with('ok', 'Запись удалена');
-    }
-
-    // ================================================================ фото к записи
-
-    /** Не больше RecordPhoto::MAX_PER_RECORD фото на запись, только картинки до 15 МБ. */
-    private function validatePhotos(Request $r, ?string $sheet = null, ?int $recordId = null): void
-    {
-        $r->validate([
-            'photos'          => ['nullable', 'array', 'max:' . RecordPhoto::MAX_PER_RECORD],
-            'photos.*'        => ['image', 'mimes:jpg,jpeg,png,webp,gif,bmp', 'max:15360'],
-            'delete_photos'   => ['nullable', 'array'],
-            'delete_photos.*' => ['integer'],
-        ], [
-            'photos.max'     => 'Не больше ' . RecordPhoto::MAX_PER_RECORD . ' фото.',
-            'photos.*.image' => 'Можно прикреплять только фото.',
-            'photos.*.mimes' => 'Можно прикреплять только фото (JPG, PNG, WebP).',
-            'photos.*.max'   => 'Фото не больше 15 МБ.',
-        ]);
-
-        if ($sheet && $recordId) {
-            $left = RecordPhoto::of($sheet, $recordId)->whereNotIn('id', (array) $r->input('delete_photos', []))->count();
-            if ($left + count($r->file('photos', [])) > RecordPhoto::MAX_PER_RECORD) {
-                throw ValidationException::withMessages(['photos' => 'У записи может быть не больше ' . RecordPhoto::MAX_PER_RECORD . ' фото.']);
-            }
-        }
-    }
-
-    private function savePhotos(Request $r, string $sheet, $record): void
-    {
-        $store = app(\App\Services\ImageStore::class);
-        $n = 0;
-        foreach ($r->file('photos', []) as $file) {
-            $saved = $store->store($file, "records/{$sheet}/" . now()->format('Y/m'));
-            RecordPhoto::create($saved + [
-                'sheet' => $sheet, 'record_id' => $record->id, 'uploaded_by' => auth()->id(),
-                'original_name' => mb_substr(basename(str_replace('\\', '/', $file->getClientOriginalName())), 0, 200),
-            ]);
-            $n++;
-        }
-        if ($n) {
-            \App\Models\AuditLog::write('records', 'updated', ($this->cfg($sheet)['title'] ?? $sheet) . " #{$record->id}: добавлено фото ({$n})",
-                ['subject_type' => $sheet, 'subject_id' => $record->id]);
-        }
-    }
-
-    private function deletePhotos(Request $r, string $sheet, $record): void
-    {
-        $ids = array_map('intval', (array) $r->input('delete_photos', []));
-        if (! $ids) return;
-        $photos = RecordPhoto::of($sheet, $record->id)->whereIn('id', $ids)->get();
-        $photos->each->delete();
-        if ($photos->isNotEmpty()) {
-            \App\Models\AuditLog::write('records', 'updated', ($this->cfg($sheet)['title'] ?? $sheet) . " #{$record->id}: удалено фото ({$photos->count()})",
-                ['subject_type' => $sheet, 'subject_id' => $record->id]);
-        }
-    }
-
-    /** Фото записи: только тем, у кого есть доступ к участку вкладки. */
-    public function photo(RecordPhoto $photo, ?string $variant = null)
-    {
-        $this->cfg($photo->sheet);   // нет доступа к участку — 403
-        $path = $variant === 'thumb' ? $photo->thumb_path : $photo->path;
-        abort_unless($path && \Illuminate\Support\Facades\Storage::disk('local')->exists($path), 404);
-
-        return response()->file(\Illuminate\Support\Facades\Storage::disk('local')->path($path), [
-            'Content-Type'           => 'image/webp',
-            'X-Content-Type-Options' => 'nosniff',
-            'Cache-Control'          => 'private, max-age=86400',
-        ]);
     }
 
     private function isDuplicate(QueryException $e): bool

@@ -189,30 +189,6 @@
                     </dl>
                 </section>
 
-                @if(($photos ?? collect())->isNotEmpty())
-                    <section class="ui-card overflow-hidden" x-data="{ open: null }" @keydown.escape.window="open = null">
-                        <h3 class="rec-section__title">Фото · {{ $photos->count() }}</h3>
-                        <div class="ui-photos ui-nocopy px-4 pb-4">
-                            @foreach($photos as $p)
-                                <button type="button" class="ui-photos__item" @click="open = {{ $loop->index }}" title="Открыть">
-                                    <img src="{{ $p->url(true) }}" alt="" loading="lazy">
-                                </button>
-                            @endforeach
-                        </div>
-                        <div x-show="open !== null" x-cloak class="ui-chat__lightbox" @click.self="open = null" role="dialog" aria-label="Просмотр фото">
-                            @foreach($photos as $p)
-                                <img x-show="open === {{ $loop->index }}" :src="open === {{ $loop->index }} ? @js($p->url()) : ''" alt="" @click="open = null" class="ui-nocopy" @contextmenu.prevent>
-                            @endforeach
-                            <div class="ui-chat__lightbox-bar">
-                                <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="open = (open + {{ $photos->count() }} - 1) % {{ $photos->count() }}" @if($photos->count() < 2) disabled @endif>←</button>
-                                <span x-text="(open + 1) + ' из {{ $photos->count() }}'"></span>
-                                <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="open = (open + 1) % {{ $photos->count() }}" @if($photos->count() < 2) disabled @endif>→</button>
-                                <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="open = null">Закрыть</button>
-                            </div>
-                        </div>
-                    </section>
-                @endif
-
                 @if(($history ?? collect())->isNotEmpty())
                     <section class="ui-card overflow-hidden">
                         <h3 class="rec-section__title">История изменений</h3>

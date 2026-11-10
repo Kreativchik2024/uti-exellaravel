@@ -415,8 +415,6 @@
         </div>
     @endforeach
 
-    @include('records._photos_input')
-
     {{-- Панель кнопок (на мобильных — в столбик, кнопки на всю ширину) --}}
     <div class="form-actions mt-8 pt-6 border-t border-gray-200">
         <a href="{{ route('records.index', $sheet) }}"
