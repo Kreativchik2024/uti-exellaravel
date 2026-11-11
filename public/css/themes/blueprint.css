@@ -1,0 +1,110 @@
+/* ============================================================
+   Тема «Конструкторское бюро» — авиация, чертёж, испытания:
+   синька с белыми линиями, сетка миллиметровки, сигнальный
+   оранжевый (окраска опытных машин), надписи как в штампе чертежа.
+   Общая часть — themes/base.css; здесь палитра, фон и детали.
+   ============================================================ */
+
+html[data-ui-theme="blueprint"] {
+    --ui-bg:            #06183a;
+    --ui-surface:       rgba(8, 34, 80, 0.86);
+    --ui-surface-2:     rgba(10, 42, 96, 0.88);
+    --ui-surface-hover: rgba(22, 64, 130, 0.9);
+    --ui-border:        rgba(200, 225, 255, 0.20);
+    --ui-border-strong: rgba(200, 225, 255, 0.38);
+    --ui-text:          #eef5ff;
+    --ui-text-2:        #cfe0f7;
+    --ui-muted:         #93b3dc;
+    --ui-faint:         #6c8cb8;
+
+    --ui-accent:        #ff8a1f;
+    --ui-accent-hover:  #ffa04a;
+    --ui-accent-soft:   rgba(255, 138, 31, 0.16);
+    --ui-accent-text:   #ffb066;
+    --ui-ring:          rgba(255, 138, 31, 0.38);
+
+    --ui-good:          #5ee0a6;
+    --ui-good-soft:     rgba(60, 200, 140, 0.15);
+    --ui-bad:           #ff6262;
+    --ui-bad-soft:      rgba(255, 70, 70, 0.16);
+
+    --ui-radius:        3px;
+    --ui-radius-sm:     2px;
+    --ui-shadow-sm:     0 1px 2px rgba(0, 10, 30, 0.5);
+    --ui-shadow:        0 2px 4px rgba(0, 10, 30, 0.4), 0 10px 26px -8px rgba(0, 10, 30, 0.7);
+    --ui-shadow-lg:     0 18px 44px -10px rgba(0, 8, 25, 0.85);
+
+    --sk-radius:      2px;
+    --sk-on-accent:   #1b0d00;
+    --sk-btn:         #ff8a1f;
+    --sk-btn-hover:   #ffa04a;
+    --sk-btn-edge:    rgba(255, 220, 180, 0.4);
+    --sk-nav:         rgba(4, 20, 50, 0.9);
+    --sk-line:        rgba(200, 225, 255, 0.35);
+    --sk-card-edge:   rgba(200, 225, 255, 0.25);
+    --sk-tile:        rgba(10, 42, 96, 0.6);
+    --sk-tile-edge:   rgba(220, 235, 255, 0.7);
+    --sk-tile-icon:   #ffffff;
+    --sk-gray-200:    rgba(30, 70, 135, 0.9);
+    --sk-gray-300:    rgba(45, 90, 160, 0.9);
+    --sk-panel:       rgba(10, 42, 96, 0.6);
+    --sk-disabled:    rgba(20, 50, 100, 0.8);
+    --sk-popup:       #0a2556;
+    --sk-shade:       rgba(2, 12, 32, 0.6);
+    --sk-scroll:      #3c6aa8;
+    --sk-auth-brand:  linear-gradient(160deg, rgba(4, 22, 56, 0.45), rgba(4, 22, 56, 0.8));
+    --sk-cursor:         url("../../img/cursors/blueprint.svg") 3 2, auto;
+    --sk-cursor-pointer: url("../../img/cursors/blueprint-pointer.svg") 6 6, pointer;
+
+    --kb-mono: "Consolas", "Lucida Console", "DejaVu Sans Mono", ui-monospace, monospace;
+    --kb-grid: rgba(190, 220, 255, 0.07);
+}
+
+/* ---------- Фон: чертежи из public/img/themes/blueprint/ + сетка миллиметровки ---------- */
+html[data-ui-theme="blueprint"] {
+    --sk-photo-pos: center;
+    --sk-photo-under: #0b3a86;
+    --sk-veil:
+        linear-gradient(var(--kb-grid) 1px, transparent 1px) 0 0 / 24px 24px,
+        linear-gradient(90deg, var(--kb-grid) 1px, transparent 1px) 0 0 / 24px 24px,
+        radial-gradient(ellipse at 50% 40%, rgba(6, 24, 58, 0.15) 0%, rgba(4, 16, 42, 0.7) 85%);
+}
+
+/* ---------- Надписи как в штампе чертежа ---------- */
+html[data-ui-theme="blueprint"] .ui-page-header h1,
+html[data-ui-theme="blueprint"] .ui-page-header h2,
+html[data-ui-theme="blueprint"] .ui-brand__name,
+html[data-ui-theme="blueprint"] .auth__headline {
+    font-family: var(--kb-mono) !important;
+    text-transform: uppercase; letter-spacing: .12em !important; font-weight: 700 !important;
+}
+html[data-ui-theme="blueprint"] .ui-page-header h1,
+html[data-ui-theme="blueprint"] .ui-page-header h2 { text-shadow: 0 0 12px rgba(120, 180, 255, 0.35); }
+html[data-ui-theme="blueprint"] h3 { font-family: var(--kb-mono); letter-spacing: .04em; }
+html[data-ui-theme="blueprint"] .ui-btn,
+html[data-ui-theme="blueprint"] .ui-menu__label,
+html[data-ui-theme="blueprint"] .ui-table thead th,
+html[data-ui-theme="blueprint"] label:not(:has(input, select, textarea)) { font-family: var(--kb-mono); letter-spacing: .08em; }
+
+/* ---------- Карточки: контур, как на чертеже, и сетка внутри ---------- */
+html[data-ui-theme="blueprint"] .ui-card {
+    border-color: var(--ui-border-strong);
+    background-image:
+        linear-gradient(rgba(190, 220, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(190, 220, 255, 0.035) 1px, transparent 1px);
+    background-size: 12px 12px;
+}
+/* Метки-уголки по краям заголовка страницы — «рамка чертежа» */
+html[data-ui-theme="blueprint"] .ui-page-header h1,
+html[data-ui-theme="blueprint"] .ui-page-header h2 {
+    display: inline-block; padding: 0 .1rem .2rem;
+    border-bottom: 2px solid var(--ui-accent);
+}
+
+/* ---------- Кнопки-«контуры» ---------- */
+html[data-ui-theme="blueprint"] .ui-btn--ghost { background: transparent; border-color: var(--ui-border-strong); }
+html[data-ui-theme="blueprint"] .ui-btn--ghost:hover { border-color: #ffffff; }
+
+/* ---------- Таблицы: линии чертежа ---------- */
+html[data-ui-theme="blueprint"] .ui-table thead th { color: var(--ui-muted); }
+html[data-ui-theme="blueprint"] .ui-table tbody td { border-bottom-style: dashed; }

@@ -46,6 +46,22 @@ class GameController extends Controller
         return back()->with('ok', $on ? 'Игры включены для всех сотрудников.' : 'Игры выключены. Их видит только администратор.');
     }
 
+    /** Админ: убрать результат сотрудника из турнирной таблицы (за выбранный период). */
+    public function forget(Request $r)
+    {
+        abort_unless($r->user()->isAdmin(), 403);
+        $data = $r->validate([
+            'board'   => ['required', Rule::in(Leaderboard::boards())],
+            'user_id' => ['required', 'integer'],
+            'period'  => ['required', Rule::in(array_keys(Leaderboard::PERIODS))],
+        ]);
+        $deleted = (new Leaderboard($data['period']))->forget($data['board'], (int) $data['user_id']);
+        $name = \App\Models\User::find($data['user_id'])?->name ?? ('#' . $data['user_id']);
+        AuditLog::write('system', 'deleted', "Удалён результат из турнирной таблицы ({$data['board']}, " . Leaderboard::PERIODS[$data['period']] . "): {$name}, партий: {$deleted}", ['section_id' => null]);
+
+        return back()->with('ok', $deleted ? "Результат удалён ({$name}, партий: {$deleted})." : 'Нечего удалять — результат уже убран.');
+    }
+
     // ================================================================ сапёр
 
     public function minesweeper()

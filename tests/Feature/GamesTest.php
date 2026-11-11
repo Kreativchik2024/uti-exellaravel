@@ -207,4 +207,49 @@ class GamesTest extends TestCase
   морской бой: обычный — %.1f выстр., сильный — %.1f выстр. в среднем
 ", $normal / 40, $strong / 40));
     }
+
+    public function test_admin_removes_any_result_from_leaderboard(): void
+    {
+        $this->enable();
+        $admin = User::factory()->admin()->create();
+        $cheater = $this->worker();
+        $honest = $this->worker();
+
+        $snake = fn (User $u, int $score, $at) => GameSession::create(['user_id' => $u->id, 'game' => 'snake', 'status' => 'finished', 'score' => $score, 'finished_at' => $at]);
+        $snake($cheater, 9999, now());
+        $snake($cheater, 50, now());
+        $old = $snake($cheater, 70, now()->subMonths(2));          // за прошлые месяцы — не в «Неделе»
+        $snake($honest, 120, now());
+        GameSession::create(['user_id' => $cheater->id, 'game' => 'minesweeper', 'level' => 'easy', 'status' => 'won', 'time_ms' => 900, 'finished_at' => now()]);
+        $win = fn (?string $level, ?User $p2 = null) => BattleshipGame::create(['player1_id' => $cheater->id, 'player2_id' => $p2?->id, 'bot_level' => $level, 'status' => 'finished', 'winner_id' => $cheater->id, 'finished_at' => now()]);
+        $win('normal');
+        $strong = $win('strong');
+        $win(null, $honest);
+
+        // Кнопку видит только админ
+        $this->asUser($admin)->get('/games')->assertOk()->assertSee('Удалить результат');
+        $this->asUser($honest)->get('/games')->assertOk()->assertDontSee('Удалить результат');
+
+        // Работник удалить не может
+        $this->asUser($honest)->delete('/games/board', ['board' => 'snake', 'user_id' => $cheater->id, 'period' => 'week'])->assertForbidden();
+        $this->assertSame(4, GameSession::where('game', 'snake')->count());
+
+        // Админ убирает змейку за неделю: строка пропадает, честный игрок и старые партии не тронуты
+        $this->asUser($admin)->delete('/games/board', ['board' => 'snake', 'user_id' => $cheater->id, 'period' => 'week'])->assertSessionHas('ok');
+        $board = (new \App\Services\Games\Leaderboard('week'))->snake();
+        $this->assertSame([$honest->id], array_column($board, 'user_id'));
+        $this->assertNotNull($old->fresh());
+        $this->assertSame(1, GameSession::where('game', 'minesweeper')->count(), 'другие таблицы не тронуты');
+
+        // Сапёр и морской бой (только выбранная таблица)
+        $this->asUser($admin)->delete('/games/board', ['board' => 'ms:easy', 'user_id' => $cheater->id, 'period' => 'all'])->assertSessionHas('ok');
+        $this->assertSame(0, GameSession::where('game', 'minesweeper')->count());
+        $this->asUser($admin)->delete('/games/board', ['board' => 'bs:bot', 'user_id' => $cheater->id, 'period' => 'all'])->assertSessionHas('ok');
+        $this->assertSame(2, BattleshipGame::count(), 'остались победы над сильным компьютером и над коллегой');
+        $this->assertNotNull($strong->fresh());
+
+        // Неизвестная таблица — ошибка проверки, а не 500
+        $this->asUser($admin)->delete('/games/board', ['board' => 'chess', 'user_id' => $cheater->id, 'period' => 'week'])->assertSessionHasErrors('board');
+        $this->assertDatabaseHas('audit_logs', ['area' => 'system', 'action' => 'deleted']);
+    }
 }

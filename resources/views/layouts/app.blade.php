@@ -22,6 +22,7 @@
 
         {{-- Тёмная тема: отдельный CSS, не зависит от сборки vite --}}
         <link rel="stylesheet" href="{{ asset('css/dark-theme.css') }}?v={{ filemtime(public_path('css/dark-theme.css')) }}">
+        @include('partials.theme-skins')
 
         {{-- Адаптивность и отступы под фиксированные элементы (тоже без сборки vite) --}}
         <link rel="stylesheet" href="{{ asset('css/responsive.css') }}?v={{ filemtime(public_path('css/responsive.css')) }}">

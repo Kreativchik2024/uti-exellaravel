@@ -17,6 +17,7 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
         <link rel="stylesheet" href="{{ asset('css/dark-theme.css') }}?v={{ filemtime(public_path('css/dark-theme.css')) }}">
+        @include('partials.theme-skins')
         <link rel="stylesheet" href="{{ asset('css/responsive.css') }}?v={{ filemtime(public_path('css/responsive.css')) }}">
 
         <style>

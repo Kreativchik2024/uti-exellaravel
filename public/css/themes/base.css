@@ -1,0 +1,192 @@
+/* ============================================================
+   Общая основа оформленных тем (html[data-ui-theme="…"]).
+
+   Оформленная тема всегда тёмная: html получает класс .dark, поэтому
+   все перекраски из dark-theme.css действуют. Здесь — то, что нужно
+   любой оформленной теме: перекраска жёстко заданных в шаблонах
+   цветов Tailwind в цвета темы, непрозрачные всплывающие окна,
+   кнопки, плитки, страница входа. Всё — через переменные.
+
+   Файл темы (themes/<имя>.css) задаёт:
+     --ui-*            палитра сайта (как в resources/css/app.css)
+     --sk-*            переменные ниже (с запасными значениями)
+     --sk-veil         вуаль поверх фоновой картинки (картинки — public/img/themes/<имя>/)
+     свои детали (шрифты, рамки…)
+   Подключение: resources/views/partials/theme-skins.blade.php
+   Режимы и переключатель: public/js/theme.js, components/theme-switcher.
+   ============================================================ */
+
+html[data-ui-theme] { color-scheme: dark; scrollbar-color: var(--sk-scroll, #555) var(--ui-bg); }
+
+/* ---------- Фон: сменяющиеся картинки (public/js/skin-bg.js) + вуаль темы ---------- */
+html[data-ui-theme] body { background-color: var(--ui-bg) !important; }
+.ui-skin-bg { display: none; }
+html[data-ui-theme] .ui-skin-bg {
+    display: block; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background: var(--sk-photo-under, transparent);
+}
+html[data-ui-theme] .ui-skin-bg[hidden] { display: none; }
+html[data-ui-theme] .ui-skin-bg > i {
+    position: absolute; inset: 0; opacity: 0; transition: opacity 1.6s ease;
+    background-position: var(--sk-photo-pos, center); background-size: cover; background-repeat: no-repeat;
+}
+html[data-ui-theme] .ui-skin-bg > i.is-on { opacity: 1; }
+html[data-ui-theme] .ui-skin-bg.no-anim > i { transition: none; }
+/* вуаль поверх картинки — чтобы текст читался (задаёт тема: --sk-veil) */
+html[data-ui-theme] .ui-skin-bg::after { content: ""; position: absolute; inset: 0; background: var(--sk-veil, rgba(0, 0, 0, 0.5)); }
+html[data-ui-theme] .ui-app,
+html[data-ui-theme] .auth { background: transparent !important; }
+
+/* ---------- Верхняя панель ---------- */
+html[data-ui-theme] .ui-nav {
+    background: var(--sk-nav);
+    border-bottom: 1px solid var(--sk-line);
+    box-shadow: 0 6px 24px -10px rgba(0, 0, 0, 0.9);
+}
+html[data-ui-theme] .ui-navlink--active,
+html[data-ui-theme] .ui-navlink--active:hover { box-shadow: inset 0 -2px 0 var(--ui-accent); }
+
+/* ---------- Углы ---------- */
+html[data-ui-theme] .ui-btn,
+html[data-ui-theme] .ui-navlink,
+html[data-ui-theme] .ui-iconbtn,
+html[data-ui-theme] .ui-section-btn,
+html[data-ui-theme] .ui-segment,
+html[data-ui-theme] .ui-segment__item,
+html[data-ui-theme] .ui-menu__item,
+html[data-ui-theme] .ui-icon-tile,
+html[data-ui-theme] .rounded-md,
+html[data-ui-theme] .rounded-lg,
+html[data-ui-theme] .rounded-xl,
+html[data-ui-theme] .rounded-2xl,
+html[data-ui-theme] input:not([type="checkbox"]):not([type="radio"]),
+html[data-ui-theme] select,
+html[data-ui-theme] textarea { border-radius: var(--sk-radius, 4px) !important; }
+
+/* ---------- Кнопки ---------- */
+html[data-ui-theme] .ui-btn { text-transform: uppercase; letter-spacing: .07em; font-size: .78rem; }
+html[data-ui-theme] .ui-btn--primary {
+    color: var(--sk-on-accent);
+    background: var(--sk-btn, var(--ui-accent));
+    box-shadow: 0 1px 0 var(--sk-btn-edge, transparent) inset, 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+html[data-ui-theme] .ui-btn--primary:hover { background: var(--sk-btn-hover, var(--ui-accent-hover)); }
+html[data-ui-theme] .ui-navlink__count,
+html[data-ui-theme] .ui-avatar { background: var(--ui-accent); color: var(--sk-on-accent); }
+html[data-ui-theme] .ui-chat__fab {
+    color: var(--sk-on-accent);
+    background: var(--sk-btn, var(--ui-accent));
+    box-shadow: 0 10px 24px -6px rgba(0, 0, 0, 0.85), inset 0 1px 0 var(--sk-btn-edge, transparent);
+}
+
+/* ---------- Плитки-иконки у заголовков ---------- */
+html[data-ui-theme] .ui-icon-tile {
+    background: var(--sk-tile);
+    box-shadow: inset 0 0 0 1px var(--sk-tile-edge), 0 4px 12px -4px rgba(0, 0, 0, 0.8);
+}
+html[data-ui-theme] .ui-icon-tile,
+html[data-ui-theme] .ui-icon-tile svg { color: var(--sk-tile-icon) !important; }
+
+/* ---------- Карточки ---------- */
+html[data-ui-theme] .ui-card { box-shadow: inset 0 1px 0 var(--sk-card-edge, transparent), var(--ui-shadow); }
+
+/* ---------- Жёстко заданные синие/фиолетовые — в акцент темы ---------- */
+html[data-ui-theme] .bg-blue-600,
+html[data-ui-theme] .bg-indigo-600 { background-color: var(--ui-accent) !important; color: var(--sk-on-accent) !important; }
+html[data-ui-theme] .hover\:bg-blue-700:hover,
+html[data-ui-theme] .hover\:bg-indigo-700:hover { background-color: var(--ui-accent-hover) !important; }
+html[data-ui-theme] .text-blue-600,
+html[data-ui-theme] .text-blue-700,
+html[data-ui-theme] .text-indigo-600,
+html[data-ui-theme] .text-indigo-700 { color: var(--ui-accent-text) !important; }
+html[data-ui-theme] .border-blue-500,
+html[data-ui-theme] .border-blue-600,
+html[data-ui-theme] .border-indigo-500,
+html[data-ui-theme] .border-indigo-600 { border-color: var(--ui-accent) !important; }
+html[data-ui-theme] .ring-blue-500,
+html[data-ui-theme] .ring-indigo-500 { --tw-ring-color: var(--ui-accent) !important; }
+html[data-ui-theme] .bg-blue-50,
+html[data-ui-theme] .bg-indigo-50,
+html[data-ui-theme] .bg-blue-100,
+html[data-ui-theme] .bg-indigo-100 { background-color: var(--ui-accent-soft) !important; }
+
+/* ---------- Серые оттенки тёмной темы — в цвета темы ---------- */
+html[data-ui-theme] .bg-gray-200,
+html[data-ui-theme] .hover\:bg-gray-200:hover { background-color: var(--sk-gray-200) !important; }
+html[data-ui-theme] .bg-gray-300,
+html[data-ui-theme] .hover\:bg-gray-300:hover { background-color: var(--sk-gray-300) !important; }
+html[data-ui-theme] .hover\:bg-white:hover,
+html[data-ui-theme] .hover\:bg-gray-50:hover,
+html[data-ui-theme] .hover\:bg-gray-100:hover { background-color: var(--ui-surface-hover) !important; }
+html[data-ui-theme] .bg-white\/95,
+html[data-ui-theme] .bg-white\/90,
+html[data-ui-theme] .bg-white\/80 { background-color: var(--ui-surface) !important; }
+html[data-ui-theme] .bg-slate-50,
+html[data-ui-theme] .bg-slate-100 { background-color: var(--ui-surface-2) !important; }
+html[data-ui-theme] .bg-gray-50\/50,
+html[data-ui-theme] .bg-gray-50\/60 { background-color: var(--sk-panel) !important; }
+html[data-ui-theme] .from-gray-50,
+html[data-ui-theme] .from-gray-50\/80 {
+    --tw-gradient-from: var(--ui-surface-2) var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: transparent var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html[data-ui-theme] .to-white { --tw-gradient-to: var(--ui-surface) var(--tw-gradient-to-position) !important; }
+html[data-ui-theme] .border-gray-200\/70 { border-color: var(--ui-border) !important; }
+html[data-ui-theme] .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+html[data-ui-theme] .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--ui-border) !important; }
+
+/* ---------- Поля ввода ---------- */
+html[data-ui-theme] input:disabled,
+html[data-ui-theme] select:disabled,
+html[data-ui-theme] textarea:disabled { background-color: var(--sk-disabled) !important; }
+html[data-ui-theme] select option { background-color: var(--sk-popup); color: var(--ui-text); }
+html[data-ui-theme] input:focus,
+html[data-ui-theme] select:focus,
+html[data-ui-theme] textarea:focus {
+    border-color: var(--ui-accent) !important;
+    box-shadow: 0 0 0 3px var(--ui-ring) !important;
+}
+
+/* ---------- Всплывающее — непрозрачное, чтобы не просвечивал текст ---------- */
+html[data-ui-theme] .ui-menu,
+html[data-ui-theme] .ui-fc-menu,
+html[data-ui-theme] .ui-fc-detail,
+html[data-ui-theme] .ui-chat__panel,
+html[data-ui-theme] .ui-consent__card,
+html[data-ui-theme] .ui-idle__card,
+html[data-ui-theme] [role="menu"],
+html[data-ui-theme] [role="dialog"] > div,
+html[data-ui-theme] .ui-modal { background-color: var(--sk-popup) !important; }
+html[data-ui-theme] .ui-fc-card { background: var(--sk-popup); }
+html[data-ui-theme] .ui-idle,
+html[data-ui-theme] .ui-consent { background: var(--sk-shade) !important; }
+
+/* ---------- Страница входа ---------- */
+html[data-ui-theme] .auth__brand {
+    color: var(--ui-text-2);
+    background: var(--sk-auth-brand) !important;
+    border-right: 1px solid var(--sk-line);
+}
+html[data-ui-theme] .auth__headline { color: var(--ui-text); }
+html[data-ui-theme] .auth__lead { color: var(--ui-muted); }
+html[data-ui-theme] .auth__logo,
+html[data-ui-theme] .auth__feature-icon { border-radius: var(--sk-radius, 4px); box-shadow: 0 0 0 1px var(--sk-tile-edge); }
+html[data-ui-theme] .auth__brand [style*="color:#a5b4fc"],
+html[data-ui-theme] .auth__brand [style*="color:#818cf8"] { color: var(--ui-accent-text) !important; }
+/* форма входа — на панели, чтобы не терялась на картинке */
+html[data-ui-theme] .auth__card {
+    background: var(--ui-surface); border: 1px solid var(--ui-border-strong);
+    border-radius: var(--sk-radius, 4px); padding: 1.75rem; box-shadow: var(--ui-shadow-lg);
+}
+
+/* ---------- Курсор темы (--sk-cursor, --sk-cursor-pointer; файлы — public/img/cursors/) ---------- */
+html[data-ui-theme] body { cursor: var(--sk-cursor, auto); }
+html[data-ui-theme] :is(a[href], button, [role="button"], [role="menuitem"], [role="menuitemradio"], [role="option"], [role="tab"],
+    label[for], summary, select, input[type="checkbox"], input[type="radio"], input[type="submit"], input[type="button"],
+    input[type="file"], input[type="range"], .cursor-pointer, [\@click], [x-on\:click]) { cursor: var(--sk-cursor-pointer, pointer); }
+html[data-ui-theme] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]):not([type="range"]),
+    textarea, [contenteditable="true"]) { cursor: text; }
+html[data-ui-theme] :is(:disabled, [aria-disabled="true"], .cursor-not-allowed) { cursor: not-allowed; }
+html[data-ui-theme] .cursor-move { cursor: move; }
+html[data-ui-theme] .cursor-zoom-out { cursor: zoom-out; }

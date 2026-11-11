@@ -1,11 +1,13 @@
 /* ============================================================
-   Тема оформления: «auto» (как в системе) / «light» / «dark».
+   Тема оформления: «auto» (как в системе) / «light» / «dark» /
+   «peaky» («Острые козырьки»), «blueprint» («Конструкторское бюро») —
+   тёмная основа + public/css/themes/*.css (атрибут html[data-ui-theme]).
 
    Подключается СИНХРОННО в <head> обоих макетов — тема применяется
    до отрисовки страницы, без мигания белым.
 
    API:
-     window.getThemeMode()        → 'auto' | 'light' | 'dark'
+     window.getThemeMode()        → 'auto' | 'light' | 'dark' | 'peaky' | 'blueprint'
      window.setThemeMode(mode)    — выбрать режим (сохраняется в браузере)
      window.toggleDark()          — совместимость: переключить светлая/тёмная
 
@@ -16,15 +18,18 @@
     'use strict';
 
     var KEY = 'theme';
+    var MODES = ['auto', 'light', 'dark', 'peaky', 'blueprint'];
+    // Оформленные темы: имя режима → тёмная ли основа
+    var SKINS = { peaky: true, blueprint: true };
     var media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
     function readMode() {
         try {
             // ?theme=dark|light|auto — ручное переключение (в т.ч. для проверки)
             var forced = new URLSearchParams(window.location.search).get('theme');
-            if (forced === 'dark' || forced === 'light' || forced === 'auto') return forced;
+            if (forced && MODES.indexOf(forced) !== -1) return forced;
             var stored = localStorage.getItem(KEY);
-            return (stored === 'dark' || stored === 'light') ? stored : 'auto';
+            return (stored && stored !== 'auto' && MODES.indexOf(stored) !== -1) ? stored : 'auto';
         } catch (e) {
             return 'auto';
         }
@@ -33,13 +38,18 @@
     var mode = readMode();
 
     function systemDark() { return !!(media && media.matches); }
-    function isDark() { return mode === 'dark' || (mode === 'auto' && systemDark()); }
+    function isDark() {
+        if (SKINS.hasOwnProperty(mode)) return SKINS[mode];
+        return mode === 'dark' || (mode === 'auto' && systemDark());
+    }
 
     function apply(notify) {
         var dark = isDark();
         var root = document.documentElement;
         root.classList.toggle('dark', dark);
         root.setAttribute('data-theme-mode', mode);
+        if (SKINS.hasOwnProperty(mode)) root.setAttribute('data-ui-theme', mode);
+        else root.removeAttribute('data-ui-theme');
         if (notify) {
             document.dispatchEvent(new CustomEvent('themechange', { detail: { mode: mode, dark: dark } }));
         }
@@ -48,7 +58,7 @@
     window.getThemeMode = function () { return mode; };
 
     window.setThemeMode = function (next) {
-        if (next !== 'auto' && next !== 'light' && next !== 'dark') next = 'auto';
+        if (MODES.indexOf(next) === -1) next = 'auto';
         mode = next;
         try {
             if (mode === 'auto') localStorage.removeItem(KEY);

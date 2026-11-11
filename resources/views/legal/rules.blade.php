@@ -17,6 +17,7 @@
     @include('partials.pwa-head')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="{{ asset('css/dark-theme.css') }}?v={{ filemtime(public_path('css/dark-theme.css')) }}">
+        @include('partials.theme-skins')
 </head>
 <body class="font-sans antialiased ui-legal-page">
     <header class="ui-legal-top">

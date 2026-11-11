@@ -193,6 +193,7 @@ Route::middleware(['auth', 'workers'])->group(function () {
 Route::middleware(['auth', 'games'])->prefix('games')->name('games.')->group(function () {
     Route::get('/',                 [\App\Http\Controllers\GameController::class, 'index'])->name('index');
     Route::post('/toggle',          [\App\Http\Controllers\GameController::class, 'toggle'])->name('toggle');
+    Route::delete('/board',         [\App\Http\Controllers\GameController::class, 'forget'])->name('board.forget');
 
     Route::get('/minesweeper',      [\App\Http\Controllers\GameController::class, 'minesweeper'])->name('minesweeper');
     Route::post('/minesweeper',     [\App\Http\Controllers\GameController::class, 'minesweeperStart'])->middleware('throttle:30,1')->name('minesweeper.start');

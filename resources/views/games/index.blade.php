@@ -97,12 +97,12 @@
 
         <div class="grid gap-4 lg:grid-cols-3">
             @foreach($minesweeper as $lvl)
-                @include('games._board', ['title' => 'Сапёр · ' . $lvl['name'], 'rows' => $lvl['rows'], 'empty' => 'Пока никто не прошёл'])
+                @include('games._board', ['board' => $lvl['key'], 'title' => 'Сапёр · ' . $lvl['name'], 'rows' => $lvl['rows'], 'empty' => 'Пока никто не прошёл'])
             @endforeach
-            @include('games._board', ['title' => 'Змейка', 'rows' => $snake, 'empty' => 'Пока никто не играл'])
-            @include('games._board', ['title' => 'Морской бой · победы над коллегами', 'rows' => $battleship['people'], 'empty' => 'Пока нет побед'])
-            @include('games._board', ['title' => 'Морской бой · победы над компьютером', 'rows' => $battleship['bot'], 'empty' => 'Пока нет побед'])
-            @include('games._board', ['title' => 'Морской бой · победы над сильным компьютером', 'rows' => $battleship['strong'], 'empty' => 'Пока никто не победил'])
+            @include('games._board', ['board' => 'snake', 'title' => 'Змейка', 'rows' => $snake, 'empty' => 'Пока никто не играл'])
+            @include('games._board', ['board' => 'bs:people', 'title' => 'Морской бой · победы над коллегами', 'rows' => $battleship['people'], 'empty' => 'Пока нет побед'])
+            @include('games._board', ['board' => 'bs:bot', 'title' => 'Морской бой · победы над компьютером', 'rows' => $battleship['bot'], 'empty' => 'Пока нет побед'])
+            @include('games._board', ['board' => 'bs:strong', 'title' => 'Морской бой · победы над сильным компьютером', 'rows' => $battleship['strong'], 'empty' => 'Пока никто не победил'])
         </div>
     </div>
 

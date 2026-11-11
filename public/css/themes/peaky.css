@@ -1,0 +1,80 @@
+/* ============================================================
+   Тема «Острые козырьки» — нуар: уголь, пергамент, латунь.
+   Общая часть — themes/base.css; здесь палитра, фон и детали.
+   ============================================================ */
+
+html[data-ui-theme="peaky"] {
+    --ui-bg:            #0c0b0a;
+    --ui-surface:       rgba(22, 20, 18, 0.86);
+    --ui-surface-2:     rgba(30, 27, 24, 0.92);
+    --ui-surface-hover: rgba(52, 46, 39, 0.92);
+    --ui-border:        rgba(236, 226, 206, 0.10);
+    --ui-border-strong: rgba(236, 226, 206, 0.20);
+    --ui-text:          #ece4d4;
+    --ui-text-2:        #d2c8b5;
+    --ui-muted:         #a0968a;
+    --ui-faint:         #736b60;
+
+    --ui-accent:        #a8823c;
+    --ui-accent-hover:  #c29a4b;
+    --ui-accent-soft:   rgba(168, 130, 60, 0.17);
+    --ui-accent-text:   #dcb86e;
+    --ui-ring:          rgba(194, 154, 75, 0.38);
+
+    --ui-good:          #8fb37f;
+    --ui-good-soft:     rgba(122, 160, 105, 0.15);
+    --ui-bad:           #cf4a3c;
+    --ui-bad-soft:      rgba(170, 40, 30, 0.18);
+
+    --ui-radius:        6px;
+    --ui-radius-sm:     4px;
+    --ui-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.5);
+    --ui-shadow:        0 2px 4px rgba(0, 0, 0, 0.45), 0 10px 26px -8px rgba(0, 0, 0, 0.7);
+    --ui-shadow-lg:     0 18px 44px -10px rgba(0, 0, 0, 0.85);
+
+    --sk-radius:      4px;
+    --sk-on-accent:   #14110d;
+    --sk-btn:         linear-gradient(180deg, #c29a4b, #9a7432);
+    --sk-btn-hover:   linear-gradient(180deg, #d0a957, #a8823c);
+    --sk-btn-edge:    rgba(255, 236, 190, 0.35);
+    --sk-nav:         rgba(10, 9, 8, 0.86);
+    --sk-line:        rgba(168, 130, 60, 0.35);
+    --sk-card-edge:   rgba(194, 154, 75, 0.18);
+    --sk-tile:        linear-gradient(160deg, #3a3128, #1c1814);
+    --sk-tile-edge:   rgba(194, 154, 75, 0.45);
+    --sk-tile-icon:   #dcb86e;
+    --sk-gray-200:    rgba(70, 62, 52, 0.9);
+    --sk-gray-300:    rgba(92, 82, 70, 0.9);
+    --sk-panel:       rgba(30, 27, 24, 0.7);
+    --sk-disabled:    rgba(40, 36, 31, 0.9);
+    --sk-popup:       #1a1714;
+    --sk-shade:       rgba(8, 7, 6, 0.6);
+    --sk-scroll:      #5a4a30;
+    --sk-auth-brand:  linear-gradient(160deg, rgba(10, 9, 8, 0.55), rgba(10, 9, 8, 0.85));
+    --sk-cursor:         url("../../img/cursors/peaky.svg") 3 2, auto;
+    --sk-cursor-pointer: url("../../img/cursors/peaky-pointer.svg") 3 2, pointer;
+
+    --pb-serif: Georgia, "Times New Roman", "Liberation Serif", serif;
+}
+
+/* ---------- Фон: картинки из public/img/themes/peaky/ под лёгкой вуалью ---------- */
+html[data-ui-theme="peaky"] {
+    --sk-photo-pos: center 40%;
+    --sk-veil:
+        radial-gradient(ellipse at 50% 35%, rgba(12, 11, 10, 0.12) 0%, rgba(12, 11, 10, 0.62) 80%),
+        linear-gradient(rgba(25, 18, 10, 0.18), rgba(25, 18, 10, 0.18));
+}
+
+/* ---------- Шрифты: заголовки с засечками, капитель ---------- */
+html[data-ui-theme="peaky"] h1,
+html[data-ui-theme="peaky"] h2,
+html[data-ui-theme="peaky"] h3 { font-family: var(--pb-serif) !important; letter-spacing: .02em; }
+html[data-ui-theme="peaky"] .ui-page-header h1,
+html[data-ui-theme="peaky"] .ui-page-header h2 {
+    text-transform: uppercase; letter-spacing: .08em !important;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+}
+html[data-ui-theme="peaky"] .ui-brand__name { font-family: var(--pb-serif); text-transform: uppercase; letter-spacing: .14em; }
+html[data-ui-theme="peaky"] .ui-menu__label,
+html[data-ui-theme="peaky"] .ui-table thead th { letter-spacing: .1em; }
+html[data-ui-theme="peaky"] .auth__headline { font-family: var(--pb-serif); text-transform: uppercase; letter-spacing: .06em; }
