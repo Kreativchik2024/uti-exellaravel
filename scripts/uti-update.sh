@@ -127,6 +127,17 @@ fi
 say "5. Режим обслуживания"
 rm -rf public/build.prev
 [ -d public/build ] && cp -a public/build public/build.prev
+
+# Права: логи и кеши, созданные веб-сервером (www-data), должны быть доступны и нам
+fix_perms() {
+    sudo chown -R "$(id -un):$WEB_GROUP" storage bootstrap/cache
+    sudo chmod -R ug+rwX storage bootstrap/cache
+    sudo find storage bootstrap/cache -type d -exec chmod g+s {} +
+}
+# Кеш списка пакетов/конфигурации: если в нём пакет, которого больше нет в vendor
+# (например, поставленный когда-то вручную), artisan не запустится — удаляем
+drop_caches() { rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php bootstrap/cache/routes-*.php bootstrap/cache/events.php; }
+fix_perms
 php artisan down --retry=15 >/dev/null 2>&1 || true
 
 # Любая ошибка дальше — вернуть прежний код и стили, открыть сайт
@@ -136,11 +147,14 @@ rollback() {
     [ "$code" -eq 0 ] && return
     printf '\n\033[1;31mОШИБКА на шаге выше — возвращаю прежнюю версию\033[0m\n' >&2
     cd "$APP"
+    fix_perms || true
+    drop_caches
     if [ "$SWITCHED" = 1 ]; then
         git reset --hard -q "$START" || true
         command -v composer >/dev/null && composer install --no-dev --optimize-autoloader --no-interaction --no-progress -q || true
     fi
     if [ -d public/build.prev ]; then rm -rf public/build; mv public/build.prev public/build; fi
+    php artisan package:discover >/dev/null 2>&1 || true
     php artisan optimize:clear >/dev/null 2>&1 || true
     php artisan optimize >/dev/null 2>&1 || true
     php artisan up >/dev/null 2>&1 || true
@@ -157,6 +171,7 @@ git merge --ff-only -q "$TARGET"
 git checkout -- package-lock.json 2>/dev/null || true
 
 say "7. PHP-зависимости (composer)"
+drop_caches
 if command -v composer >/dev/null; then
     composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 else
@@ -173,8 +188,8 @@ say "9. Миграции базы"
 php artisan migrate --force
 
 say "10. Права, кеши, перезапуск"
-sudo chown -R "$(id -un):$WEB_GROUP" storage bootstrap/cache public/build
-sudo chmod -R ug+rwX storage bootstrap/cache
+fix_perms
+sudo chown -R "$(id -un):$WEB_GROUP" public/build
 php artisan optimize:clear >/dev/null
 php artisan storage:link >/dev/null 2>&1 || true
 php artisan optimize
