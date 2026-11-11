@@ -221,7 +221,7 @@ class AppRulesTest extends TestCase
 
         $this->assertStringContainsString('192.168.1.', $html);
         $this->assertMatchesRegularExpression('/data-show-when-filled="status"\s+hidden/', $html);
-        $this->assertStringContainsString('list="combo-fault_code"', $html);
+        $this->assertStringContainsString('x-data="faultCode(', $html);
         $this->assertMatchesRegularExpression('/name="work_end"\s+value="\d{2}:\d{2}"/', $html);
     }
 }

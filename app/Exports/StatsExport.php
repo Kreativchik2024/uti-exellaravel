@@ -2,83 +2,73 @@
 
 namespace App\Exports;
 
-use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithTitle;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use App\Exports\Support\TableSheet;
+use App\Exports\Support\Workbook;
 
-class StatsExport implements FromArray, WithHeadings, WithStyles, WithTitle
+/**
+ * Статистика: лист «Сводка» (по вкладкам и по исполнителям) и лист «Исполнители по вкладкам»
+ * — плоская таблица с фильтром, чтобы в Excel можно было отобрать нужное.
+ */
+class StatsExport extends Workbook
 {
-    /**
-     * @param string $periodLabel подпись периода, как на странице статистики («За всё время», «С … по …»)
-     * @param string $section     название участка
-     */
-    public function __construct(
-        protected string $periodLabel,
-        protected string $section,
-        protected array $perSheet,
-        protected array $totals,
-    ) {}
-
-    public function title(): string
+    public function __construct(string $periodLabel, string $section, array $perSheet, array $totals)
     {
-        return 'Статистика';   // имя листа Excel: до 31 символа, без «:», «/» и т.п.
-    }
+        $info = [['Участок', $section], ['Период', $periodLabel], Workbook::stamp()];
 
-    public function headings(): array
-    {
-        return [
-            'Вкладка',
-            'Всего',
-            'Исправных',
-            'Брак',
-            'Брак, %',
-            'Исполнители',
-        ];
-    }
-
-    public function array(): array
-    {
-        $rows = [];
-
-        $rows[] = ["Участок: {$this->section}"];
-        $rows[] = ["Период: {$this->periodLabel}"];
-        $rows[] = ['Выгружено: ' . now()->format('d.m.Y H:i')];
-        $rows[] = [];
-
-        // Сводка
-        $t = $this->totals;
-        // Брак/исправные по всем вкладкам не суммируем — устройства разные
-        $rows[] = ['ИТОГО по всем вкладкам', $t['total']];
-        if (! empty($t['perUser'])) {
-            foreach ($t['perUser'] as $name => $count) {
-                $rows[] = ['  ' . $name, $count];
+        $bySheet = [];
+        $sum = ['total' => 0, 'good' => 0, 'defects' => 0];
+        foreach ($perSheet as $d) {
+            $has = $d['hasDefects'] ?? true;
+            $bySheet[] = [$d['title'], $d['unit'] ?? 'записей', $d['total'],
+                $has ? $d['good'] : null, $has ? $d['defects'] : null, $has ? Workbook::share($d['defects'], $d['total']) : null,
+                count($d['perUser'])];
+            if ($has) {
+                $sum['total'] += $d['total'];
+                $sum['good'] += $d['good'];
+                $sum['defects'] += $d['defects'];
             }
         }
-        $rows[] = [];
 
-        // По вкладкам
-        foreach ($this->perSheet as $data) {
-            $total   = $data['total'];
-            $defects = $data['defects'] ?? 0;
-            $rows[] = [
-                $data['title'],
-                $total,
-                $data['good'] ?? $total,
-                $defects,
-                $total > 0 ? round($defects / $total * 100, 1) : 0,
-                implode(', ', array_map(fn($u) => "{$u['name']} ({$u['count']})", $data['perUser'])) ?: '—',
-            ];
+        $people = [];
+        foreach ($totals['perUser'] ?? [] as $name => $count) {
+            $people[] = [$name, $count, Workbook::share($count, $totals['total'])];
         }
 
-        return $rows;
-    }
+        $flat = [];
+        foreach ($perSheet as $d) {
+            foreach ($d['perUser'] as $u) {
+                $flat[] = [$d['title'], $u['name'], $u['count'], Workbook::share($u['count'], $d['total'])];
+            }
+        }
 
-    public function styles(Worksheet $sheet): array
-    {
-        return [
-            1 => ['font' => ['bold' => true]],
-        ];
+        $int = ['type' => 'int'];
+        parent::__construct([
+            TableSheet::make('Сводка', 'Статистика', $info, [
+                [
+                    'caption' => 'По вкладкам',
+                    'columns' => [
+                        ['title' => 'Вкладка'], ['title' => 'Учёт'], ['title' => 'Всего'] + $int,
+                        ['title' => 'Исправных'] + $int, ['title' => 'Брак'] + $int,
+                        ['title' => 'Брак, %', 'type' => 'pct'], ['title' => 'Исполнителей'] + $int,
+                    ],
+                    'rows'  => $bySheet,
+                    'empty' => 'За период записей нет',
+                    // Брак суммируется только по вкладкам, где он считается
+                    'total' => $bySheet ? ['Итого (вкладки с учётом брака)', null, $sum['total'], $sum['good'], $sum['defects'], Workbook::share($sum['defects'], $sum['total']), null] : null,
+                ],
+                [
+                    'caption' => 'По исполнителям (все вкладки)',
+                    'columns' => [['title' => 'Исполнитель'], ['title' => 'Записей'] + $int, ['title' => 'Доля', 'type' => 'pct']],
+                    'rows'  => $people,
+                    'empty' => 'Нет данных',
+                    'total' => $people ? ['Всего записей', $totals['total'], null] : null,
+                ],
+            ]),
+            TableSheet::make('Исполнители по вкладкам', null, [], [[
+                'columns' => [['title' => 'Вкладка'], ['title' => 'Исполнитель'], ['title' => 'Записей'] + $int, ['title' => 'Доля во вкладке', 'type' => 'pct']],
+                'rows'  => $flat,
+                'empty' => 'Нет данных',
+            ]]),
+        ]);
     }
 }

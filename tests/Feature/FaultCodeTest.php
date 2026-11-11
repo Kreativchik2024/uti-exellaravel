@@ -62,9 +62,9 @@ class FaultCodeTest extends TestCase
         $user = $this->worker();
 
         $this->asUser($user)->get('/records/pgp/create')->assertOk()
-            ->assertSee('<option value="E07">Сбой калибровки</option>', false);
+            ->assertSee('faultCode(', false)->assertSee('E07', false)->assertSee('Сбой калибровки', false);
         // Код есть во всех вкладках, не только в ПГП
-        $this->asUser($user)->get('/records/cross1/create')->assertOk()->assertSee('<option value="E07">', false);
+        $this->asUser($user)->get('/records/cross1/create')->assertOk()->assertSee('E07', false);
 
         $rec = PgpRecord::create(['record_date' => now()->toDateString(), 'post_number' => 1, 'worker1' => $this->nameOf($user),
             'board_number' => 'RA-1', 'ip_address' => '192.168.1.5', 'status' => 'Не сдан', 'fault_code' => 'E07', 'defect_reason' => 'x',

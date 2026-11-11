@@ -99,8 +99,15 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/fault-codes',                [\App\Http\Controllers\FaultCodeController::class, 'index'])->name('fault-codes.index');
     Route::post('/fault-codes',               [\App\Http\Controllers\FaultCodeController::class, 'store'])->name('fault-codes.store');
     Route::get('/fault-codes/template',       [\App\Http\Controllers\FaultCodeController::class, 'template'])->name('fault-codes.template');
+    Route::get('/fault-codes/export',         [\App\Http\Controllers\FaultCodeController::class, 'export'])->name('fault-codes.export');
+    Route::post('/fault-codes/wipe',          [\App\Http\Controllers\FaultCodeController::class, 'wipe'])->name('fault-codes.wipe');
     Route::post('/fault-codes/import',        [\App\Http\Controllers\FaultCodeController::class, 'import'])->middleware('throttle:10,1')->name('fault-codes.import');
     Route::patch('/fault-codes/{faultCode}',  [\App\Http\Controllers\FaultCodeController::class, 'update'])->name('fault-codes.update');
+    Route::patch('/fault-codes/{faultCode}/approve', [\App\Http\Controllers\FaultCodeController::class, 'approve'])->name('fault-codes.approve');
+    Route::post('/fault-codes/{faultCode}/merge',    [\App\Http\Controllers\FaultCodeController::class, 'merge'])->name('fault-codes.merge');
+    Route::post('/fault-code-groups',                [\App\Http\Controllers\FaultCodeController::class, 'storeGroup'])->name('fault-codes.groups.store');
+    Route::patch('/fault-code-groups/{group}',       [\App\Http\Controllers\FaultCodeController::class, 'updateGroup'])->name('fault-codes.groups.update');
+    Route::delete('/fault-code-groups/{group}',      [\App\Http\Controllers\FaultCodeController::class, 'destroyGroup'])->name('fault-codes.groups.destroy');
     Route::delete('/fault-codes/{faultCode}', [\App\Http\Controllers\FaultCodeController::class, 'destroy'])->name('fault-codes.destroy');
     Route::get('/system', [\App\Http\Controllers\SystemController::class, 'index'])->name('system.index');
     Route::get('/system/status', [\App\Http\Controllers\SystemController::class, 'status'])->name('system.status');
@@ -160,6 +167,7 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/records/{sheet}/create',    [RecordController::class, 'create'])->name('records.create');
     Route::post('/records/{sheet}',          [RecordController::class, 'store'])->name('records.store');
     Route::get('/records/{sheet}/lookup',    [RecordController::class, 'lookup'])->name('records.lookup');
+    Route::get('/records/{sheet}/fault-codes', [RecordController::class, 'faultCodes'])->middleware('throttle:120,1')->name('records.faultCodes');
     Route::get('/records/{sheet}/{id}',      [RecordController::class, 'show'])->name('records.show');
     Route::get('/records/{sheet}/{id}/edit', [RecordController::class, 'edit'])->name('records.edit');
     Route::put('/records/{sheet}/{id}',      [RecordController::class, 'update'])->name('records.update');

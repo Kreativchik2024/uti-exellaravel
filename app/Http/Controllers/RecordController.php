@@ -104,18 +104,18 @@ class RecordController extends Controller
      * Варианты для полей type=combo: ранее введённые значения (частые — выше)
      * плюс заданные в конфиге. В форме — выпадающий список с возможностью ввести своё.
      */
-    private function comboOptions(array $cfg): array
+    private function comboOptions(array $cfg, string $sheet): array
     {
         $result = [];
-        $directory = null;
         foreach ($cfg['fields'] as $name => $f) {
             if (($f['type'] ?? '') !== 'combo') continue;
 
-            // Справочник кодов неисправностей: «код — описание»
+            // Справочник кодов неисправностей: только коды категорий этой вкладки и общие, «код — описание»
             $known = [];
+            $allDirectory = [];
             if ($name === 'fault_code') {
-                $directory ??= \App\Models\FaultCode::mapFor(app(SectionContext::class)->current());
-                foreach ($directory as $code => $desc) $known[(string) $code] = $desc;
+                foreach (app(\App\Services\FaultCodes::class)->mapForSheet($sheet) as $code => $desc) $known[(string) $code] = $desc;
+                $allDirectory = array_flip(\App\Models\FaultCode::pluck('code')->map(fn ($c) => (string) $c)->all());
             }
 
             $used = $cfg['model']::query()
@@ -129,9 +129,19 @@ class RecordController extends Controller
 
             foreach (array_merge($f['options'] ?? [], $used) as $v) {
                 $v = trim((string) $v);
-                if ($v !== '' && ! array_key_exists($v, $known)) $known[$v] = '';
+                // Коды из справочника другой категории не подмешиваем
+                if ($v !== '' && ! array_key_exists($v, $known) && ! isset($allDirectory[$v])) $known[$v] = '';
             }
-            // [значение => подпись]; подпись — описание из справочника
+            // [значение => подпись]; подпись — описание из справочника.
+            // Для кодов неисправностей — список с разъяснением и подгруппой.
+            if ($name === 'fault_code') {
+                $items = app(\App\Services\FaultCodes::class)->optionsForSheet($sheet);
+                $inDir = array_flip(array_column($items, 'code'));
+                foreach ($known as $v => $_) {
+                    if (! isset($inDir[(string) $v])) $items[] = ['code' => (string) $v, 'description' => '', 'hint' => '', 'group' => null, 'path' => [], 'used' => true, 'score' => 1];
+                }
+                $known = $items;
+            }
             $result[$name] = $known;
         }
         return $result;
@@ -486,7 +496,7 @@ class RecordController extends Controller
         );
         $isTimeLocked = false;
         $serverNow    = now()->timestamp;
-        $comboOptions = $this->comboOptions($cfg);
+        $comboOptions = $this->comboOptions($cfg, $sheet);
 
         return view('records.create', compact(
             'sheet', 'cfg', 'defaults', 'employeesList', 'lookups',
@@ -529,6 +539,10 @@ class RecordController extends Controller
 
         $data['created_by'] = auth()->id();
         $this->applyLookupSnapshots($cfg, $data);
+        if (array_key_exists('fault_code', $data)) {
+            // Вписали неисправность словами — подставляется код похожей или создаётся новый
+            $data['fault_code'] = app(\App\Services\FaultCodes::class)->resolve($sheet, $data['fault_code'], auth()->id());
+        }
 
         // --- Защита от дублей ---
         // 1) Та же форма отправлена второй раз (двойной клик, «Назад» + отправить): номер формы уже использован
@@ -584,7 +598,7 @@ class RecordController extends Controller
         );
         $isTimeLocked = $this->isRecordLocked($record);
         $serverNow    = now()->timestamp;
-        $comboOptions = $this->comboOptions($cfg);
+        $comboOptions = $this->comboOptions($cfg, $sheet);
 
         return view('records.edit', compact(
             'sheet', 'cfg', 'record', 'employeesList', 'lookups',
@@ -626,6 +640,10 @@ class RecordController extends Controller
 
         $data['updated_by'] = auth()->id();
         $this->applyLookupSnapshots($cfg, $data);
+        if (array_key_exists('fault_code', $data)) {
+            // Вписали неисправность словами — подставляется код похожей или создаётся новый
+            $data['fault_code'] = app(\App\Services\FaultCodes::class)->resolve($sheet, $data['fault_code'], auth()->id());
+        }
 
         try {
             $record->update($data);
@@ -656,6 +674,15 @@ class RecordController extends Controller
 
         $record->delete();
         return redirect()->route('records.index', $sheet)->with('ok', 'Запись удалена');
+    }
+
+    /** Подсказки для поля «Код неисправности»: по коду и по описанию, только коды этой вкладки. */
+    public function faultCodes(Request $r, string $sheet)
+    {
+        $this->cfg($sheet);   // доступ к вкладке
+        $q = mb_substr(trim((string) $r->query('q', '')), 0, 200);
+
+        return response()->json(app(\App\Services\FaultCodes::class)->suggest($sheet, $q))->header('Cache-Control', 'no-store');
     }
 
     private function isDuplicate(QueryException $e): bool

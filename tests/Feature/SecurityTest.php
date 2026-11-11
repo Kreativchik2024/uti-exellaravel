@@ -174,18 +174,41 @@ class SecurityTest extends TestCase
         $this->assertTrue(\App\Models\AuditLog::where('action', 'logout')->exists());
     }
 
-    public function test_session_lasts_until_logout_and_idle_limit_is_30_minutes(): void
+    public function test_idle_limit_is_90_minutes(): void
     {
-        $this->assertSame(30, config('auth.idle_logout_minutes'));
+        $this->assertSame(90, config('auth.idle_logout_minutes'));
         $this->assertGreaterThanOrEqual(720, config('session.lifetime'), 'сессия — не меньше рабочего дня');
         $this->assertFalse(config('session.expire_on_close'));
 
         $user = User::factory()->admin()->create();
         $this->actingAs($user)->get('/profile')->assertOk();
-        $this->travel(29)->minutes();
-        $this->get('/profile')->assertOk();   // 29 минут без действий — ещё в системе
-        $this->travel(31)->minutes();
-        $this->get('/profile')->assertRedirect('/login');   // больше 30 — выход
+        $this->travel(89)->minutes();
+        $this->get('/profile')->assertOk();   // 1 ч 29 мин без действий — ещё в системе
+        $this->travel(91)->minutes();
+        $this->get('/profile')->assertRedirect('/login');   // больше 1,5 ч — выход
+        $this->assertTrue(\App\Models\AuditLog::where('summary', 'Автовыход: не было действий 1 ч 30 мин')->exists());
+    }
+
+    public function test_session_ends_after_12_hours_even_when_user_is_active(): void
+    {
+        $this->assertSame(12, config('auth.max_session_hours'));
+        $user = User::factory()->admin()->create();
+
+        $this->actingAs($user)->get('/profile')->assertOk();
+        foreach (range(1, 11) as $h) {           // работает весь день, каждый час что-то делает
+            $this->travel(60)->minutes();
+            $this->get('/profile')->assertOk();
+        }
+        $this->travel(61)->minutes();
+        $this->get('/profile')->assertRedirect('/login');
+        $this->assertGuest();
+        $this->assertTrue(\App\Models\AuditLog::where('summary', 'Автовыход: сеанс длится больше 12 ч')->exists());
+        $this->get('/login')->assertSee('сеанс длится больше 12 ч');
+
+        // Фоновый запрос тоже выкидывает — с причиной для страницы
+        $this->actingAs($user)->get('/profile')->assertOk();
+        $this->travel(13)->hours();
+        $this->getJson('/session/status')->assertStatus(401)->assertJson(['idle_logout' => true]);
     }
 
     public function test_server_reports_idle_time_for_all_tabs_and_logout_reason_is_logged(): void

@@ -306,6 +306,9 @@
                                 <p class="mt-1 text-xs text-amber-700">Прежнее значение: <span class="font-mono">{{ $ipOther }}</span> — введите новое число</p>
                             @endif
 
+                        @elseif($type === 'combo' && $name === 'fault_code')
+                            @include('records._fault_code', ['value' => $value, 'options' => $comboOptions[$name] ?? [], 'isReq' => $isReq, 'baseInput' => $baseInput])
+
                         @elseif($type === 'combo')
                             <input type="text" name="{{ $name }}" value="{{ $value }}"
                                    list="combo-{{ $name }}" autocomplete="off"

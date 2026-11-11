@@ -2,62 +2,53 @@
 
 namespace App\Exports;
 
+use App\Exports\Support\TableSheet;
+use App\Exports\Support\Workbook;
 use Carbon\Carbon;
-use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithTitle;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-/** Отчёт по смене в Excel: по исполнителям и по вкладкам. */
-class ShiftReportExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle
+/** Отчёт по смене: лист «Смена» (исполнители, вкладки) и лист «Подробно» — исполнитель × вкладка. */
+class ShiftReportExport extends Workbook
 {
-    private array $boldRows = [];
-
-    public function __construct(private array $data, private Carbon $from, private Carbon $to, private string $section) {}
-
-    public function array(): array
+    public function __construct(array $data, Carbon $from, Carbon $to, string $section)
     {
-        $rows = [];
-        $rows[] = ["Отчёт по смене · {$this->section}"];
-        $rows[] = [$this->from->format('d.m.Y H:i') . ' — ' . $this->to->format('d.m.Y H:i')];
-        $rows[] = [];
+        $info = [['Участок', $section ?: '—'], ['Начало смены', $from->format('d.m.Y H:i')], ['Конец смены', $to->format('d.m.Y H:i')], Workbook::stamp()];
+        $t = $data['totals'];
+        $int = ['type' => 'int'];
+        $pct = ['title' => 'Брак, %', 'type' => 'pct'];
 
-        $rows[] = ['Исполнитель', 'Записей', 'Изделий', 'Брак', '% брака', 'По вкладкам'];
-        $this->boldRows[] = count($rows);
-        foreach ($this->data['workers'] as $name => $w) {
-            $by = collect($w['sheets'])->map(fn ($s, $slug) => ($this->data['sheets'][$slug]['title'] ?? $slug) . ': ' . $s['total'] . ($s['defect'] ? " (брак {$s['defect']})" : ''))->implode('; ');
-            $rows[] = [$name, $w['total'], $w['items'], $w['defect'], self::pct($w['defect'], $w['total']), $by];
+        $workers = [];
+        $flat = [];
+        foreach ($data['workers'] as $name => $w) {
+            $workers[] = [$name, $w['total'], $w['items'], $w['defect'], Workbook::share($w['defect'], $w['total'])];
+            foreach ($w['sheets'] as $slug => $s) {
+                $flat[] = [$name, $data['sheets'][$slug]['title'] ?? $slug, $s['total'], $s['defect'], Workbook::share($s['defect'], $s['total'])];
+            }
         }
-        $rows[] = [];
+        $sheets = array_map(fn ($s) => [$s['title'], $s['total'], $s['items'], $s['defect'], Workbook::share($s['defect'], $s['total'])], array_values($data['sheets']));
+        $total = ['Итого', $t['total'], $t['items'], $t['defect'], Workbook::share($t['defect'], $t['total'])];
 
-        $rows[] = ['Вкладка', 'Записей', 'Изделий', 'Брак', '% брака'];
-        $this->boldRows[] = count($rows);
-        foreach ($this->data['sheets'] as $s) {
-            $rows[] = [$s['title'], $s['total'], $s['items'], $s['defect'], self::pct($s['defect'], $s['total'])];
-        }
-        $t = $this->data['totals'];
-        $rows[] = ['Итого', $t['total'], $t['items'], $t['defect'], self::pct($t['defect'], $t['total'])];
-        $this->boldRows[] = count($rows);
-
-        return $rows;
+        parent::__construct([
+            TableSheet::make('Смена', 'Отчёт по смене', $info, [
+                [
+                    'caption' => 'По исполнителям',
+                    'columns' => [['title' => 'Исполнитель'], ['title' => 'Записей'] + $int, ['title' => 'Изделий'] + $int, ['title' => 'Брак'] + $int, $pct],
+                    'rows' => $workers, 'empty' => 'За смену записей нет',
+                ],
+                [
+                    'caption' => 'По вкладкам',
+                    'columns' => [['title' => 'Вкладка'], ['title' => 'Записей'] + $int, ['title' => 'Изделий'] + $int, ['title' => 'Брак'] + $int, $pct],
+                    'rows' => $sheets, 'empty' => 'За смену записей нет', 'total' => $sheets ? $total : null,
+                ],
+            ]),
+            TableSheet::make('Подробно', null, [], [[
+                'columns' => [['title' => 'Исполнитель'], ['title' => 'Вкладка'], ['title' => 'Записей'] + $int, ['title' => 'Брак'] + $int, $pct],
+                'rows' => $flat, 'empty' => 'Нет данных',
+            ]]),
+        ]);
     }
 
     public static function pct(int $part, int $total): string
     {
         return $total ? round($part / $total * 100, 1) . '%' : '—';
-    }
-
-    public function styles(Worksheet $sheet): array
-    {
-        $styles = [1 => ['font' => ['bold' => true, 'size' => 13]]];
-        foreach ($this->boldRows as $r) $styles[$r] = ['font' => ['bold' => true]];
-
-        return $styles;
-    }
-
-    public function title(): string
-    {
-        return 'Смена';
     }
 }

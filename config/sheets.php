@@ -117,7 +117,11 @@ $map = [
             'fields' => array_merge([
                 'record_date'   => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
                 'serial_number' => ['label'=>'S/N','type'=>'text','rules'=>'required|string|max:120'],
-                'ip_address'    => ['label'=>'IP','type'=>'text','rules'=>'nullable|string|max:64'],
+                // Маска как на ПГП: вводится только последнее число адреса
+                'ip_address'    => ['label'=>'IP','type'=>'ip_suffix','prefix'=>'192.168.1.',
+                                    'rules'=>['nullable', 'regex:/^192\.168\.1\.(25[0-4]|2[0-4]\d|1\d\d|[1-9]\d?)$/'],
+                                    'hint'=>'Введите последнее число адреса: от 1 до 254',
+                                    'messages'=>['regex'=>'IP: последнее число должно быть от 1 до 254.']],
             ], $workers, [
                 'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
             ], $faultCode),

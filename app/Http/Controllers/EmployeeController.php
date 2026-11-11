@@ -186,31 +186,12 @@ class EmployeeController extends Controller
 
     public function export()
     {
-        $rows = Employee::query()->with('user')->orderBy('short_name')->get();
-
-        return response()->streamDownload(function () use ($rows) {
-            $out = fopen('php://output', 'w');
-            fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Фамилия', 'Имя', 'Отчество', 'Кратко', 'Должность', 'Участок', 'Активен', 'Учётка']);
-            foreach ($rows as $e) {
-                fputcsv($out, [
-                    $e->last_name, $e->first_name, $e->middle_name, $e->short_name,
-                    $e->position, $e->department, $e->is_active ? 'Да' : 'Нет', $e->user?->email,
-                ]);
-            }
-            fclose($out);
-        }, 'employees-' . now()->format('Ymd-His') . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\EmployeesExport(), 'Сотрудники ' . now()->format('Y-m-d') . '.xlsx');
     }
 
     public function template()
     {
-        return response()->streamDownload(function () {
-            $out = fopen('php://output', 'w');
-            fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Фамилия', 'Имя', 'Отчество', 'Должность', 'Участок', 'Активен']);
-            fputcsv($out, ['Иванов', 'Иван', 'Иванович', 'Инженер', 'Цех 1', 'Да']);
-            fclose($out);
-        }, 'employees-template.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\EmployeesExport(true), 'Сотрудники — шаблон.xlsx');
     }
 
     public function importForm()
@@ -222,16 +203,8 @@ class EmployeeController extends Controller
     {
         $r->validate(['file' => 'required|file|max:8192']);
 
-        $file = $r->file('file');
-        $rows = [];
-
-        $handle = fopen($file->getRealPath(), 'r');
-        if ($handle !== false) {
-            $bom = fread($handle, 3);
-            if ($bom !== "\xEF\xBB\xBF") rewind($handle);
-            while (($r2 = fgetcsv($handle)) !== false) $rows[] = $r2;
-            fclose($handle);
-        }
+        // Excel или CSV (UTF-8 / Windows-1251, разделитель «;» или «,»)
+        $rows = \App\Support\TableReader::rows($r->file('file'));
 
         if (empty($rows)) {
             return back()->withErrors(['file' => 'Файл пустой или не удалось прочитать.']);

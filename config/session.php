@@ -33,7 +33,7 @@ return [
     */
 
     // Сессия живёт до выхода из системы: не меньше рабочего дня (12 ч), даже если в .env меньше.
-    // Выход по бездействию — отдельно: auth.idle_logout_minutes (по умолчанию 30 мин).
+    // Выход по бездействию — отдельно: auth.idle_logout_minutes (1,5 ч), предел сеанса — auth.max_session_hours (12 ч).
     'lifetime' => max((int) env('SESSION_LIFETIME', 720), 720),
 
     'expire_on_close' => false,   // закрытие вкладки не выкидывает из системы
