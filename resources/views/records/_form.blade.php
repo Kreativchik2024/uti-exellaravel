@@ -249,14 +249,18 @@
                         $isReq = in_array('required', $ruleList, true) && !in_array('nullable', $ruleList, true);
 
                         // Обязательность по значению другого поля: 'required_when' => ['status' => 'Не сдан']
+                        // и обратное: 'required_unless' => ['status' => 'Не сдан'] — обязательно, кроме этого значения
                         $reqWhenField = $reqWhenValue = null;
-                        if (!empty($f['required_when'])) {
-                            $reqWhenField = array_key_first($f['required_when']);
-                            $reqWhenValue = (string) $f['required_when'][$reqWhenField];
-                            $isReq = (string) $currentValue($reqWhenField) === $reqWhenValue;
+                        $reqUnless = !empty($f['required_unless']);
+                        $reqCond = $f['required_when'] ?? ($f['required_unless'] ?? null);
+                        if (!empty($reqCond)) {
+                            $reqWhenField = array_key_first($reqCond);
+                            $reqWhenValue = (string) $reqCond[$reqWhenField];
+                            $isReq = ((string) $currentValue($reqWhenField) === $reqWhenValue) !== $reqUnless;
                         }
                         $reqAttrs = $reqWhenField
                             ? 'data-required-when-field="'.e($reqWhenField).'" data-required-when-value="'.e($reqWhenValue).'"'
+                              . ($reqUnless ? ' data-required-unless="1"' : '')
                             : '';
                         $hasLookup  = !empty($f['lookup']);
                         $lookupData = $lookups[$name] ?? null;
@@ -513,6 +517,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             form.querySelectorAll('[data-required-when-field]').forEach(function (wrap) {
                 var on = valueOf(wrap.dataset.requiredWhenField) === wrap.dataset.requiredWhenValue;
+                if (wrap.dataset.requiredUnless) on = !on;   // «обязательно, кроме этого значения»
                 var input = wrap.querySelector('input[name], select[name], textarea[name]');
                 if (input && !input.disabled) input.required = on;
                 var badge = wrap.querySelector('[data-required-badge]');

@@ -186,6 +186,38 @@ class AppRulesTest extends TestCase
         $this->assertSame('СВОЙ-1', PgpRecord::firstOrFail()->fault_code);
     }
 
+    public function test_pgp_board_and_ip_optional_only_when_not_delivered(): void
+    {
+        $user = $this->adminWithEmployee();
+        $base = array_diff_key($this->pgpBase('Тестов Т.Т.'), ['board_number' => 1]);
+
+        // «Сдан» — номер борта и IP обязательны
+        $this->actingAs($user)->withSession(['workstation_workers' => []])
+            ->post('/records/pgp', $base + ['board_number' => '', 'ip_address' => '', 'status' => 'Сдан'])
+            ->assertSessionHasErrors(['board_number', 'ip_address']);
+
+        // «Не сдан» — можно без них (наклейки уходят на другой борт)
+        $this->actingAs($user)->withSession(['workstation_workers' => []])
+            ->post('/records/pgp', $base + [
+                'board_number' => '', 'ip_address' => '', 'manet_number' => '', 'status' => 'Не сдан',
+                'fuselage_number' => 'F1', 'frame_serial' => 'M1', 'cross3_number' => 'C1',
+                'bracket_serial' => 'K1', 'defect_reason' => 'не включается', 'fault_code' => 'СВОЙ-1',
+            ])
+            ->assertSessionHasNoErrors();
+        $record = PgpRecord::firstOrFail();
+        $this->assertNull($record->board_number);
+        $this->assertNull($record->ip_address);
+
+        // Если IP всё же вписан — проверяется как обычно
+        $this->actingAs($user)->withSession(['workstation_workers' => []])
+            ->post('/records/pgp', $base + ['ip_address' => '300', 'status' => 'Не сдан'])
+            ->assertSessionHasErrors('ip_address');
+
+        // Форма: звёздочка и required переключаются по статусу
+        $html = $this->actingAs($user)->get('/records/pgp/create')->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/data-required-when-field="status" data-required-when-value="Не сдан" data-required-unless="1"/', $html);
+    }
+
     #[DataProvider('badIpProvider')]
     public function test_pgp_rejects_invalid_ip_suffix(string $suffix): void
     {

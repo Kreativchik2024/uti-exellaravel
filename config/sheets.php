@@ -27,7 +27,9 @@ $map = [
                 'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
                 'post_number' => ['label'=>'Пост','type'=>'number','rules'=>'required|integer|min:1|max:30'],
             ], $workers, [
-                'board_number'    => ['label'=>'Номер борта','type'=>'text','rules'=>'required|string|max:80'],
+                // Борт «Не сдан» — номер борта и IP не обязательны: наклейки уходят на другой борт
+                'board_number'    => ['label'=>'Номер борта','type'=>'text','rules'=>'nullable|required_unless:status,Не сдан|string|max:80',
+                                      'required_unless'=>['status'=>'Не сдан']],
                 'work_start'      => ['label'=>'Начало','type'=>'time','rules'=>'nullable'],
                 // При открытии формы подставляется текущее время сервера, можно изменить
                 'work_end'        => ['label'=>'Окончание','type'=>'time','rules'=>'nullable|date_format:H:i,H:i:s',
@@ -37,7 +39,8 @@ $map = [
                 // Маска: префикс 192.168.1. фиксирован, вводится только последний октет (1–254).
                 // В БД хранится полный адрес (RecordController::applyIpSuffix склеивает).
                 'ip_address'      => ['label'=>'IP модуля связи','type'=>'ip_suffix','prefix'=>'192.168.1.',
-                                      'rules'=>['required', 'regex:/^192\.168\.1\.(25[0-4]|2[0-4]\d|1\d\d|[1-9]\d?)$/'],
+                                      'rules'=>['nullable', 'required_unless:status,Не сдан', 'regex:/^192\.168\.1\.(25[0-4]|2[0-4]\d|1\d\d|[1-9]\d?)$/'],
+                                      'required_unless'=>['status'=>'Не сдан'],
                                       'hint'=>'Введите последнее число адреса: от 1 до 254',
                                       'messages'=>['regex'=>'IP модуля связи: последнее число должно быть от 1 до 254.']],
                 'manet_number'    => [
