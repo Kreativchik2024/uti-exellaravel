@@ -17,6 +17,17 @@
 
     function skin() { return document.documentElement.getAttribute('data-ui-theme'); }
 
+    // Курсоры темы — загрузить заранее: иначе при первом наведении/прокрутке курсор может мигнуть
+    var me = document.currentScript;
+    var imgBase = me ? me.src.replace(/\/js\/[^\/]*$/, '/img/cursors/') : '/img/cursors/';
+    var preloaded = {};
+    function preloadCursors(name) {
+        if (!name || preloaded[name]) return;
+        preloaded[name] = true;
+        var hi = (window.devicePixelRatio || 1) > 1.25 ? '@2x' : '';
+        [name, name + '-pointer'].forEach(function (f) { new Image().src = imgBase + f + hi + '.png'; });
+    }
+
     function ensureBox() {
         if (box) return;
         box = document.createElement('div');
@@ -45,6 +56,7 @@
     }
 
     function update() {
+        preloadCursors(skin());
         var list = pools[skin()] || [];
         if (!list.length) {
             if (box) box.hidden = true;

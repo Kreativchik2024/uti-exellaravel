@@ -18,6 +18,8 @@
 
         <link rel="stylesheet" href="{{ asset('css/dark-theme.css') }}?v={{ filemtime(public_path('css/dark-theme.css')) }}">
         @include('partials.theme-skins')
+        {{-- Плашка «через 15 секунд обновление сервера» (флаг пишет scripts/uti-update.sh) --}}
+        <script src="{{ asset('js/update-notice.js') }}?v={{ filemtime(public_path('js/update-notice.js')) }}" data-url="{{ asset('update-notice.json') }}" defer></script>
         <link rel="stylesheet" href="{{ asset('css/responsive.css') }}?v={{ filemtime(public_path('css/responsive.css')) }}">
 
         <style>

@@ -3,6 +3,9 @@
 #  uti-update — обновление сайта УТИ на сервере из GitHub.
 #
 #  Порядок (сайт работает, пока идёт всё долгое):
+#    0. всем, у кого открыт сайт, приходит уведомление «через 15 секунд
+#       начнётся обновление» (public/update-notice.json → public/js/update-notice.js);
+#       через 15 секунд начинается работа, в конце — «сервер обновлён»
 #    1. забирает новый код из GitHub (git fetch) — сайт ещё на старом коде
 #    2. (по желанию) обновляет пакеты системы: apt update && apt upgrade
 #    3. собирает стили и скрипты (npm ci + npm run build) в отдельной копии
@@ -22,6 +25,7 @@
 #      uti-update              — обновление сайта
 #      uti-update --system     — то же + обновление пакетов системы
 #      uti-update --no-backup  — без бэкапа базы
+#      uti-update --no-wait    — без 15-секундного предупреждения (сразу)
 #
 #  Установка (один раз):
 #      chmod +x /var/www/uti-exellaravel/scripts/uti-update.sh
@@ -41,12 +45,14 @@ BACKUPS="$HOME/backups"
 STAMP="$(date +%F_%H%M)"
 SYSTEM=0
 BACKUP=1
+WAIT=15          # секунд между уведомлением пользователей и началом обновления
 
 for arg in "$@"; do
     case "$arg" in
         --system)    SYSTEM=1 ;;
         --no-backup) BACKUP=0 ;;
-        -h|--help)   sed -n '2,29p' "$(readlink -f "$0")"; exit 0 ;;
+        --no-wait)   WAIT=0 ;;
+        -h|--help)   sed -n '2,33p' "$(readlink -f "$0")"; exit 0 ;;
         *) echo "Неизвестный параметр: $arg (см. uti-update --help)"; exit 1 ;;
     esac
 done
@@ -62,6 +68,27 @@ for tool in git php npm; do command -v "$tool" >/dev/null || die "не уста�
 
 cd "$APP"
 START="$(git rev-parse HEAD)"
+
+# ---------------------------------------------------------------- 0. уведомление
+# Флаг для всех открытых страниц (обычный статический файл — его отдаёт веб-сервер без PHP).
+# state: soon (at — когда начнётся) | updating | done | cancelled
+NOTICE="$APP/public/update-notice.json"
+notice() {
+    local tmp="$NOTICE.tmp"
+    printf '{"state":"%s","at":%s,"version":"%s"}
+' "$1" "${2:-0}" "$(git -C "$APP" rev-parse --short HEAD 2>/dev/null)" > "$tmp"         && chmod 664 "$tmp" && mv -f "$tmp" "$NOTICE" || true
+}
+# Упало до переключения кода — сайт не менялся: убрать плашку у пользователей
+trap 'code=$?; [ "$code" -ne 0 ] && notice cancelled; exit "$code"' EXIT
+
+if [ "$WAIT" -gt 0 ]; then
+    say "0. Уведомление пользователям: обновление через $WAIT с"
+    notice soon "$(( $(date +%s) + WAIT ))"
+    for ((i = WAIT; i > 0; i--)); do printf '   начало через %2d с… (Ctrl+C — отменить)' "$i"; sleep 1; done
+    printf '   начинаю                                      
+'
+fi
+notice updating
 
 # ---------------------------------------------------------------- 1. git
 say "1. Новый код из GitHub (ветка $BRANCH)"
@@ -160,6 +187,7 @@ rollback() {
     php artisan optimize:clear >/dev/null 2>&1 || true
     php artisan optimize >/dev/null 2>&1 || true
     php artisan up >/dev/null 2>&1 || true
+    notice cancelled
     echo "   сайт открыт на прежней версии $(git rev-parse --short HEAD)." >&2
     [ "$BACKUP" = 1 ] && [ -f "$BACKUPS/uti-db-$STAMP.sql" ] && \
         echo "   если упали миграции и база повреждена: sudo mysql <база> < $BACKUPS/uti-db-$STAMP.sql" >&2
@@ -203,6 +231,7 @@ done
 say "11. Сайт открыт"
 php artisan up
 trap - EXIT
+notice done
 rm -rf public/build.prev
 printf '\n\033[1;32mГотово.\033[0m Версия: %s — %s\n' "$(git rev-parse --short HEAD)" "$(git log -1 --format=%s)"
 if [ "$BACKUP" = 1 ] && [ -f "$BACKUPS/uti-db-$STAMP.sql" ]; then echo "Бэкап базы: $BACKUPS/uti-db-$STAMP.sql"; fi

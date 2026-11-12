@@ -56,8 +56,8 @@ html[data-ui-theme="minions"] {
     --sk-shade:       rgba(60, 45, 0, 0.35);
     --sk-scroll:      #e0b400;
     --sk-auth-brand:  linear-gradient(160deg, rgba(255, 214, 40, 0.55), rgba(255, 196, 0, 0.8));
-    --sk-cursor:         url("../../img/cursors/minions.svg") 3 2, auto;
-    --sk-cursor-pointer: url("../../img/cursors/minions-pointer.svg") 4 4, pointer;
+    --sk-cursor:         image-set(url("../../img/cursors/minions.png") 1x, url("../../img/cursors/minions@2x.png") 2x) 3 2, auto;
+    --sk-cursor-pointer: image-set(url("../../img/cursors/minions-pointer.png") 1x, url("../../img/cursors/minions-pointer@2x.png") 2x) 4 4, pointer;
 
     /* Фон: картинки из public/img/themes/minions/ под светлой вуалью */
     --sk-photo-pos: center 35%;

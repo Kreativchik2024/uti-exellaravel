@@ -47,3 +47,6 @@ auth.json
 
 # Архивы версий для офлайн-развёртывания (scripts/make-release.ps1)
 /releases/
+
+# флаг «идёт обновление» (пишет scripts/uti-update.sh)
+/public/update-notice.json

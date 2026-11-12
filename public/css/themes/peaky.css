@@ -51,8 +51,8 @@ html[data-ui-theme="peaky"] {
     --sk-shade:       rgba(8, 7, 6, 0.6);
     --sk-scroll:      #5a4a30;
     --sk-auth-brand:  linear-gradient(160deg, rgba(10, 9, 8, 0.55), rgba(10, 9, 8, 0.85));
-    --sk-cursor:         url("../../img/cursors/peaky.svg") 3 2, auto;
-    --sk-cursor-pointer: url("../../img/cursors/peaky-pointer.svg") 3 2, pointer;
+    --sk-cursor:         image-set(url("../../img/cursors/peaky.png") 1x, url("../../img/cursors/peaky@2x.png") 2x) 3 2, auto;
+    --sk-cursor-pointer: image-set(url("../../img/cursors/peaky-pointer.png") 1x, url("../../img/cursors/peaky-pointer@2x.png") 2x) 3 2, pointer;
 
     --pb-serif: Georgia, "Times New Roman", "Liberation Serif", serif;
 }

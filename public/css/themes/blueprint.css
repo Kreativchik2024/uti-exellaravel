@@ -53,8 +53,8 @@ html[data-ui-theme="blueprint"] {
     --sk-shade:       rgba(2, 12, 32, 0.6);
     --sk-scroll:      #3c6aa8;
     --sk-auth-brand:  linear-gradient(160deg, rgba(4, 22, 56, 0.45), rgba(4, 22, 56, 0.8));
-    --sk-cursor:         url("../../img/cursors/blueprint.svg") 3 2, auto;
-    --sk-cursor-pointer: url("../../img/cursors/blueprint-pointer.svg") 6 6, pointer;
+    --sk-cursor:         image-set(url("../../img/cursors/blueprint.png") 1x, url("../../img/cursors/blueprint@2x.png") 2x) 3 2, auto;
+    --sk-cursor-pointer: image-set(url("../../img/cursors/blueprint-pointer.png") 1x, url("../../img/cursors/blueprint-pointer@2x.png") 2x) 6 6, pointer;
 
     --kb-mono: "Consolas", "Lucida Console", "DejaVu Sans Mono", ui-monospace, monospace;
     --kb-grid: rgba(190, 220, 255, 0.07);
