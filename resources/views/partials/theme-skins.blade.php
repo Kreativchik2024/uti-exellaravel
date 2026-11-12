@@ -4,7 +4,7 @@
      сменяются сами (public/js/skin-bg.js). Добавить картинку = положить файл в папку. --}}
 @php
     $skinPools = [];
-    foreach (['peaky', 'blueprint', 'minions'] as $skin) {
+    foreach (['peaky', 'blueprint', 'minions', 'darkknight'] as $skin) {
         $files = array_filter(glob(public_path("img/themes/$skin/*")) ?: [], fn ($f) => preg_match('/\.(jpe?g|png|webp)$/i', $f));
         natsort($files);
         $skinPools[$skin] = array_values(array_map(
@@ -13,7 +13,7 @@
         ));
     }
 @endphp
-@foreach (['base', 'peaky', 'blueprint', 'minions'] as $skin)
+@foreach (['base', 'peaky', 'blueprint', 'minions', 'darkknight'] as $skin)
 <link rel="stylesheet" href="{{ asset("css/themes/$skin.css") }}?v={{ filemtime(public_path("css/themes/$skin.css")) }}">
 @endforeach
 <script>window.UI_SKIN_POOLS = @json($skinPools);</script>

@@ -1,0 +1,89 @@
+/* ============================================================
+   Тема «Тёмный рыцарь» — ночной Готэм и Джокер:
+   почти чёрный с холодной сталью (Бэтмен), фиолетовые кнопки
+   и ядовито-зелёные ссылки (Джокер), красный — ошибки.
+   Курсор над кнопками — бэт-сигнал.
+   Общая часть — themes/base.css; здесь палитра, фон и детали.
+   ============================================================ */
+
+html[data-ui-theme="darkknight"] {
+    --ui-bg:            #07090d;
+    --ui-surface:       rgba(13, 16, 22, 0.88);
+    --ui-surface-2:     rgba(18, 22, 30, 0.90);
+    --ui-surface-hover: rgba(40, 30, 58, 0.92);
+    --ui-border:        rgba(150, 170, 200, 0.12);
+    --ui-border-strong: rgba(150, 170, 200, 0.24);
+    --ui-text:          #e6e9ef;
+    --ui-text-2:        #c3c9d4;
+    --ui-muted:         #8b95a7;
+    --ui-faint:         #5f6878;
+
+    --ui-accent:        #7b3fc4;
+    --ui-accent-hover:  #9152dd;
+    --ui-accent-soft:   rgba(123, 63, 196, 0.2);
+    --ui-accent-text:   #a6d93b;
+    --ui-ring:          rgba(145, 82, 221, 0.42);
+
+    --ui-good:          #8fd14f;
+    --ui-good-soft:     rgba(120, 190, 60, 0.15);
+    --ui-bad:           #e0443a;
+    --ui-bad-soft:      rgba(200, 40, 30, 0.18);
+
+    --ui-radius:        4px;
+    --ui-radius-sm:     3px;
+    --ui-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.6);
+    --ui-shadow:        0 2px 4px rgba(0, 0, 0, 0.5), 0 12px 28px -8px rgba(0, 0, 0, 0.8);
+    --ui-shadow-lg:     0 20px 48px -10px rgba(0, 0, 0, 0.9);
+
+    --sk-radius:      3px;
+    --sk-on-accent:   #ffffff;
+    --sk-btn:         linear-gradient(180deg, #8a4ad6, #5f2aa3);
+    --sk-btn-hover:   linear-gradient(180deg, #9a5ce6, #6d33b6);
+    --sk-btn-edge:    rgba(200, 160, 255, 0.35);
+    --sk-nav:         rgba(5, 7, 10, 0.9);
+    --sk-line:        rgba(123, 63, 196, 0.45);
+    --sk-card-edge:   rgba(166, 217, 59, 0.14);
+    --sk-tile:        linear-gradient(160deg, #1d2230, #0b0e13);
+    --sk-tile-edge:   rgba(145, 82, 221, 0.55);
+    --sk-tile-icon:   #a6d93b;
+    --sk-gray-200:    rgba(40, 46, 60, 0.9);
+    --sk-gray-300:    rgba(58, 66, 84, 0.9);
+    --sk-panel:       rgba(18, 22, 30, 0.7);
+    --sk-disabled:    rgba(28, 32, 42, 0.9);
+    --sk-popup:       #10131a;
+    --sk-shade:       rgba(3, 4, 8, 0.65);
+    --sk-scroll:      #4a2c78;
+    --sk-auth-brand:  linear-gradient(160deg, rgba(5, 7, 10, 0.55), rgba(20, 10, 34, 0.85));
+    --sk-cursor:         image-set(url("../../img/cursors/darkknight.png") 1x, url("../../img/cursors/darkknight@2x.png") 2x) 3 2, auto;
+    --sk-cursor-pointer: image-set(url("../../img/cursors/darkknight-pointer.png") 1x, url("../../img/cursors/darkknight-pointer@2x.png") 2x) 16 16, pointer;
+
+    /* Фон: кадры из public/img/themes/darkknight/ под холодной тёмной вуалью */
+    --sk-photo-pos: center 30%;
+    --sk-veil:
+        radial-gradient(ellipse at 50% 35%, rgba(7, 9, 13, 0.25) 0%, rgba(7, 9, 13, 0.85) 80%),
+        linear-gradient(rgba(10, 14, 26, 0.3), rgba(10, 14, 26, 0.3));
+}
+
+/* ---------- Шапка: чёрная, снизу — фиолетовая кромка с зелёным отсветом ---------- */
+html[data-ui-theme="darkknight"] .ui-nav { box-shadow: 0 1px 0 rgba(166, 217, 59, 0.25), 0 8px 26px -10px rgba(0, 0, 0, 0.95); }
+html[data-ui-theme="darkknight"] .ui-navlink--active,
+html[data-ui-theme="darkknight"] .ui-navlink--active:hover { color: #c9f06b; box-shadow: inset 0 -2px 0 #9152dd; }
+
+/* ---------- Заголовки: рублено, заглавными ---------- */
+html[data-ui-theme="darkknight"] .ui-page-header h1,
+html[data-ui-theme="darkknight"] .ui-page-header h2,
+html[data-ui-theme="darkknight"] .ui-brand__name,
+html[data-ui-theme="darkknight"] .auth__headline {
+    text-transform: uppercase; letter-spacing: .1em !important; font-weight: 800 !important;
+}
+html[data-ui-theme="darkknight"] .ui-page-header h1,
+html[data-ui-theme="darkknight"] .ui-page-header h2 { text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9), 0 0 22px rgba(123, 63, 196, 0.35); }
+html[data-ui-theme="darkknight"] .ui-menu__label,
+html[data-ui-theme="darkknight"] .ui-table thead th { letter-spacing: .12em; }
+
+/* ---------- Кнопки: фиолетовый Джокера ---------- */
+html[data-ui-theme="darkknight"] .ui-btn--primary:hover { box-shadow: 0 0 0 1px rgba(166, 217, 59, 0.35), 0 4px 14px -4px rgba(123, 63, 196, 0.8); }
+html[data-ui-theme="darkknight"] .ui-chat__fab { box-shadow: 0 0 0 2px rgba(166, 217, 59, 0.45), 0 10px 24px -6px rgba(0, 0, 0, 0.9); }
+
+/* ---------- Карточки: стальная кромка ---------- */
+html[data-ui-theme="darkknight"] .ui-card { border-color: rgba(150, 170, 200, 0.16); }
