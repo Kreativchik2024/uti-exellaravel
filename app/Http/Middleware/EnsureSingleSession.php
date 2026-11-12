@@ -23,6 +23,8 @@ class EnsureSingleSession
             // Сессия была заменена (вход с другого устройства)
             elseif ($user->session_id !== $currentSessionId) {
                 \App\Models\AuditLog::write('auth', 'logout', 'Выход: под этой учётной записью вошли на другом устройстве', ['section_id' => null]);
+                // Отметки «занят» этой (вытесненной) сессии больше не нужны
+                \App\Models\ActiveWorkerSession::where('session_id', $currentSessionId)->delete();
                 Auth::logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();

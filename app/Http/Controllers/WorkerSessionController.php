@@ -36,6 +36,8 @@ class WorkerSessionController extends Controller
             ->where('last_heartbeat_at', '>=', $cutoff)
             ->where('session_id', '!=', $sessionId)
             ->whereNotNull('sheet')
+            // «своего» сотрудника не показываем занятым — себя можно поставить всегда
+            ->when($r->user()?->employee, fn ($q, $own) => $q->where('employee_id', '!=', $own->id))
             ->get();
 
         $map = [];
@@ -72,6 +74,11 @@ class WorkerSessionController extends Controller
 
         $sessionId = $r->session()->getId();
         $cutoff = now()->subSeconds(self::OFFLINE_AFTER_SECONDS);
+
+        // Себя можно поставить всегда: человек пересел за этот компьютер — прежнее место освобождается
+        if ($employee->user_id === $user->id) {
+            ActiveWorkerSession::releaseEmployeeElsewhere($employee->id, $sessionId);
+        }
 
         // Проверяем, не занят ли он другим
         $busy = ActiveWorkerSession::where('employee_id', $employee->id)

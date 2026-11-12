@@ -41,6 +41,11 @@ class AuthenticatedSessionController extends Controller
 
         $user->forceFill(['last_login_at' => now()])->saveQuietly();
 
+        // Пересел за другой компьютер — освобождаем «своего» сотрудника от прежних рабочих мест
+        if ($user->employee) {
+            \App\Models\ActiveWorkerSession::releaseEmployeeElsewhere($user->employee->id, session()->getId());
+        }
+
         // --- АВТОПОДСТАНОВКА ИСПОЛНИТЕЛЯ ---
         // Если к аккаунту привязан сотрудник, ставим его в сессию по умолчанию.
         // При заходе на /workstation/select он уже будет выбран в первом слоте.
@@ -59,6 +64,8 @@ class AuthenticatedSessionController extends Controller
         if ($user && $user->isExecutor()) {
             $user->forceFill(['session_id' => null])->saveQuietly();
         }
+        // Сотрудник свободен — его можно сразу поставить на другое рабочее место
+        \App\Models\ActiveWorkerSession::releaseOnLogout($user, $request->session()->getId());
 
         Auth::guard('web')->logout();
 

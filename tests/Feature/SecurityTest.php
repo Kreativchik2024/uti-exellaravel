@@ -174,19 +174,61 @@ class SecurityTest extends TestCase
         $this->assertTrue(\App\Models\AuditLog::where('action', 'logout')->exists());
     }
 
-    public function test_idle_limit_is_90_minutes(): void
+    public function test_idle_limit_is_12_hours(): void
     {
-        $this->assertSame(90, config('auth.idle_logout_minutes'));
+        $this->assertSame(720, config('auth.idle_logout_minutes'));
         $this->assertGreaterThanOrEqual(720, config('session.lifetime'), 'сессия — не меньше рабочего дня');
         $this->assertFalse(config('session.expire_on_close'));
 
         $user = User::factory()->admin()->create();
         $this->actingAs($user)->get('/profile')->assertOk();
-        $this->travel(89)->minutes();
-        $this->get('/profile')->assertOk();   // 1 ч 29 мин без действий — ещё в системе
-        $this->travel(91)->minutes();
-        $this->get('/profile')->assertRedirect('/login');   // больше 1,5 ч — выход
-        $this->assertTrue(\App\Models\AuditLog::where('summary', 'Автовыход: не было действий 1 ч 30 мин')->exists());
+        $this->travel(11 * 60 + 50)->minutes();
+        $this->get('/profile')->assertOk();   // почти 12 ч без действий — ещё в системе
+        $this->travel(12 * 60 + 1)->minutes();
+        $this->get('/profile')->assertRedirect('/login');   // больше 12 ч — выход
+        $this->assertTrue(\App\Models\AuditLog::where('summary', 'like', 'Автовыход:%')->exists());
+    }
+
+    public function test_worker_moves_to_another_computer_after_logout(): void
+    {
+        $owner = User::factory()->create(['role' => 'executor', 'is_active' => true]);
+        $emp = Employee::create(['last_name' => 'Орлов', 'first_name' => 'Иван', 'short_name' => 'Орлов И.', 'is_active' => true, 'user_id' => $owner->id]);
+        $master = User::factory()->create(['role' => 'master', 'is_active' => true]);
+        $mark = fn (string $session) => \App\Models\ActiveWorkerSession::create([
+            'employee_id' => $emp->id, 'user_id' => $owner->id, 'session_id' => $session, 'sheet' => 'pgp', 'last_heartbeat_at' => now(),
+        ]);
+
+        // Компьютер 1: работал в форме ПГП — числится «занят»
+        $mark('pc-1');
+        $this->assertSame('pgp', $this->actingAs($master)->getJson('/worker-sessions/occupied')->json('occupied')['Орлов И.']['sheet'] ?? null);
+
+        // Выход из аккаунта — сотрудник сразу свободен
+        $this->actingAs($owner)->post('/logout');
+        $this->assertSame(0, \App\Models\ActiveWorkerSession::where('employee_id', $emp->id)->count());
+        $this->assertArrayNotHasKey('Орлов И.', $this->actingAs($master)->getJson('/worker-sessions/occupied')->json('occupied'));
+
+        // Не вышел, а просто сел за другой компьютер и вошёл — прежнее место освобождается при входе
+        $mark('pc-1');
+        auth()->logout();
+        $this->post('/login', ['email' => $owner->email, 'password' => 'password']);
+        $this->assertAuthenticatedAs($owner);
+        $this->assertSame(0, \App\Models\ActiveWorkerSession::where('session_id', 'pc-1')->count());
+
+        // Себя можно поставить всегда, даже если числится за другим компьютером
+        $mark('pc-old');
+        $owner->forceFill(['session_id' => null])->saveQuietly();   // «один вход на устройство» — в тестах номер сессии другой
+        $this->actingAs($owner)->withSession(['workstation_workers' => []]);
+        $this->assertArrayNotHasKey('Орлов И.', $this->getJson('/worker-sessions/occupied')->json('occupied'));
+        $owner->forceFill(['session_id' => null])->saveQuietly();
+        $this->postJson('/worker-sessions/claim', ['short_name' => 'Орлов И.', 'sheet' => 'pgp'])->assertJsonPath('ok', true);
+        $this->assertSame(0, \App\Models\ActiveWorkerSession::where('session_id', 'pc-old')->count());
+
+        // А чужого «занятого» сотрудника перехватить по-прежнему нельзя
+        $other = User::factory()->create(['role' => 'executor', 'is_active' => true]);
+        \App\Models\ActiveWorkerSession::query()->update(['session_id' => 'pc-2']);
+        $other->forceFill(['session_id' => null])->saveQuietly();
+        $this->actingAs($other)->withSession(['verified_workers' => [$emp->id => now()->addHour()->timestamp]])
+            ->postJson('/worker-sessions/claim', ['short_name' => 'Орлов И.', 'sheet' => 'pgp'])->assertStatus(409);
     }
 
     public function test_session_ends_after_12_hours_even_when_user_is_active(): void

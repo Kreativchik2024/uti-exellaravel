@@ -1,8 +1,9 @@
 /* ============================================================
    Общая основа оформленных тем (html[data-ui-theme="…"]).
 
-   Оформленная тема всегда тёмная: html получает класс .dark, поэтому
-   все перекраски из dark-theme.css действуют. Здесь — то, что нужно
+   Оформленная тема обычно тёмная: html получает класс .dark, поэтому
+   все перекраски из dark-theme.css действуют (светлая — например «Миньоны» —
+   задаёт color-scheme: light у себя). Здесь — то, что нужно
    любой оформленной теме: перекраска жёстко заданных в шаблонах
    цветов Tailwind в цвета темы, непрозрачные всплывающие окна,
    кнопки, плитки, страница входа. Всё — через переменные.
@@ -190,3 +191,11 @@ html[data-ui-theme] :is(input:not([type="checkbox"]):not([type="radio"]):not([ty
 html[data-ui-theme] :is(:disabled, [aria-disabled="true"], .cursor-not-allowed) { cursor: not-allowed; }
 html[data-ui-theme] .cursor-move { cursor: move; }
 html[data-ui-theme] .cursor-zoom-out { cursor: zoom-out; }
+/* текст на левой панели входа и кнопка «Войти» — в цветах темы (в шаблоне белые) */
+html[data-ui-theme] .auth__feature,
+html[data-ui-theme] .auth__brand .text-white { color: var(--ui-text-2) !important; }
+html[data-ui-theme] .auth__brand .text-white { color: var(--ui-text) !important; }
+html[data-ui-theme] .auth button[type="submit"] {
+    background: var(--sk-btn, var(--ui-accent)) !important; color: var(--sk-on-accent) !important;
+    border-radius: var(--sk-radius, 4px) !important;
+}

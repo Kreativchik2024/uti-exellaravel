@@ -1,13 +1,13 @@
 /* ============================================================
    Тема оформления: «auto» (как в системе) / «light» / «dark» /
-   «peaky» («Острые козырьки»), «blueprint» («Конструкторское бюро») —
-   тёмная основа + public/css/themes/*.css (атрибут html[data-ui-theme]).
+   «peaky» («Острые козырьки»), «blueprint» («Конструкторское бюро»), «minions» («Миньоны», светлая) —
+   основа тёмная (или светлая: SKINS[имя] = false) + public/css/themes/*.css (атрибут html[data-ui-theme]).
 
    Подключается СИНХРОННО в <head> обоих макетов — тема применяется
    до отрисовки страницы, без мигания белым.
 
    API:
-     window.getThemeMode()        → 'auto' | 'light' | 'dark' | 'peaky' | 'blueprint'
+     window.getThemeMode()        → 'auto' | 'light' | 'dark' | 'peaky' | 'blueprint' | 'minions'
      window.setThemeMode(mode)    — выбрать режим (сохраняется в браузере)
      window.toggleDark()          — совместимость: переключить светлая/тёмная
 
@@ -18,9 +18,9 @@
     'use strict';
 
     var KEY = 'theme';
-    var MODES = ['auto', 'light', 'dark', 'peaky', 'blueprint'];
+    var MODES = ['auto', 'light', 'dark', 'peaky', 'blueprint', 'minions'];
     // Оформленные темы: имя режима → тёмная ли основа
-    var SKINS = { peaky: true, blueprint: true };
+    var SKINS = { peaky: true, blueprint: true, minions: false };
     var media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
     function readMode() {

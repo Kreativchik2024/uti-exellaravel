@@ -115,7 +115,7 @@ return [
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
     // Автовыход при бездействии, минут (0 — выключен). App\Http\Middleware\LogoutWhenIdle
-    'idle_logout_minutes' => (int) env('IDLE_LOGOUT_MINUTES', 90),
+    'idle_logout_minutes' => (int) env('IDLE_LOGOUT_MINUTES', 720),
     // Сколько часов после входа можно работать без повторного входа, даже при активности
     'max_session_hours'   => (int) env('MAX_SESSION_HOURS', 12),
 

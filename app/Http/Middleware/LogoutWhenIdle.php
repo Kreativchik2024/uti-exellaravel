@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Автовыход (общие компьютеры цеха):
- *  - при бездействии дольше auth.idle_logout_minutes (по умолчанию 1,5 часа);
+ *  - при бездействии дольше auth.idle_logout_minutes (по умолчанию 12 часов);
  *  - в любом случае через auth.max_session_hours после входа (по умолчанию 12 часов), даже если человек работает.
  *
  * Фоновые запросы (опрос чата, «кто онлайн», обновление токена) активностью не считаются.
@@ -54,6 +54,7 @@ class LogoutWhenIdle
             }
             if ($reason) {
                 \App\Models\AuditLog::write('auth', 'logout', $reason[0], ['section_id' => null]);
+                \App\Models\ActiveWorkerSession::releaseOnLogout($request->user(), $session->getId());
                 Auth::guard('web')->logout();
                 $session->invalidate();
                 $session->regenerateToken();

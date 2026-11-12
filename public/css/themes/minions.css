@@ -1,0 +1,111 @@
+/* ============================================================
+   Тема «Миньоны» — жёлтая и весёлая: бананы, комбинезон, очки.
+   В отличие от двух других — СВЕТЛАЯ (класс .dark не ставится).
+   Акцент — жёлтый (кнопки), ссылки и выделение — джинсово-синие.
+   Общая часть — themes/base.css; здесь палитра, фон и детали.
+   ============================================================ */
+
+html[data-ui-theme="minions"] {
+    color-scheme: light;
+
+    --ui-bg:            #fff6cc;
+    --ui-surface:       rgba(255, 253, 242, 0.93);
+    --ui-surface-2:     rgba(255, 248, 214, 0.94);
+    --ui-surface-hover: rgba(255, 236, 160, 0.95);
+    --ui-border:        rgba(120, 90, 0, 0.16);
+    --ui-border-strong: rgba(120, 90, 0, 0.30);
+    --ui-text:          #2b2100;
+    --ui-text-2:        #45380f;
+    --ui-muted:         #7a6a3c;
+    --ui-faint:         #a8975f;
+
+    --ui-accent:        #ffd21f;
+    --ui-accent-hover:  #ffc400;
+    --ui-accent-soft:   rgba(47, 109, 181, 0.12);
+    --ui-accent-text:   #1f5596;
+    --ui-ring:          rgba(47, 109, 181, 0.28);
+
+    --ui-good:          #2f8a3e;
+    --ui-good-soft:     rgba(47, 138, 62, 0.12);
+    --ui-bad:           #d0342c;
+    --ui-bad-soft:      rgba(208, 52, 44, 0.1);
+
+    --ui-radius:        18px;
+    --ui-radius-sm:     12px;
+    --ui-shadow-sm:     0 1px 2px rgba(120, 90, 0, 0.12);
+    --ui-shadow:        0 2px 4px rgba(120, 90, 0, 0.1), 0 10px 26px -10px rgba(120, 90, 0, 0.35);
+    --ui-shadow-lg:     0 18px 44px -12px rgba(90, 65, 0, 0.45);
+
+    --sk-radius:      12px;
+    --sk-on-accent:   #2b2100;
+    --sk-btn:         linear-gradient(180deg, #ffe066, #ffc400);
+    --sk-btn-hover:   linear-gradient(180deg, #ffe680, #ffb800);
+    --sk-btn-edge:    rgba(255, 255, 255, 0.6);
+    --sk-nav:         rgba(255, 210, 31, 0.96);
+    --sk-line:        rgba(120, 90, 0, 0.25);
+    --sk-card-edge:   rgba(255, 255, 255, 0.8);
+    /* плитки-иконки — «очки миньона»: металлическая оправа */
+    --sk-tile:        radial-gradient(circle at 50% 45%, #ffffff 0 45%, #dfe6ee 46% 60%, #8d99a6 61%);
+    --sk-tile-edge:   rgba(60, 70, 80, 0.55);
+    --sk-tile-icon:   #1f5596;
+    --sk-gray-200:    rgba(255, 228, 130, 0.9);
+    --sk-gray-300:    rgba(240, 205, 90, 0.9);
+    --sk-panel:       rgba(255, 244, 196, 0.75);
+    --sk-disabled:    rgba(245, 238, 210, 0.9);
+    --sk-popup:       #fffbea;
+    --sk-shade:       rgba(60, 45, 0, 0.35);
+    --sk-scroll:      #e0b400;
+    --sk-auth-brand:  linear-gradient(160deg, rgba(255, 214, 40, 0.55), rgba(255, 196, 0, 0.8));
+    --sk-cursor:         url("../../img/cursors/minions.svg") 3 2, auto;
+    --sk-cursor-pointer: url("../../img/cursors/minions-pointer.svg") 4 4, pointer;
+
+    /* Фон: картинки из public/img/themes/minions/ под светлой вуалью */
+    --sk-photo-pos: center 35%;
+    --sk-photo-under: #ffe14d;
+    --sk-veil:
+        radial-gradient(ellipse at 50% 40%, rgba(255, 246, 204, 0.2) 0%, rgba(255, 240, 180, 0.72) 80%);
+}
+
+/* ---------- Шапка: жёлтая, ссылки — тёмные, активная — «комбинезон» ---------- */
+html[data-ui-theme="minions"] .ui-nav { box-shadow: 0 4px 0 #1f5596, 0 10px 24px -10px rgba(90, 65, 0, 0.5); border-bottom: 0; }
+html[data-ui-theme="minions"] .ui-navlink,
+html[data-ui-theme="minions"] .ui-iconbtn { color: #3a2d00; }
+html[data-ui-theme="minions"] .ui-navlink:hover,
+html[data-ui-theme="minions"] .ui-iconbtn:hover { background: rgba(255, 255, 255, 0.45); color: #1d1600; }
+html[data-ui-theme="minions"] .ui-navlink--active,
+html[data-ui-theme="minions"] .ui-navlink--active:hover { background: #2f6db5; color: #ffffff; box-shadow: none; }
+html[data-ui-theme="minions"] .ui-brand__name { color: #1d1600; }
+html[data-ui-theme="minions"] .ui-brand__sub { color: #5a4600; }
+html[data-ui-theme="minions"] .ui-navlink__count,
+html[data-ui-theme="minions"] .ui-avatar { background: #2f6db5; color: #fff; }
+
+/* ---------- Заголовки: крупно и жирно ---------- */
+html[data-ui-theme="minions"] .ui-page-header h1,
+html[data-ui-theme="minions"] .ui-page-header h2 {
+    font-weight: 900 !important; letter-spacing: -.01em;
+    text-shadow: 0 2px 0 rgba(255, 255, 255, 0.85);
+}
+
+/* ---------- Кнопки: жёлтые «банановые», без капители ---------- */
+html[data-ui-theme="minions"] .ui-btn { text-transform: none; letter-spacing: 0; font-size: .85rem; font-weight: 700; }
+html[data-ui-theme="minions"] .ui-btn--primary { border: 1px solid #d9a800; }
+html[data-ui-theme="minions"] .ui-btn--ghost { background: rgba(255, 255, 255, 0.75); }
+html[data-ui-theme="minions"] .ui-chat__fab { border: 3px solid #2f6db5; }
+
+/* Жёлтое на светлом не читается — у залитых акцентом элементов тёмный текст */
+html[data-ui-theme="minions"] .bg-blue-600,
+html[data-ui-theme="minions"] .bg-indigo-600 { color: #2b2100 !important; }
+
+/* ---------- Карточки: тёплая кромка ---------- */
+html[data-ui-theme="minions"] .ui-card { border-color: rgba(120, 90, 0, 0.18); }
+
+/* ---------- Вход ---------- */
+html[data-ui-theme="minions"] .auth__brand { color: #2b2100; }
+html[data-ui-theme="minions"] .auth__headline { color: #1d1600; font-weight: 900; }
+html[data-ui-theme="minions"] .auth__lead { color: #45380f; }
+html[data-ui-theme="minions"] .auth__brand [style*="color:#a5b4fc"],
+html[data-ui-theme="minions"] .auth__brand [style*="color:#818cf8"] { color: #1f5596 !important; }
+
+/* Подписи под заголовком страницы лежат прямо на картинке — светлая подсветка для читаемости */
+html[data-ui-theme="minions"] .ui-page-header :is(p, span, div) { text-shadow: 0 0 6px rgba(255, 252, 235, 1), 0 0 12px rgba(255, 252, 235, 0.9); }
+html[data-ui-theme="minions"] .ui-page-header { color: #3a2d00; }
