@@ -191,6 +191,10 @@ html[data-ui-theme] :is(input:not([type="checkbox"]):not([type="radio"]):not([ty
 html[data-ui-theme] :is(:disabled, [aria-disabled="true"], .cursor-not-allowed) { cursor: not-allowed; }
 html[data-ui-theme] .cursor-move { cursor: move; }
 html[data-ui-theme] .cursor-zoom-out { cursor: zoom-out; }
+/* Выпадающие списки — системные курсоры: картинка темы при прокрутке списка в Chrome/Windows
+   пропадает (курсор над пунктами меняется на каждом кадре прокрутки), у <select> — над раскрытым списком */
+html[data-ui-theme] :is(select:not(:disabled), .ui-fc-menu, .ui-fc-detail, [role="listbox"]) { cursor: default; }
+html[data-ui-theme] :is(.ui-fc-menu button, [role="listbox"] [role="option"]) { cursor: pointer; }
 /* текст на левой панели входа и кнопка «Войти» — в цветах темы (в шаблоне белые) */
 html[data-ui-theme] .auth__feature,
 html[data-ui-theme] .auth__brand .text-white { color: var(--ui-text-2) !important; }

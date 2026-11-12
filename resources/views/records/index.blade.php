@@ -92,7 +92,7 @@
                                 @foreach($cardFields as $col)
                                     @php
                                         $colValue = $record->$col ?? null;
-                                        if ($col === 'is_repaired') $colValue = $colValue ? 'Да' : 'Нет';
+                                        if ($col === 'is_repaired' || ($cfg['fields'][$col]['type'] ?? '') === 'checkbox' || !empty($cfg['fields'][$col]['bool'])) $colValue = $colValue ? 'Да' : 'Нет';
                                     @endphp
                                     <div class="min-w-0">
                                         <dt>{{ $cfg['fields'][$col]['label'] ?? $col }}</dt>
@@ -172,8 +172,8 @@
                                         <span class="ui-table__strong whitespace-nowrap">{{ $record->post_number ? '№' . $record->post_number : '—' }}</span>
                                     @elseif($col === 'peripheral_number')
                                         <span class="ui-table__strong whitespace-nowrap">{{ $record->peripheral_number ? 'П' . $record->peripheral_number : '—' }}</span>
-                                    @elseif($col === 'is_repaired')
-                                        <x-status-pill :value="$record->is_repaired ? 'Да' : 'Нет'" />
+                                    @elseif($col === 'is_repaired' || ($cfg['fields'][$col]['type'] ?? '') === 'checkbox' || !empty($cfg['fields'][$col]['bool']))
+                                        <x-status-pill :value="$record->$col ? 'Да' : 'Нет'" />
                                     @elseif($col === 'fault_code')
                                         @if($record->fault_code)
                                             <span class="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md" style="background: var(--ui-surface-hover); color: var(--ui-text)">{{ $record->fault_code }}</span>

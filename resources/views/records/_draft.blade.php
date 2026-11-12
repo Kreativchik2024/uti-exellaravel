@@ -65,6 +65,7 @@
         Object.keys(draft.data).forEach(function (name) {
             var els = form.querySelectorAll('[name="' + name.replace(/"/g, '\\"') + '"]');
             Array.prototype.forEach.call(els, function (el) {
+                if (el.type === 'hidden' && els.length > 1) return;   // «0» под галочкой не трогаем
                 if (el.type === 'checkbox' || el.type === 'radio') el.checked = el.value === draft.data[name];
                 else el.value = draft.data[name];
                 el.dispatchEvent(new Event('input', { bubbles: true }));

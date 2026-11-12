@@ -24,7 +24,7 @@
             <div x-show="browsing() && trail.length" class="ui-fc-trail" x-text="trail.join(' › ')"></div>
             <template x-for="(it, i) in list()" :key="it.key">
                 <button type="button" class="ui-fc-item" :class="{ 'is-active': i === active, 'is-new': it.isNew, 'is-back': it.isBack, 'is-group': it.isGroup }"
-                        @mousedown.prevent="pick(it)" @mouseenter="active = i">
+                        @mousedown.prevent="pick(it)" @mousemove="active !== i && (active = i)">
                     <template x-if="it.isBack"><span>← Назад</span></template>
                     <template x-if="it.isGroup">
                         <span class="flex items-center justify-between gap-2 w-full min-w-0">

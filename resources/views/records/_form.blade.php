@@ -31,7 +31,7 @@
                 'board_number', 'ip_address', 'fuselage_number', 'frame_serial',
                 'fuselage_no', 'fuselage_serial',
                 'work_start', 'work_end',
-                'qty', 'seq',
+                'qty', 'flashed_with_day', 'seq',
             ],
         ],
         'equipment' => [
@@ -310,6 +310,16 @@
                                 <p class="mt-1 text-xs text-amber-700">Прежнее значение: <span class="font-mono">{{ $ipOther }}</span> — введите новое число</p>
                             @endif
 
+                        @elseif($type === 'checkbox')
+                            {{-- Галочка: скрытый «0» уходит, если галочку не поставили --}}
+                            <input type="hidden" name="{{ $name }}" value="0" @if($isTimeLocked) disabled @endif>
+                            <label class="tap-44 flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 shadow-sm transition hover:border-gray-300 {{ $isTimeLocked ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer' }}">
+                                <input type="checkbox" name="{{ $name }}" value="1"
+                                       @checked(filter_var($value, FILTER_VALIDATE_BOOLEAN)) @if($isTimeLocked) disabled @endif
+                                       class="h-5 w-5 flex-shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500/30">
+                                <span class="text-sm text-gray-900">Да</span>
+                            </label>
+
                         @elseif($type === 'combo' && $name === 'fault_code')
                             @include('records._fault_code', ['value' => $value, 'options' => $comboOptions[$name] ?? [], 'isReq' => $isReq, 'baseInput' => $baseInput])
 
@@ -362,6 +372,7 @@
                                       class="{{ $baseInput }} resize-none @error($name) !border-red-400 !ring-red-500/15 @enderror">{{ $value }}</textarea>
 
                         @elseif($type === 'select')
+                            @php if (is_bool($value)) $value = (int) $value; // поле «Да/Нет» хранится как true/false @endphp
                             <select name="{{ $name }}" @if($isReq) required @endif @if($isTimeLocked) disabled @endif
                                     class="{{ $baseInput }} @error($name) !border-red-400 !ring-red-500/15 @enderror">
                                 <option value="">— выберите —</option>

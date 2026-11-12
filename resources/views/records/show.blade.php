@@ -104,7 +104,7 @@
                                             elseif ($type === 'time') $display = \Carbon\Carbon::parse($value)->format('H:i');
                                         } catch (\Throwable $e) {}
                                     }
-                                    if ($name === 'is_repaired' && $value !== null) $display = $value ? 'Да' : 'Нет';
+                                    if (($name === 'is_repaired' || ($type === 'checkbox' || !empty($f['bool']))) && $value !== null) $display = $value ? 'Да' : 'Нет';
                                     $empty = $display === null || $display === '';
                                 @endphp
 
@@ -113,7 +113,7 @@
                                     <dd>
                                         @if($empty)
                                             <span style="color: var(--ui-faint)">—</span>
-                                        @elseif(in_array($name, $pillFields, true) || $name === 'is_repaired')
+                                        @elseif(in_array($name, $pillFields, true) || $name === 'is_repaired' || ($type === 'checkbox' || !empty($f['bool'])))
                                             <x-status-pill :value="$display" />
                                         @elseif($type === 'textarea')
                                             <div class="rec-text">{{ $display }}</div>

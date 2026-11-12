@@ -387,10 +387,12 @@ $map = [
             'fields' => array_merge([
                 'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
                 'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
+                'flashed_with_day' => ['label'=>'Дневная камера прошита','type'=>'select','bool'=>true,'rules'=>'required|boolean',
+                                 'options'=>['1'=>'Да','0'=>'Нет']],
             ], $workers, [
                 'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
             ], $faultCode),
-            'list_columns' => ['record_date','qty','fault_code'],
+            'list_columns' => ['record_date','qty','flashed_with_day','fault_code'],
         ],
 
         // =====================================================
