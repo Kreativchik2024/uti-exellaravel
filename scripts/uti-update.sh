@@ -98,6 +98,8 @@ if ! git -C "$BUILD" checkout --detach --force "$TARGET" >/dev/null 2>&1; then
     git worktree add --detach --force "$BUILD" "$TARGET" >/dev/null 2>&1 || die "не удалось создать копию для сборки в $BUILD"
 fi
 git -C "$BUILD" clean -fdq -e node_modules
+# Tailwind берёт классы и из шаблонов в vendor/ (пагинация и т.п.) — без этого кнопки страниц пропадают
+[ -d "$APP/vendor" ] && ln -sfn "$APP/vendor" "$BUILD/vendor"
 (
     cd "$BUILD" &&
     { npm ci --no-audit --no-fund || { echo "   npm ci не прошёл — пробую npm install"; npm install --no-audit --no-fund; }; } &&

@@ -55,6 +55,36 @@ class StatsTest extends TestCase
         }
     }
 
+    /** Сводка по исполнителю считает все вкладки участка и разные написания ФИО, а не только ПГП. */
+    public function test_executor_summary_counts_all_sheets_and_name_variants(): void
+    {
+        $master = $this->worker('master');
+        foreach ([['Иванов', 'Иван', 'Иванов И.И.'], ['Петров', 'Пётр', 'Петров П.П.']] as [$last, $first, $short]) {
+            \App\Models\Employee::create(['last_name' => $last, 'first_name' => $first, 'short_name' => $short, 'is_active' => true]);
+        }
+        $today = now()->toDateString();
+        \Illuminate\Database\Eloquent\Model::unguarded(function () use ($today) {
+            // ПГП: Иванов в двух записях (одна — с другим написанием), Петров — в одной вторым исполнителем
+            \App\Models\PgpRecord::create(['record_date' => $today, 'worker1' => 'Иванов И.И.', 'status' => 'Сдан']);
+            \App\Models\PgpRecord::create(['record_date' => $today, 'worker1' => 'иванов и. и.', 'worker2' => 'Петров П.П.', 'status' => 'Сдан']);
+            // Другая вкладка: Петров работал только здесь — раньше в сводку не попадал
+            \App\Models\CommModuleRecord::create(['record_date' => $today, 'worker1' => 'Петров П.П.', 'serial_number' => 'SN-1']);
+            \App\Models\CommModuleRecord::create(['record_date' => $today, 'worker1' => 'Петров П.П.', 'serial_number' => 'SN-2']);
+        });
+
+        $range = ['from' => now()->subDay()->toDateString(), 'to' => $today];
+        $data = $this->asUser($master)->getJson('/stats/zone2?' . http_build_query($range))->assertOk()->json();
+        $rows = collect($data['rows'])->pluck('cnt', 'name');
+        $this->assertSame(2, $rows['Иванов И.И.'] ?? null, 'оба написания — один человек');
+        $this->assertSame(3, $rows['Петров П.П.'] ?? null, 'ПГП + модуль связи');
+        $this->assertSame(4, $data['total'], 'записей с исполнителями по всем вкладкам');
+
+        $chart = $this->asUser($master)->getJson('/stats/zone2-chart?' . http_build_query($range + ['executor' => 'Петров П.П.']))->assertOk()->json();
+        $this->assertSame(3, array_sum($chart['values']));
+        $all = $this->asUser($master)->getJson('/stats/zone2-chart?' . http_build_query($range))->assertOk()->json();
+        $this->assertSame(4, array_sum($all['values']));
+    }
+
     public function test_defects_are_counted_in_summary_and_zone5(): void
     {
         $master = $this->worker('master');

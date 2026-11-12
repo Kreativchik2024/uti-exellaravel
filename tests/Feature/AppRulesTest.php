@@ -140,19 +140,21 @@ class AppRulesTest extends TestCase
 
     // ---------------- Форма ПГП ----------------
 
-    public function test_pgp_not_delivered_requires_inspection_fields(): void
+    public function test_pgp_not_delivered_saves_without_inspection_fields(): void
     {
         $user = $this->adminWithEmployee();
 
+        // «Не сдан»: № фюзеляжа, моторамы, Кросс 3, кронштейна, причина и код — необязательные
         $this->actingAs($user)->withSession(['workstation_workers' => []])
             ->post('/records/pgp', $this->pgpBase('Тестов Т.Т.') + ['ip_address' => '45', 'status' => 'Не сдан'])
-            ->assertSessionHasErrors([
-                'fuselage_number', 'frame_serial', 'cross3_number',
-                'bracket_serial', 'defect_reason', 'fault_code',
-            ])
-            ->assertSessionDoesntHaveErrors(['actions_taken', 'ip_address']);
+            ->assertSessionHasNoErrors();
 
-        $this->assertSame(0, PgpRecord::count());
+        $this->assertSame(1, PgpRecord::count());
+        $html = $this->actingAs($user)->get('/records/pgp/create')->assertOk()->getContent();
+        $this->assertStringNotContainsString('data-required-when-value="Не сдан" >', $html);
+        foreach (['fuselage_number', 'frame_serial', 'cross3_number', 'bracket_serial', 'defect_reason', 'fault_code'] as $f) {
+            $this->assertNull(config("sheets.map.pgp.fields.$f.required_when"), $f);
+        }
     }
 
     public function test_pgp_delivered_saves_without_inspection_fields_and_builds_ip(): void

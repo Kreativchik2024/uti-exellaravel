@@ -232,7 +232,7 @@
                         <template x-if="!selectedExecutor">
                             <div>
                                 <div class="mb-4 flex items-baseline gap-2">
-                                    <span class="text-sm text-gray-600">Найдено записей:</span>
+                                    <span class="text-sm text-gray-600">Найдено записей (все вкладки участка):</span>
                                     <span class="text-3xl font-extrabold text-blue-700" x-text="zone2Total"></span>
                                 </div>
                                 <div class="relative h-72"><canvas id="zone2Chart"></canvas></div>
@@ -636,7 +636,7 @@
                         if (!force) this.loaded2 = true;
                         this.loading2 = true;
                         try {
-                            const params = new URLSearchParams({ sheet: 'pgp' });
+                            const params = new URLSearchParams();   // все вкладки участка
                             if (this.dateFrom2) params.set('from', this.dateFrom2);
                             if (this.dateTo2)   params.set('to',   this.dateTo2);
                             const res = await fetch('{{ route("stats.zone2") }}?' + params.toString());
@@ -678,7 +678,7 @@
                         if (typeof Chart === 'undefined') { this.chartError = 'Chart.js не загрузился.'; return; }
                         this.chartError = '';
                         try {
-                            const params = new URLSearchParams({ sheet: 'pgp' });
+                            const params = new URLSearchParams();   // все вкладки участка
                             if (this.selectedExecutor) params.set('executor', this.selectedExecutor);
                             if (this.dateFrom2) params.set('from', this.dateFrom2);
                             if (this.dateTo2)   params.set('to',   this.dateTo2);

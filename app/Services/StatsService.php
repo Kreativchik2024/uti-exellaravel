@@ -331,6 +331,77 @@ class StatsService
         return $out;
     }
 
+    /**
+     * Зона 3 «Сводка по исполнителю» — по ВСЕМ вкладкам участка (раньше считалась только ПГП).
+     * Имена сравниваются так же, как в детализации (App\Support\WorkerNames): разные написания
+     * одного ФИО и несколько ФИО в одном поле считаются правильно. В список попадают только
+     * активные сотрудники справочника.
+     *
+     * @return array{rows: list<array{name: string, cnt: int}>, total: int, days: array<string,int>, workerDays: array<string, array<string,int>>}
+     */
+    public function executorsOverview(?Carbon $from, ?Carbon $to): array
+    {
+        $key = 'stats.executors.v1.' . app(SectionContext::class)->cacheKey() . '.' . ($from?->toDateString() ?? '-') . '_' . ($to?->toDateString() ?? '-');
+
+        return Cache::remember($key, 120, function () use ($from, $to) {
+            // ключ ФИО → имя сотрудника из справочника (только активные)
+            $directory = [];
+            foreach ($this->listWorkers() as $name) {
+                $k = $this->normalizeName((string) $name);
+                if ($k !== '') $directory[$k] = $name;
+            }
+
+            $counts = []; $workerDays = []; $days = []; $total = 0;
+            foreach ($this->sheets() as $cfg) {
+                if (empty($cfg['model']) || !class_exists($cfg['model'])) continue;
+                $meta = $this->metaFor($cfg);
+                if (empty($meta['workerFields'])) continue;
+
+                $model = $cfg['model'];
+                $dateField = $meta['dateField'];
+                $base = function () use ($model, $dateField, $from, $to) {
+                    $q = $model::query();
+                    $this->applyRange($q, $dateField, $from, $to);
+                    return $q;
+                };
+
+                // Записи с исполнителями (каждая — один раз) по дням
+                $perDay = $base()->where(function ($w) use ($meta) {
+                    foreach ($meta['workerFields'] as $f) $w->orWhere(fn ($x) => $x->whereNotNull($f)->where($f, '!=', ''));
+                })->selectRaw("DATE($dateField) AS d, COUNT(*) AS c")->groupBy('d')->get();
+                foreach ($perDay as $row) {
+                    $d = substr((string) $row->d, 0, 10);
+                    $days[$d] = ($days[$d] ?? 0) + (int) $row->c;
+                    $total += (int) $row->c;
+                }
+
+                // Участие каждого исполнителя: группировка по значению поля, имена разбираются в PHP
+                foreach ($meta['workerFields'] as $f) {
+                    $groups = $base()->whereNotNull($f)->where($f, '!=', '')
+                        ->selectRaw("DATE($dateField) AS d, $f AS v, COUNT(*) AS c")->groupBy('d', $f)->get();
+                    foreach ($groups as $g) {
+                        $d = substr((string) $g->d, 0, 10);
+                        $seen = [];
+                        foreach ($this->parseWorkers((string) $g->v) as $part) {
+                            $k = $this->normalizeName($part);
+                            if ($k === '' || isset($seen[$k]) || !isset($directory[$k])) continue;
+                            $seen[$k] = true;
+                            $name = $directory[$k];
+                            $counts[$name] = ($counts[$name] ?? 0) + (int) $g->c;
+                            $workerDays[$name][$d] = ($workerDays[$name][$d] ?? 0) + (int) $g->c;
+                        }
+                    }
+                }
+            }
+
+            arsort($counts);
+            $rows = [];
+            foreach ($counts as $name => $cnt) $rows[] = ['name' => (string) $name, 'cnt' => $cnt];
+
+            return ['rows' => $rows, 'total' => $total, 'days' => $days, 'workerDays' => $workerDays];
+        });
+    }
+
     public function listWorkers(): array
     {
         return Employee::query()

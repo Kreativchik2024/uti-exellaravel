@@ -218,76 +218,29 @@ class StatsController extends Controller
     }
 
     /**
-     * Зона 3 — список исполнителей (селект). Только admin/master.
-     * Возвращает ТОЛЬКО активных сотрудников из справочника (у кого есть записи за период).
+     * Зона 3 — список исполнителей (селект) и итог. Только admin/master.
+     * Считается по ВСЕМ вкладкам участка (StatsService::executorsOverview), только активные сотрудники.
+     * Параметр sheet (старые клиенты) лишь проверяется: чужая вкладка — 404.
      */
-    public function zone2(Request $r)
+    public function zone2(Request $r, StatsService $s)
     {
         abort_unless(auth()->user()->isAdmin() || auth()->user()->isMaster(), 403);
+        if ($r->filled('sheet')) abort_unless($this->sheetCfg($r->input('sheet')), 404);
 
-        $sheet = $r->input('sheet', 'pgp');
-        $from  = $r->input('from');
-        $to    = $r->input('to');
+        [$from, $to] = $this->resolveDateRange($r);
+        $data = $s->executorsOverview($from, $to);
 
-        $cfg = $this->sheetCfg($sheet);
-        abort_unless($cfg && isset($cfg['model']), 404);
-
-        $model = $cfg['model'];
-        $table = (new $model)->getTable();
-
-        [$whereSql, $bindings] = $this->sqlDateRange($from, $to);
-
-        $unionBindings = array_merge($bindings, $bindings, $bindings, $bindings, $bindings);
-        $cacheKey = "stats.zone2.{$this->sectionKey()}.$sheet.{$from}_{$to}";
-
-        $result = Cache::remember($cacheKey, 120, function () use ($table, $whereSql, $bindings, $unionBindings) {
-            $sql = "
-                SELECT name, COUNT(*) AS cnt FROM (
-                    SELECT worker1 AS name FROM `$table` WHERE worker1 IS NOT NULL AND worker1 != '' {$whereSql}
-                    UNION ALL SELECT worker2 FROM `$table` WHERE worker2 IS NOT NULL AND worker2 != '' {$whereSql}
-                    UNION ALL SELECT worker3 FROM `$table` WHERE worker3 IS NOT NULL AND worker3 != '' {$whereSql}
-                    UNION ALL SELECT worker4 FROM `$table` WHERE worker4 IS NOT NULL AND worker4 != '' {$whereSql}
-                    UNION ALL SELECT worker5 FROM `$table` WHERE worker5 IS NOT NULL AND worker5 != '' {$whereSql}
-                ) w GROUP BY name ORDER BY cnt DESC
-            ";
-            // В кеш кладём массивы, а не stdClass: Laravel 13 десериализует
-            // кеш с ограничением allowed_classes, и объекты стали бы «incomplete».
-            $rows = array_map(
-                fn ($row) => ['name' => $row->name, 'cnt' => (int) $row->cnt],
-                DB::select($sql, $unionBindings)
-            );
-
-            $totalSql = "
-                SELECT COUNT(*) AS total FROM `$table`
-                WHERE (
-                    (worker1 IS NOT NULL AND worker1 != '')
-                    OR (worker2 IS NOT NULL AND worker2 != '')
-                    OR (worker3 IS NOT NULL AND worker3 != '')
-                    OR (worker4 IS NOT NULL AND worker4 != '')
-                    OR (worker5 IS NOT NULL AND worker5 != '')
-                ) {$whereSql}
-            ";
-            $total = (int) (DB::select($totalSql, $bindings)[0]->total ?? 0);
-            return ['rows' => $rows, 'total' => $total];
-        });
-
-        // Фильтруем rows: только активные сотрудники из справочника
-        $activeSet = array_flip($this->activeWorkerNames());
-        $result['rows'] = array_values(array_filter($result['rows'], function ($row) use ($activeSet) {
-            return isset($activeSet[$row['name']]);
-        }));
-
-        return response()->json($result);
+        return response()->json(['rows' => $data['rows'], 'total' => $data['total']]);
     }
 
     /**
-     * Зона 3 — график по дням. Только admin/master. Только активный сотрудник.
+     * Зона 3 — график по дням (все вкладки участка). Только admin/master. Только активный сотрудник.
      */
-    public function zone2Chart(Request $r)
+    public function zone2Chart(Request $r, StatsService $s)
     {
         abort_unless(auth()->user()->isAdmin() || auth()->user()->isMaster(), 403);
+        if ($r->filled('sheet')) abort_unless($this->sheetCfg($r->input('sheet')), 404);
 
-        $sheet    = $r->input('sheet', 'pgp');
         $executor = trim((string) $r->input('executor', ''));
         $from     = $r->input('from');
         $to       = $r->input('to');
@@ -296,38 +249,9 @@ class StatsController extends Controller
             return response()->json(['labels' => [], 'values' => []]);
         }
 
-        $cfg = $this->sheetCfg($sheet);
-        abort_unless($cfg && isset($cfg['model']), 404);
-
-        $model = $cfg['model'];
-        $table = (new $model)->getTable();
-
-        [$whereSql, $bindings] = $this->sqlDateRange($from, $to);
-
-        if ($executor) {
-            $sql = "
-                SELECT DATE(record_date) AS record_date, COUNT(*) AS cnt FROM `$table`
-                WHERE (worker1 = ? OR worker2 = ? OR worker3 = ? OR worker4 = ? OR worker5 = ?)
-                {$whereSql} GROUP BY DATE(record_date) ORDER BY record_date
-            ";
-            $execBindings = [$executor, $executor, $executor, $executor, $executor];
-            $rows = DB::select($sql, array_merge($execBindings, $bindings));
-        } else {
-            $sql = "
-                SELECT DATE(record_date) AS record_date, COUNT(*) AS cnt FROM `$table`
-                WHERE (
-                    (worker1 IS NOT NULL AND worker1 != '')
-                    OR (worker2 IS NOT NULL AND worker2 != '')
-                    OR (worker3 IS NOT NULL AND worker3 != '')
-                    OR (worker4 IS NOT NULL AND worker4 != '')
-                    OR (worker5 IS NOT NULL AND worker5 != '')
-                ) {$whereSql} GROUP BY DATE(record_date) ORDER BY record_date
-            ";
-            $rows = DB::select($sql, $bindings);
-        }
-
-        $counts = [];
-        foreach ($rows as $row) $counts[substr((string) $row->record_date, 0, 10)] = (int) $row->cnt;
+        [$fromC, $toC] = $this->resolveDateRange($r);
+        $data = $s->executorsOverview($fromC, $toC);
+        $counts = $executor !== '' ? ($data['workerDays'][$executor] ?? []) : $data['days'];
 
         $rangeFrom = $from ? Carbon::parse($from)->startOfDay() : null;
         $rangeTo   = $to   ? Carbon::parse($to)->endOfDay()     : now()->endOfDay();
