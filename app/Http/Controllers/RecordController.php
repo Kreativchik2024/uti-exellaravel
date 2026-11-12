@@ -506,17 +506,24 @@ class RecordController extends Controller
         ));
     }
 
+    /** Поля «Да/Нет» (is_repaired, 'bool'=>true, checkbox): «Да»/«Нет» из списка → 1/0 */
+    private function normalizeBooleans(array $cfg, Request $r): void
+    {
+        foreach ($cfg['fields'] as $name => $f) {
+            $isBool = $name === 'is_repaired' || !empty($f['bool']) || ($f['type'] ?? '') === 'checkbox';
+            if (!$isBool || !$r->has($name)) continue;
+            $val = $r->input($name);
+            if (in_array($val, ['Да', '1', 1, true, 'true', 'on'], true)) $r->merge([$name => 1]);
+            if (in_array($val, ['Нет', '0', 0, false, 'false'], true)) $r->merge([$name => 0]);
+        }
+    }
+
     public function store(Request $r, string $sheet)
     {
         $cfg = $this->cfg($sheet);
         Gate::authorize('create', $cfg['model']);
 
-        // --- ИСПРАВЛЕНИЕ ДЛЯ ЛОГИЧЕСКОГО ПОЛЯ ---
-        if ($r->has('is_repaired')) {
-            $val = $r->input('is_repaired');
-            if (in_array($val, ['Да', '1', 1, true, 'true'], true)) $r->merge(['is_repaired' => 1]);
-            if (in_array($val, ['Нет', '0', 0, false, 'false'], true)) $r->merge(['is_repaired' => 0]);
-        }
+        $this->normalizeBooleans($cfg, $r);
 
         $defaults = $this->defaults($sheet, $cfg);
         foreach ($defaults as $field => $value) {
@@ -622,12 +629,7 @@ class RecordController extends Controller
             return back()->withErrors(['general' => 'Редактирование запрещено: прошло более 24 часов с момента создания записи.']);
         }
 
-        // --- ИСПРАВЛЕНИЕ ДЛЯ ЛОГИЧЕСКОГО ПОЛЯ ---
-        if ($r->has('is_repaired')) {
-            $val = $r->input('is_repaired');
-            if (in_array($val, ['Да', '1', 1, true, 'true'], true)) $r->merge(['is_repaired' => 1]);
-            if (in_array($val, ['Нет', '0', 0, false, 'false'], true)) $r->merge(['is_repaired' => 0]);
-        }
+        $this->normalizeBooleans($cfg, $r);
 
         $this->applyIpSuffix($cfg, $r);
         $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();

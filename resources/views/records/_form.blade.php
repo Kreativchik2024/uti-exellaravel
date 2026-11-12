@@ -378,7 +378,8 @@
                                 <option value="">— выберите —</option>
                                 @foreach(($f['options'] ?? []) as $optKey => $optVal)
                                     @php
-                                        $optValue = is_string($optKey) ? $optKey : $optVal;
+                                        // у поля «Да/Нет» ('bool'=>true) ключи 1/0 — PHP делает их числами, поэтому отдельно
+                                        $optValue = (is_string($optKey) || !empty($f['bool'])) ? $optKey : $optVal;
                                         $optLabel = is_string($optKey) ? $optVal : $optVal;
                                     @endphp
                                     <option value="{{ $optValue }}" @selected((string)$value === (string)$optValue)>{{ $optLabel }}</option>
