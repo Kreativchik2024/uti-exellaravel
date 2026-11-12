@@ -4,7 +4,10 @@
     "type": "project",
     "description": "The skeleton application for the Laravel framework.",
     "keywords": ["laravel", "framework"],
-    "license": "MIT",
+    "license": "proprietary",
+    "authors": [
+        { "name": "Смирнов Александр Вадимович", "role": "Правообладатель" }
+    ],
     "require": {
         "php": "^8.3",
         "intervention/image-laravel": "^4.1",
