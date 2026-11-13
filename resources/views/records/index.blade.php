@@ -47,6 +47,9 @@
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 <input name="q" value="{{ $q }}" placeholder="Поиск: борт, серийный номер, исполнитель…" autocomplete="off">
             </label>
+            @if($listFilter && $listFilter['current'] !== '')
+                <input type="hidden" name="{{ $listFilter['field'] }}" value="{{ $listFilter['current'] }}">
+            @endif
             <button type="submit" class="ui-btn ui-btn--ghost">Найти</button>
             @if($q)
                 <a href="{{ route('records.index', $sheet) }}" class="ui-btn" style="color: var(--ui-muted)">
@@ -55,6 +58,32 @@
                 </a>
             @endif
         </form>
+
+        {{-- Вкладки-фильтры (ПГП: тип борта). Список вкладок — из config/board_types.php --}}
+        @if($listFilter)
+            @php
+                $lfTabs = [['value' => '', 'label' => 'Все', 'count' => $listFilter['total']]];
+                foreach ($listFilter['options'] as $opt) {
+                    $lfTabs[] = ['value' => $opt, 'label' => $opt, 'count' => $listFilter['counts'][$opt] ?? 0];
+                }
+                if (($listFilter['counts']['_none'] ?? 0) > 0 || $listFilter['current'] === '_none') {
+                    $lfTabs[] = ['value' => '_none', 'label' => $listFilter['empty_label'] ?? 'Без значения', 'count' => $listFilter['counts']['_none'] ?? 0];
+                }
+            @endphp
+            <nav class="flex flex-wrap items-center gap-2" aria-label="{{ $listFilter['label'] }}">
+                <span class="text-sm font-medium mr-1" style="color: var(--ui-muted)">{{ $listFilter['label'] }}:</span>
+                @foreach($lfTabs as $tab)
+                    @php $active = $listFilter['current'] === $tab['value']; @endphp
+                    <a href="{{ route('records.index', array_filter([$sheet, $listFilter['field'] => $tab['value'], 'q' => $q], fn ($v) => $v !== '' && $v !== null)) }}"
+                       class="ui-btn ui-btn--sm {{ $active ? 'ui-btn--primary' : 'ui-btn--ghost' }}"
+                       @if($active) aria-current="page" @endif>
+                        {{ $tab['label'] }}
+                        <span class="tabular-nums text-xs font-semibold px-1.5 rounded-full"
+                              style="background: {{ $active ? 'rgba(255,255,255,.22)' : 'var(--ui-surface-hover)' }}">{{ number_format($tab['count'], 0, ',', ' ') }}</span>
+                    </a>
+                @endforeach
+            </nav>
+        @endif
 
         {{-- Карточки записей: мобильные (< 768px) --}}
         <div class="records-cards">

@@ -17,6 +17,11 @@
             typing: @js(route('chat.typing')),
             react: @js(route('chat.react', ['message' => '__ID__'])),
             pin: @js(route('chat.pin', ['message' => '__ID__'])),
+            groupCreate: @js(route('chat.groups.create')),
+            groupShow: @js(route('chat.groups.show', ['group' => '__ID__'])),
+            groupAdd: @js(route('chat.groups.members.add', ['group' => '__ID__'])),
+            groupRemove: @js(route('chat.groups.members.remove', ['group' => '__ID__'])),
+            groupRename: @js(route('chat.groups.rename', ['group' => '__ID__'])),
             battleInvite: @js(route('games.battleship.invite')),
         },
      })"
@@ -50,6 +55,9 @@
                             :aria-label="notifyOn ? 'Выключить уведомления' : 'Включить уведомления'" :style="notifyOn ? 'color: var(--ui-accent)' : ''">
                         <svg x-show="notifyOn" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 22a2.5 2.5 0 002.45-2h-4.9A2.5 2.5 0 0012 22zm7-6V11a7 7 0 00-5.5-6.84V3.5a1.5 1.5 0 00-3 0v.66A7 7 0 005 11v5l-2 2v1h18v-1l-2-2z"/></svg>
                         <svg x-show="!notifyOn" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/><path stroke-linecap="round" stroke-width="2" d="M4 4l16 16"/></svg>
+                    </button>
+                    <button type="button" class="ui-iconbtn" @click="startPick('create')" title="Новая группа" aria-label="Новая группа">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
                     </button>
                     <button type="button" class="ui-iconbtn" @click="startNew()" title="Новое сообщение" aria-label="Новое сообщение">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -86,6 +94,33 @@
                         </span>
                     </button>
 
+                    <div class="ui-chat__section" x-show="conv.groups && conv.groups.length">Группы</div>
+                    <template x-for="g in (conv.groups || [])" :key="'g' + g.group">
+                        <button type="button" class="ui-chat__conv" @click="openThread(0, g.name, false, g.group, g.members)">
+                            <span class="ui-chat__avatar ui-chat__avatar--group"><span x-text="g.initials"></span></span>
+                            <span class="ui-chat__conv-body">
+                                <span class="ui-chat__conv-top">
+                                    <span class="ui-chat__conv-name" x-text="g.name"></span>
+                                    <span class="ui-chat__conv-time" x-text="g.last ? timeShort(g.last.at) : ''"></span>
+                                </span>
+                                <span class="ui-chat__conv-bottom">
+                                    <span class="ui-chat__conv-last">
+                                        <template x-if="g.last">
+                                            <span class="ui-chat__conv-preview">
+                                                <span x-text="g.last.author + ':'"></span>
+                                                <img x-show="g.last.media && g.last.media.thumb_url" :src="g.last.media && g.last.media.thumb_url" class="ui-chat__mini-thumb" alt="" loading="lazy">
+                                                <span x-show="g.last.media && !g.last.body" class="ui-chat__media-label" x-text="g.last.media && g.last.media.label"></span>
+                                                <span x-show="g.last.body" x-text="g.last.body"></span>
+                                            </span>
+                                        </template>
+                                        <span x-show="!g.last" class="ui-chat__media-label" x-text="'Участников: ' + g.members"></span>
+                                    </span>
+                                    <span x-show="g.unread" class="ui-chat__count" x-text="g.unread"></span>
+                                </span>
+                            </span>
+                        </button>
+                    </template>
+
                     <div class="ui-chat__section" x-show="conv.direct.length">Личные</div>
                     <template x-for="c in conv.direct" :key="c.peer">
                         <button type="button" class="ui-chat__conv" @click="openThread(c.peer, c.name, c.online)">
@@ -119,6 +154,9 @@
                     <div x-show="!conv.direct.length" class="ui-chat__empty">
                         Личных переписок пока нет.
                         <button type="button" class="ui-chat__link" @click="startNew()">Написать сотруднику</button>
+                    </div>
+                    <div x-show="!(conv.groups && conv.groups.length)" class="ui-chat__empty" style="padding: .25rem 1.25rem .5rem">
+                        <button type="button" class="ui-chat__link" @click="startPick('create')">Создать группу из нескольких человек</button>
                     </div>
                     <p class="ui-chat__retention">История чата хранится 7 дней</p>
                 </div>
@@ -159,6 +197,101 @@
             </div>
         </template>
 
+        {{-- ===== Выбор нескольких участников: новая группа / добавить в группу ===== --}}
+        <template x-if="view === 'pick'">
+            <div class="ui-chat__screen">
+                <header class="ui-chat__head">
+                    <button type="button" class="ui-iconbtn" @click="pick.mode === 'add' ? openGroupInfo() : backToList()" aria-label="Назад">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <div class="flex-1 min-w-0">
+                        <div class="ui-chat__title truncate" x-text="pick.mode === 'add' ? 'Добавить участников' : 'Новая группа'"></div>
+                        <div class="ui-chat__sub" x-text="pick.selected.length ? 'выбрано: ' + pick.selected.length : 'отметьте одного или нескольких'"></div>
+                    </div>
+                </header>
+                <div class="px-3 pb-2 flex flex-col gap-2">
+                    <input x-show="pick.mode === 'create'" type="text" x-model="pick.name" maxlength="80" class="ui-input w-full"
+                           placeholder="Название группы, например «Смена А»" aria-label="Название группы" x-ref="groupName">
+                    <label class="ui-search">
+                        <span class="sr-only">Найти сотрудника</span>
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" x-model="search" @input.debounce.300ms="loadUsers()" x-ref="search" placeholder="Фамилия или имя…" autocomplete="off">
+                    </label>
+                    <div x-show="pick.selected.length" class="flex flex-wrap gap-1">
+                        <template x-for="u in pick.selected" :key="'s' + u.peer">
+                            <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="togglePick(u)" :title="'Убрать ' + u.name">
+                                <span x-text="u.name"></span> ✕
+                            </button>
+                        </template>
+                    </div>
+                </div>
+                <div class="ui-chat__scroll">
+                    <template x-for="u in pickable()" :key="'p' + u.peer">
+                        <button type="button" class="ui-chat__conv" @click="togglePick(u)" :aria-pressed="isPicked(u)">
+                            <span class="ui-chat__avatar">
+                                <span x-text="u.initials"></span>
+                                <span x-show="u.online" class="ui-chat__online-dot"></span>
+                            </span>
+                            <span class="ui-chat__conv-body">
+                                <span class="ui-chat__conv-name" x-text="u.name"></span>
+                                <span class="ui-chat__conv-last" x-text="u.online ? 'в сети' : 'не в сети'"></span>
+                            </span>
+                            <input type="checkbox" class="rounded" :checked="isPicked(u)" tabindex="-1" aria-hidden="true" style="pointer-events: none">
+                        </button>
+                    </template>
+                    <div x-show="!pickable().length" class="ui-chat__empty">Никого не найдено</div>
+                </div>
+                <div x-show="error" x-text="error" class="ui-chat__error" role="alert"></div>
+                <div class="p-3 border-t" style="border-color: var(--ui-border)">
+                    <button type="button" class="ui-btn ui-btn--primary w-full" @click="submitPick()"
+                            :disabled="pick.busy || !pick.selected.length || (pick.mode === 'create' && !pick.name.trim())"
+                            x-text="pick.busy ? 'Сохранение…' : (pick.mode === 'add' ? 'Добавить (' + pick.selected.length + ')' : 'Создать группу (' + (pick.selected.length + 1) + ' уч.)')"></button>
+                </div>
+            </div>
+        </template>
+
+        {{-- ===== О группе: участники ===== --}}
+        <template x-if="view === 'groupInfo'">
+            <div class="ui-chat__screen">
+                <header class="ui-chat__head">
+                    <button type="button" class="ui-iconbtn" @click="backToThread()" aria-label="Назад к переписке">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <div class="flex-1 min-w-0">
+                        <div class="ui-chat__title truncate" x-text="groupInfo ? groupInfo.name : peerName"></div>
+                        <div class="ui-chat__sub" x-text="groupInfo ? 'участников: ' + groupInfo.members.length : 'загрузка…'"></div>
+                    </div>
+                    <button type="button" class="ui-iconbtn" x-show="groupInfo && groupInfo.can_manage" @click="renameGroup()" title="Переименовать" aria-label="Переименовать группу">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    </button>
+                </header>
+                <div class="px-3 pb-2">
+                    <button type="button" class="ui-btn ui-btn--primary w-full" @click="startPick('add')"
+                            :disabled="!groupInfo || groupInfo.members.length >= groupInfo.max">+ Добавить участников</button>
+                </div>
+                <div class="ui-chat__scroll">
+                    <template x-for="u in (groupInfo ? groupInfo.members : [])" :key="'m' + u.peer">
+                        <div class="ui-chat__conv" style="cursor: default">
+                            <span class="ui-chat__avatar">
+                                <span x-text="u.initials"></span>
+                                <span x-show="u.online" class="ui-chat__online-dot"></span>
+                            </span>
+                            <span class="ui-chat__conv-body">
+                                <span class="ui-chat__conv-name" x-text="u.name + (u.me ? ' (вы)' : '')"></span>
+                                <span class="ui-chat__conv-last" x-text="u.owner ? 'создатель группы' : (u.online ? 'в сети' : 'не в сети')"></span>
+                            </span>
+                            <button type="button" x-show="groupInfo.can_manage && !u.me" class="ui-iconbtn" style="width: 28px; height: 28px"
+                                    @click="removeMember(u)" :title="'Исключить ' + u.name" :aria-label="'Исключить ' + u.name">✕</button>
+                        </div>
+                    </template>
+                </div>
+                <div x-show="error" x-text="error" class="ui-chat__error" role="alert"></div>
+                <div class="p-3 border-t" style="border-color: var(--ui-border)">
+                    <button type="button" class="ui-btn ui-btn--ghost w-full" style="color: var(--ui-bad)" @click="leaveGroup()">Выйти из группы</button>
+                </div>
+            </div>
+        </template>
+
         {{-- ===== Переписка ===== --}}
         <template x-if="view === 'thread'">
             <div class="ui-chat__screen" @dragover.prevent="dragOver = true" @dragleave.self="dragOver = false" @drop.prevent="dragOver = false; addFiles($event.dataTransfer.files)">
@@ -173,9 +306,12 @@
                                 <span class="ui-chat__typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
                                 <span x-text="typingText()"></span>
                             </span>
-                            <span x-show="!typingNames.length" x-text="peer === 0 ? 'все сотрудники' : (peerOnline ? 'в сети' : 'не в сети')"></span>
+                            <span x-show="!typingNames.length" x-text="group ? 'участников: ' + groupMembers : (peer === 0 ? 'все сотрудники' : (peerOnline ? 'в сети' : 'не в сети'))"></span>
                         </div>
                     </div>
+                    <button type="button" class="ui-iconbtn" x-show="group" @click="openGroupInfo()" title="Участники группы" aria-label="Участники группы">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    </button>
                     <button type="button" class="ui-iconbtn" x-show="games && peer !== 0" @click="inviteBattle()" :disabled="inviting"
                             title="Пригласить в морской бой" aria-label="Пригласить в морской бой">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 17l2 3h14l2-3M5 17V9l7-4 7 4v8M12 5v12"/></svg>
@@ -185,7 +321,7 @@
                     </button>
                 </header>
 
-                <div x-show="peer === 0 && pinned" class="ui-chat__pinned" role="note">
+                <div x-show="peer === 0 && !group && pinned" class="ui-chat__pinned" role="note">
                     <svg class="w-4 h-4 shrink-0" style="color: var(--ui-accent)" fill="currentColor" viewBox="0 0 24 24"><path d="M16 3a1 1 0 01.7 1.7L15 6.4V10l2.7 2.7a1 1 0 01-.7 1.7H13v6a1 1 0 01-2 0v-6H6.3a1 1 0 01-.7-1.7L8.3 10V6.4L6.6 4.7A1 1 0 017.3 3H16z"/></svg>
                     <button type="button" class="ui-chat__pinned-body" @click="pinned && scrollToMessage(pinned.id)" title="Перейти к сообщению">
                         <span class="ui-chat__pinned-title">Закреплено · <span x-text="pinned && pinned.sender_name"></span></span>
@@ -213,7 +349,7 @@
                                         <template x-for="(e, ei) in reactionSet" :key="e">
                                             <button type="button" class="ui-chat__actions-emoji" :style="'--i:' + ei" @click="react(m, e)" x-text="e" :aria-label="'Реакция ' + e"></button>
                                         </template>
-                                        <button type="button" x-show="canPin && peer === 0" class="ui-chat__actions-reply" @click="togglePin(m)"
+                                        <button type="button" x-show="canPin && peer === 0 && !group" class="ui-chat__actions-reply" @click="togglePin(m)"
                                                 :title="pinned && pinned.id === m.id ? 'Открепить' : 'Закрепить для всех'">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 3l5 5-4 1-4 4 1 5-3 3-4-4-4 4M8 13l-5-5 3-3 5 1 4-4"/></svg>
                                         </button>
@@ -290,7 +426,7 @@
                     </template>
 
                     <div x-show="!messages.length && !loading" class="ui-chat__empty">
-                        <span x-text="peer === 0 ? 'В общем чате пока тихо. Напишите первым!' : 'Начните переписку — сообщение увидит только собеседник.'"></span>
+                        <span x-text="group ? 'В группе пока тихо. Сообщение увидят только участники группы.' : (peer === 0 ? 'В общем чате пока тихо. Напишите первым!' : 'Начните переписку — сообщение увидит только собеседник.')"></span>
                     </div>
                 </div>
 
@@ -381,9 +517,11 @@ document.addEventListener('alpine:init', () => {
             notifyOn: false, notifyAfter: null, notifySupported: 'Notification' in window && window.isSecureContext, hiddenTicks: 0,
             open: false, view: 'list',
             unread: 0,
-            conv: { general: { unread: 0, online: 0, last: null }, direct: [] },
+            conv: { general: { unread: 0, online: 0, last: null }, groups: [], direct: [] },
             users: [], search: '',
             peer: 0, peerName: '', peerOnline: false,
+            group: 0, groupMembers: 0, groupInfo: null,
+            pick: { mode: 'create', name: '', selected: [], busy: false },
             messages: [], hasMore: false, loading: false, loadingOlder: false,
             draft: '', error: '',
             peerReadId: 0, generalReads: [], tmpSeq: 0,
@@ -433,6 +571,8 @@ document.addEventListener('alpine:init', () => {
                 });
             },
             withParams(url, params) { return url + '?' + new URLSearchParams(params).toString(); },
+            /** Параметры текущего канала: группа или собеседник (0 — общий чат). */
+            chan(extra = {}) { return Object.assign(this.group ? { group: this.group } : { peer: this.peer }, extra); },
 
             // ---- опрос ----
             tick(force = false) {
@@ -475,16 +615,19 @@ document.addEventListener('alpine:init', () => {
             },
             showNotification(n) {
                 // Уже открыт этот разговор и вкладка на экране — не мешаем
-                if (!document.hidden && this.open && this.view === 'thread' && this.peer === n.peer) return;
+                if (!document.hidden && this.open && this.view === 'thread' && this.peer === n.peer && this.group === (n.group || 0)) return;
                 if (!this.notifyOn || Notification.permission !== 'granted') return;
                 try {
-                    const note = new Notification(n.mention ? n.name + ' упомянул(а) вас в общем чате' : 'Сообщение от ' + n.name, {
+                    const title = n.group ? n.name + ' в группе «' + n.group_name + '»'
+                                : n.mention ? n.name + ' упомянул(а) вас в общем чате' : 'Сообщение от ' + n.name;
+                    const note = new Notification(title, {
                         body: n.preview, icon: '/icons/icon-192.png', tag: 'uti-chat-' + n.id,
                     });
                     note.onclick = () => {
                         window.focus();
                         this.open = true;
-                        this.openThread(n.peer, n.peer === 0 ? 'Общий чат' : n.name, false);
+                        if (n.group) this.openThread(0, n.group_name, false, n.group);
+                        else this.openThread(n.peer, n.peer === 0 ? 'Общий чат' : n.name, false);
                         note.close();
                     };
                 } catch (e) {}
@@ -509,7 +652,7 @@ document.addEventListener('alpine:init', () => {
                     try {
                         const users = (await this.api(this.withParams(this.urls.users, { q }))).users || [];
                         const list = users.slice(0, 6);
-                        if (this.peer === 0 && 'все'.startsWith(q.toLowerCase())) list.unshift({ peer: -1, name: 'все', initials: '@', online: false });
+                        if (this.peer === 0 && !this.group && 'все'.startsWith(q.toLowerCase())) list.unshift({ peer: -1, name: 'все', initials: '@', online: false });
                         this.mentionList = list;
                         this.mentionIdx = 0;
                     } catch (e) { this.mentionList = []; }
@@ -546,8 +689,84 @@ document.addEventListener('alpine:init', () => {
             async loadConversations() {
                 try {
                     this.conv = await this.api(this.urls.conversations);
-                    this.unread = (this.conv.general.unread || 0) + this.conv.direct.reduce((s, c) => s + (c.unread || 0), 0);
+                    this.conv.groups = this.conv.groups || [];
+                    this.unread = (this.conv.general.unread || 0)
+                        + this.conv.direct.reduce((s, c) => s + (c.unread || 0), 0)
+                        + this.conv.groups.reduce((s, c) => s + (c.unread || 0), 0);
                 } catch (e) {}
+            },
+
+            // ---- группы ----
+            startPick(mode) {
+                this.view = 'pick'; this.error = ''; this.search = '';
+                this.pick = { mode, name: '', selected: [], busy: false };
+                this.loadUsers();
+                this.$nextTick(() => { const el = this.el(mode === 'create' ? 'groupName' : 'search'); el && el.focus(); });
+            },
+            /** Кого можно отметить: уже состоящих в группе не показываем. */
+            pickable() {
+                const inGroup = new Set(this.pick.mode === 'add' && this.groupInfo ? this.groupInfo.members.map(m => m.peer) : []);
+                return this.users.filter(u => !inGroup.has(u.peer));
+            },
+            isPicked(u) { return this.pick.selected.some(x => x.peer === u.peer); },
+            togglePick(u) {
+                this.pick.selected = this.isPicked(u)
+                    ? this.pick.selected.filter(x => x.peer !== u.peer)
+                    : [...this.pick.selected, { peer: u.peer, name: u.name }];
+            },
+            async submitPick() {
+                if (this.pick.busy || !this.pick.selected.length) return;
+                this.pick.busy = true; this.error = '';
+                const ids = this.pick.selected.map(u => u.peer);
+                try {
+                    if (this.pick.mode === 'add') {
+                        this.groupInfo = await this.post(this.urls.groupAdd.replace('__ID__', this.group), { user_ids: ids });
+                        this.groupMembers = this.groupInfo.members.length;
+                        this.view = 'groupInfo';
+                    } else {
+                        const g = await this.post(this.urls.groupCreate, { name: this.pick.name.trim(), members: ids });
+                        this.openThread(0, g.name, false, g.group, g.members.length);
+                    }
+                } catch (e) { this.error = e.message; }
+                this.pick.busy = false;
+            },
+            async openGroupInfo() {
+                if (!this.group) return;
+                this.view = 'groupInfo'; this.error = '';
+                try {
+                    this.groupInfo = await this.api(this.urls.groupShow.replace('__ID__', this.group));
+                    this.groupMembers = this.groupInfo.members.length;
+                    this.peerName = this.groupInfo.name;
+                } catch (e) { this.error = e.message; }
+            },
+            backToThread() {
+                this.openThread(0, this.groupInfo ? this.groupInfo.name : this.peerName, false, this.group, this.groupMembers);
+            },
+            async removeMember(u) {
+                if (!confirm('Исключить ' + u.name + ' из группы?')) return;
+                this.error = '';
+                try {
+                    this.groupInfo = await this.post(this.urls.groupRemove.replace('__ID__', this.group), { user_id: u.peer });
+                    this.groupMembers = this.groupInfo.members.length;
+                } catch (e) { this.error = e.message; }
+            },
+            async leaveGroup() {
+                if (!confirm('Выйти из группы «' + (this.groupInfo ? this.groupInfo.name : this.peerName) + '»? Сообщения группы больше не будут видны.')) return;
+                this.error = '';
+                try {
+                    await this.post(this.urls.groupRemove.replace('__ID__', this.group), { user_id: this.me });
+                    this.group = 0; this.groupInfo = null;
+                    this.backToList();
+                } catch (e) { this.error = e.message; }
+            },
+            async renameGroup() {
+                const name = prompt('Новое название группы', this.groupInfo ? this.groupInfo.name : '');
+                if (name === null || !name.trim()) return;
+                this.error = '';
+                try {
+                    this.groupInfo = await this.post(this.urls.groupRename.replace('__ID__', this.group), { name: name.trim() });
+                    this.peerName = this.groupInfo.name;
+                } catch (e) { this.error = e.message; }
             },
             async loadUsers() {
                 try { this.users = (await this.api(this.withParams(this.urls.users, { q: this.search }))).users; } catch (e) {}
@@ -562,15 +781,23 @@ document.addEventListener('alpine:init', () => {
                 this.view = 'new'; this.search = ''; this.loadUsers();
                 this.$nextTick(() => this.el("search") && this.el("search").focus());
             },
-            async openThread(peer, name, online) {
+            async openThread(peer, name, online, group = 0, members = 0) {
                 this.view = 'thread';
-                this.peer = peer; this.peerName = name; this.peerOnline = online;
+                this.peer = group ? 0 : peer; this.peerName = name; this.peerOnline = online;
+                if (group !== this.group) this.groupInfo = null;
+                this.group = group || 0; this.groupMembers = members || 0;
+                if (this.group && !this.groupMembers) {
+                    // открыли из уведомления — число участников ещё неизвестно
+                    this.api(this.urls.groupShow.replace('__ID__', this.group))
+                        .then(g => { if (this.group === g.group) { this.groupInfo = g; this.groupMembers = g.members.length; } })
+                        .catch(() => {});
+                }
                 this.messages = []; this.hasMore = false; this.error = ''; this.draft = '';
                 this.replyTo = null; this.clearFiles(); this.actionsFor = null; this.typingNames = [];
                 this.loading = true;
                 try {
                     // Открываем на первом непрочитанном (если есть)
-                    const data = await this.api(this.withParams(this.urls.messages, { peer, initial: 1 }));
+                    const data = await this.api(this.withParams(this.urls.messages, this.chan({ initial: 1 })));
                     this.messages = data.messages; this.hasMore = data.has_more;
                     this.firstUnreadId = data.first_unread_id;
                     this.applyMeta(data);
@@ -606,7 +833,7 @@ document.addEventListener('alpine:init', () => {
                 try {
                     const after = this.lastId();
                     // Пустой канал: «последнего id» ещё нет — забираем последнюю страницу целиком
-                    const params = after ? { peer: this.peer, after } : { peer: this.peer };
+                    const params = after ? this.chan({ after }) : this.chan();
                     if (after && this.since) params.since = this.since;
                     const data = await this.api(this.withParams(this.urls.messages, params));
                     this.applyMeta(data);
@@ -632,7 +859,7 @@ document.addEventListener('alpine:init', () => {
                 this.loadingOlder = true;
                 const list = this.el("list"), prevHeight = list ? list.scrollHeight : 0;
                 try {
-                    const data = await this.api(this.withParams(this.urls.messages, { peer: this.peer, before: first.id }));
+                    const data = await this.api(this.withParams(this.urls.messages, this.chan({ before: first.id })));
                     this.messages.unshift(...data.messages);
                     this.hasMore = data.has_more;
                     this.applyMeta(data);
@@ -667,9 +894,9 @@ document.addEventListener('alpine:init', () => {
                 await this.deliver(live);
             },
             async deliver(tmp) {
-                const peer = this.peer;
+                const peer = this.peer, group = this.group;
                 const form = new FormData();
-                form.append('peer', peer);
+                for (const [k, v] of Object.entries(this.chan())) form.append(k, v);
                 if (tmp.body) form.append('body', tmp.body);
                 if (tmp.reply_to) form.append('reply_to_id', tmp.reply_to.id);
                 for (const key of (tmp.fileKeys || [])) {
@@ -679,7 +906,7 @@ document.addEventListener('alpine:init', () => {
                 try {
                     const data = await this.post(this.urls.send, form);
                     for (const key of (tmp.fileKeys || [])) fileStore.delete(key);
-                    if (peer !== this.peer) return;                       // уже в другой переписке
+                    if (peer !== this.peer || group !== this.group) return;   // уже в другой переписке
                     const real = this.messages.find(x => x.id === data.message.id);
                     if (real && real !== tmp) this.messages.splice(this.messages.indexOf(tmp), 1);
                     else Object.assign(tmp, data.message, { pending: false, failed: false, fileKeys: [] });
@@ -698,13 +925,13 @@ document.addEventListener('alpine:init', () => {
             },
             markRead() {
                 const id = this.lastId();
-                if (id) this.post(this.urls.read, { peer: this.peer, last_id: id }).catch(() => {});
+                if (id) this.post(this.urls.read, this.chan({ last_id: id })).catch(() => {});
             },
             notifyTyping() {
                 const now = Date.now();
                 if (now - lastTypingSent < 3000 || !this.draft.trim()) return;
                 lastTypingSent = now;
-                this.post(this.urls.typing, { peer: this.peer }).catch(() => {});
+                this.post(this.urls.typing, this.chan()).catch(() => {});
             },
             typingText() {
                 const n = this.typingNames;

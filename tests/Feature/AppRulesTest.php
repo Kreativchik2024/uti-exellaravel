@@ -36,6 +36,7 @@ class AppRulesTest extends TestCase
             'post_number'  => 3,
             'worker1'      => $worker,
             'board_number' => 'B-1',
+            'board_type'   => 'МН',
         ];
     }
 

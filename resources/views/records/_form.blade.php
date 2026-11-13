@@ -582,3 +582,49 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+@php
+    // Поля с автоопределением (например, «Тип борта» по номеру борта): правила — в config/sheets.php → 'autodetect'
+    $autodetect = [];
+    foreach ($cfg['fields'] as $adName => $adField) {
+        $ad = $adField['autodetect'] ?? null;
+        if (!$ad || empty($ad['using']) || !method_exists($ad['using'], 'patterns')) continue;
+        $autodetect[] = [
+            'field'      => $adName,
+            'from'       => $ad['from'],
+            'patterns'   => $ad['using']::patterns(),
+            'homoglyphs' => method_exists($ad['using'], 'homoglyphs') ? $ad['using']::homoglyphs() : [],
+        ];
+    }
+@endphp
+@if($autodetect)
+<script>
+(function () {
+    // Пока поле не выбрано вручную — подставляем значение по другому полю (тип борта по номеру)
+    var rules = @json($autodetect);
+    document.addEventListener('DOMContentLoaded', function () {
+        rules.forEach(function (rule) {
+            var target = document.querySelector('[name="' + rule.field + '"]');
+            var source = document.querySelector('[name="' + rule.from + '"]');
+            if (!target || !source || target.disabled) return;
+            var auto = !target.value;               // пользователь сам выбрал — не трогаем
+            target.addEventListener('change', function () { auto = !target.value; });
+            var detect = function () {
+                if (!auto) return;
+                var v = String(source.value || '').toUpperCase().replace(/./g, function (c) { return rule.homoglyphs[c] || c; });
+                var found = '';
+                for (var i = 0; i < rule.patterns.length; i++) {
+                    if (v.indexOf(rule.patterns[i][0]) !== -1) { found = rule.patterns[i][1]; break; }
+                }
+                if (target.value !== found) {
+                    target.value = found;
+                    target.dispatchEvent(new Event('change'));
+                    auto = true;
+                }
+            };
+            source.addEventListener('input', detect);
+            source.addEventListener('change', detect);
+        });
+    });
+})();
+</script>
+@endif

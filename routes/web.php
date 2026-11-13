@@ -228,6 +228,12 @@ Route::middleware('auth')->prefix('chat')->name('chat.')->group(function () {
     Route::post('/messages/{message}/react', [ChatController::class, 'react'])->middleware('throttle:60,1')->name('react');
     Route::post('/messages/{message}/pin',   [ChatController::class, 'pin'])->middleware('throttle:30,1')->name('pin');
     Route::post('/typing',       [ChatController::class, 'typing'])->middleware('throttle:40,1')->name('typing');
+    // Групповые беседы: создать с несколькими участниками, добавить ещё, исключить / выйти, переименовать
+    Route::post('/groups',                 [ChatController::class, 'createGroup'])->middleware('throttle:20,1')->name('groups.create');
+    Route::get('/groups/{group}',          [ChatController::class, 'showGroup'])->name('groups.show');
+    Route::post('/groups/{group}/members', [ChatController::class, 'addGroupMembers'])->middleware('throttle:30,1')->name('groups.members.add');
+    Route::post('/groups/{group}/remove',  [ChatController::class, 'removeGroupMember'])->middleware('throttle:30,1')->name('groups.members.remove');
+    Route::post('/groups/{group}/rename',  [ChatController::class, 'renameGroup'])->middleware('throttle:20,1')->name('groups.rename');
     Route::get('/attachments/{attachment}/{variant?}', [ChatController::class, 'attachment'])
         ->whereIn('variant', ['thumb'])->name('attachment');
 });

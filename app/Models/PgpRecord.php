@@ -10,7 +10,7 @@ class PgpRecord extends Model
         'record_date', 'post_number', 'peripheral_number',
         'worker1', 'worker2', 'worker3', 'worker4', 'worker5',
         'work_start', 'work_end',
-        'board_number', 'ip_address', 'fuselage_number',
+        'board_number', 'board_type', 'ip_address', 'fuselage_number',
         'frame_serial',
 
         'cross3_number', 'cross3_worker', 'cross3_record_date', 'cross3_health', 'cross3_status_text',
@@ -33,6 +33,16 @@ class PgpRecord extends Model
             'bracket_record_date'  => 'date',
             'manet_record_date'    => 'date',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Тип борта не указан — определяем по номеру («УМН-12» → УМН), см. App\Support\BoardTypes
+        static::saving(function (self $record) {
+            if (blank($record->board_type) && filled($record->board_number)) {
+                $record->board_type = \App\Support\BoardTypes::detect($record->board_number);
+            }
+        });
     }
 
     public function creator()

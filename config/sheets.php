@@ -14,6 +14,9 @@ $faultCode = [
                      'placeholder'=>'Выберите из списка или введите свой'],
 ];
 
+// Типы бортов ПГП — из config/board_types.php (новый тип добавляется там одной строкой)
+$boardTypes = array_keys((require __DIR__ . '/board_types.php')['types']);
+
 $map = [
 
         // =====================================================
@@ -30,6 +33,12 @@ $map = [
                 // Борт «Не сдан» — номер борта и IP не обязательны: наклейки уходят на другой борт
                 'board_number'    => ['label'=>'Номер борта','type'=>'text','rules'=>'nullable|required_unless:status,Не сдан|string|max:80',
                                       'required_unless'=>['status'=>'Не сдан']],
+                // Тип борта: выпадающее меню; если в номере борта есть «УМН»/«МН»/«СОН» — подставится сам
+                'board_type'      => ['label'=>'Тип борта','type'=>'select','rules'=>'required|in:' . implode(',', $boardTypes),
+                                      'options'=>$boardTypes,
+                                      'autodetect'=>['from'=>'board_number', 'using'=>\App\Support\BoardTypes::class],
+                                      'hint'=>'Если в номере борта есть ' . implode(' / ', $boardTypes) . ' — тип определится сам',
+                                      'messages'=>['required'=>'Выберите тип борта.', 'in'=>'Неизвестный тип борта.']],
                 'work_start'      => ['label'=>'Начало','type'=>'time','rules'=>'nullable'],
                 // При открытии формы подставляется текущее время сервера, можно изменить
                 'work_end'        => ['label'=>'Окончание','type'=>'time','rules'=>'nullable|date_format:H:i,H:i:s',
@@ -82,7 +91,7 @@ $map = [
             // Своя раскладка формы (вместо общей группировки в records/_form)
             'layout' => [
                 ['title'=>'Основное', 'subtitle'=>'Дата, пост, борт и рабочее время', 'icon'=>'calendar',
-                 'fields'=>['record_date','post_number','board_number','work_start','work_end']],
+                 'fields'=>['record_date','post_number','board_number','board_type','work_start','work_end']],
                 ['title'=>'Модуль связи', 'subtitle'=>null, 'icon'=>'chip',
                  'fields'=>['ip_address','manet_number']],
                 ['title'=>'Статус', 'subtitle'=>'После выбора статуса откроются поля проверки', 'icon'=>'shield',
@@ -96,10 +105,13 @@ $map = [
 
             'health_fields'      => ['status'],
             'health_good_values' => ['Сдан'],
+            // Вкладки-фильтры над списком: «Все / УМН / МН / СОН / Без типа»
+            'list_filter' => ['field'=>'board_type', 'label'=>'Тип борта', 'options'=>$boardTypes, 'empty_label'=>'Без типа'],
             'list_columns' => [
                 'record_date',
                 'post_number',
                 'board_number',
+                'board_type',
                 'status',
             ],
         ],

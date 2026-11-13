@@ -31,6 +31,15 @@
         html.dark .sheet-card__bar   { background: #334155; }
         html.dark .sheet-card__good  { color: #34d399; }
         html.dark .sheet-card__bad   { color: #f87171; }
+
+        /* ---- Борта по типам (УМН / МН / СОН …) ---- */
+        .board-types { margin-bottom: 1rem; }
+        .board-types__head { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .5rem; }
+        .board-types__title { font-size: .875rem; font-weight: 600; color: #374151; }
+        .board-types__hint { font-size: .75rem; color: #9ca3af; }
+        .sheet-card--accent { border-color: #93c5fd; background: #eff6ff; }
+        html.dark .board-types__title { color: #cbd5e1; }
+        html.dark .sheet-card--accent { border-color: #1d4ed8; background: #172554; }
     </style>
     @endpush
 
@@ -125,6 +134,48 @@
                 </div>
             </div>
             <div x-show="expanded1" x-cloak>
+                {{-- Борта ПГП: общее количество и по типам (типы — config/board_types.php) --}}
+                @if(!empty($boardTypes))
+                    @php
+                        $btCards = [['label' => 'Всего бортов', 'total' => $boardTypes['total'], 'delivered' => $boardTypes['delivered'], 'accent' => true]];
+                        foreach ($boardTypes['types'] as $code => $t) $btCards[] = $t + ['accent' => false];
+                        if ($boardTypes['none']['total'] > 0) $btCards[] = ['label' => 'Тип не указан', 'accent' => false] + $boardTypes['none'];
+                    @endphp
+                    <div class="board-types">
+                        <div class="board-types__head">
+                            <span class="board-types__title">Борта по типам</span>
+                            <span class="board-types__hint">{{ $periodLabel }} · ✓ сдано / ✕ не сдано</span>
+                        </div>
+                        <div class="sheet-grid">
+                            @foreach($btCards as $card)
+                                @php
+                                    $bt = $card['total']; $btOk = $card['delivered']; $btBad = $bt - $btOk;
+                                    $btPct = $bt > 0 ? round($btBad / $bt * 100, 1) : 0;
+                                    $btShare = $boardTypes['total'] > 0 ? round($bt / $boardTypes['total'] * 100) : 0;
+                                @endphp
+                                <div class="sheet-card {{ $card['accent'] ? 'sheet-card--accent' : '' }} {{ $bt === 0 ? 'sheet-card--empty' : '' }}">
+                                    <div class="sheet-card__title" title="{{ $card['label'] }}">
+                                        {{ $card['label'] }}@if(!$card['accent'] && $bt > 0) <span class="sheet-card__muted">· {{ $btShare }}%</span>@endif
+                                    </div>
+                                    <div class="sheet-card__total">{{ number_format($bt, 0, ',', ' ') }}<span class="sheet-card__unit">шт.</span></div>
+                                    @if($bt > 0)
+                                        <div class="sheet-card__bar" role="img" aria-label="Сдано {{ $btOk }}, не сдано {{ $btBad }}">
+                                            <span class="sheet-card__bar-good" style="width: {{ 100 - $btPct }}%"></span>
+                                            <span class="sheet-card__bar-bad"  style="width: {{ $btPct }}%"></span>
+                                        </div>
+                                        <div class="sheet-card__split">
+                                            <span class="sheet-card__good">✓ {{ number_format($btOk, 0, ',', ' ') }}</span>
+                                            <span class="sheet-card__bad">✕ {{ number_format($btBad, 0, ',', ' ') }}</span>
+                                        </div>
+                                    @else
+                                        <div class="sheet-card__split"><span class="sheet-card__muted">нет данных</span></div>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 {{-- По вкладкам: выпуск / исправные / брак (общего итога нет — устройства разные) --}}
                 <div class="sheet-grid">
                     @foreach($perSheet as $slug => $data)

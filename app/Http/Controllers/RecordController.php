@@ -82,6 +82,20 @@ class RecordController extends Controller
         }
     }
 
+    /**
+     * Пустое поле с 'autodetect' (тип борта) заполняем по другому полю (номеру борта).
+     * Выбранное вручную значение не трогаем.
+     */
+    private function applyAutodetect(array $cfg, Request $r): void
+    {
+        foreach ($cfg['fields'] as $name => $f) {
+            $ad = $f['autodetect'] ?? null;
+            if (!$ad || filled($r->input($name)) || empty($ad['using'])) continue;
+            $found = $ad['using']::detect((string) $r->input($ad['from'], ''));
+            if ($found !== null) $r->merge([$name => $found]);
+        }
+    }
+
     /** Свои тексты ошибок из конфига: 'messages' => ['regex' => '...'] у поля. */
     private function fieldMessages(array $cfg): array
     {
@@ -428,6 +442,27 @@ class RecordController extends Controller
             }
         }
 
+        // Вкладки-фильтры над списком (ПГП: «Все / УМН / МН / СОН / Без типа») — 'list_filter' в config/sheets.php
+        $listFilter = null;
+        if ($lf = $cfg['list_filter'] ?? null) {
+            $field   = $lf['field'];
+            $current = (string) $request->query($field, '');
+            if ($current !== '' && $current !== '_none' && !in_array($current, $lf['options'], true)) $current = '';
+
+            if ($current === '_none') {
+                $query->where(fn ($w) => $w->whereNull($field)->orWhere($field, ''));
+            } elseif ($current !== '') {
+                $query->where($field, $current);
+            }
+
+            // Сколько записей в каждой вкладке (без учёта поиска)
+            $counts = $cfg['model']::query()
+                ->selectRaw("COALESCE(NULLIF(`$field`, ''), '_none') as k, COUNT(*) as c")
+                ->groupBy('k')->pluck('c', 'k')->map(fn ($c) => (int) $c)->all();
+
+            $listFilter = $lf + ['current' => $current, 'counts' => $counts, 'total' => array_sum($counts)];
+        }
+
         if (array_key_exists('record_date', $cfg['fields'])) {
             $query->orderByDesc('record_date')->orderByDesc('id');
         } else {
@@ -452,7 +487,7 @@ class RecordController extends Controller
             }
         }
 
-        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns'));
+        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter'));
     }
 
     public function show(string $sheet, int $id)
@@ -533,6 +568,7 @@ class RecordController extends Controller
         }
 
         $this->applyIpSuffix($cfg, $r);
+        $this->applyAutodetect($cfg, $r);
         $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
         $rules = $this->withSnapshotRules($cfg, $rules);
 
@@ -632,6 +668,7 @@ class RecordController extends Controller
         $this->normalizeBooleans($cfg, $r);
 
         $this->applyIpSuffix($cfg, $r);
+        $this->applyAutodetect($cfg, $r);
         $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
         $rules = $this->withSnapshotRules($cfg, $rules);
 

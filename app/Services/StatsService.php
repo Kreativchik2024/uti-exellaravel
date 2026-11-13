@@ -201,6 +201,55 @@ class StatsService
     }
 
     /**
+     * Борта ПГП за период: всего и по типам (УМН / МН / СОН / … из config/board_types.php).
+     * null — если на участке нет ПГП. Фильтры те же, что у сводки (период, исполнитель, свои записи).
+     *
+     * @return array{total:int, delivered:int, types: array<string, array{label:string,total:int,delivered:int}>, none: array{total:int,delivered:int}}|null
+     */
+    public function boardTypes(?Carbon $from, ?Carbon $to, ?User $user, ?string $worker = null): ?array
+    {
+        $cfg = $this->sheets()['pgp'] ?? null;
+        if (!$cfg || empty($cfg['model']) || !isset($cfg['fields']['board_type'])) return null;
+
+        $model = $cfg['model'];
+        $meta  = $this->metaFor($cfg);
+
+        $q = $model::query();
+        $this->applyRange($q, $meta['dateField'], $from, $to);
+        if ($user && $user->isExecutor()) $this->applyUserScope($q, $cfg, $user);
+        if ($worker !== null && $worker !== '' && $meta['workerFields']) {
+            $index = $this->workersIndex();
+            $key   = $this->normalizeName($worker);
+            $this->applyWorkerFilter($q, $meta['workerFields'], isset($index[$key]) ? $index[$key]['variants'] : [$worker]);
+        }
+
+        $rows = $q->selectRaw("COALESCE(NULLIF(board_type, ''), '_none') as t")
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw("SUM(CASE WHEN status = 'Сдан' THEN 1 ELSE 0 END) as delivered")
+            ->groupBy('t')
+            ->get()
+            ->keyBy('t');
+
+        $row = fn ($k) => ['total' => (int) ($rows[$k]->total ?? 0), 'delivered' => (int) ($rows[$k]->delivered ?? 0)];
+
+        $types = [];
+        foreach (\App\Support\BoardTypes::labels() as $code => $label) {
+            $types[$code] = ['label' => $label] + $row($code);
+        }
+        // Тип, которого уже нет в справочнике, но он остался в записях, — тоже показываем
+        foreach ($rows->keys() as $k) {
+            if ($k !== '_none' && !isset($types[$k])) $types[$k] = ['label' => (string) $k] + $row($k);
+        }
+
+        return [
+            'total'     => (int) $rows->sum('total'),
+            'delivered' => (int) $rows->sum('delivered'),
+            'types'     => $types,
+            'none'      => $row('_none'),
+        ];
+    }
+
+    /**
      * Детализация по постам — считается в SQL (GROUP BY), без выгрузки всех записей в память.
      */
     public function byPosts(?Carbon $from, ?Carbon $to, ?User $user): array

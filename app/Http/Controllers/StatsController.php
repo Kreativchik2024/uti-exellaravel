@@ -181,13 +181,17 @@ class StatsController extends Controller
         $workersList = $canSeeWorkersStats ? $s->listWorkers() : [];
 
         // Кеш на минуту: расчёт по 19 таблицам — самая дорогая часть страницы
-        $cacheKey = 'stats.index.v2.' . $this->sectionKey() . '.' . md5(json_encode([
+        $cacheKey = 'stats.index.v3.' . $this->sectionKey() . '.' . md5(json_encode([
             $from?->toDateString(), $to?->toDateString(), $targetUser?->id, $worker,
         ]));
 
-        [$perSheet, $byPosts] = Cache::remember($cacheKey, 60, function () use ($s, $from, $to, $targetUser, $worker) {
+        [$perSheet, $byPosts, $boardTypes] = Cache::remember($cacheKey, 60, function () use ($s, $from, $to, $targetUser, $worker) {
             $perSheet = $s->forPeriod($from, $to, $targetUser, $worker !== '' ? $worker : null);
-            return [$perSheet, $s->byPosts($from, $to, $targetUser)];
+            return [
+                $perSheet,
+                $s->byPosts($from, $to, $targetUser),
+                $s->boardTypes($from, $to, $targetUser, $worker !== '' ? $worker : null),
+            ];
         });
 
         $totals = $s->totals($perSheet);
@@ -196,7 +200,7 @@ class StatsController extends Controller
 
         return view('stats.index', compact(
             'from', 'to', 'periodLabel',
-            'perSheet', 'totals', 'byPosts',
+            'perSheet', 'totals', 'byPosts', 'boardTypes',
             'targetUser', 'worker', 'workersList', 'canSeeWorkersStats', 'zoneFilters'
         ));
     }
