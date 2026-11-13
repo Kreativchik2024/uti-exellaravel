@@ -177,6 +177,7 @@ Route::middleware(['auth', 'workers'])->group(function () {
 Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/stats',                [StatsController::class, 'index'])->name('stats.index');
     Route::get('/stats/export',         [StatsController::class, 'export'])->name('stats.export');
+    Route::post('/stats/filters',       [StatsController::class, 'saveFilters'])->middleware('throttle:120,1')->name('stats.saveFilters');
     Route::get('/stats/zone1',          [StatsController::class, 'zone1'])->name('stats.zone1');
     Route::get('/stats/zone2',          [StatsController::class, 'zone2'])->name('stats.zone2');
     Route::get('/stats/zone2-chart',    [StatsController::class, 'zone2Chart'])->name('stats.zone2Chart');

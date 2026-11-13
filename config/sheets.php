@@ -299,6 +299,22 @@ $map = [
         ],
 
         // =====================================================
+        // БЧ
+        // =====================================================
+        'bch' => [
+            'title'  => 'БЧ',
+            'model'  => \App\Models\BchRecord::class,
+            'policy' => \App\Policies\RecordPolicy::class,
+            'fields' => array_merge([
+                'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
+                'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
+            ], $workers, [
+                'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
+            ], $faultCode),
+            'list_columns' => ['record_date','qty','fault_code'],
+        ],
+
+        // =====================================================
         // Провода питания
         // =====================================================
         'power_wires' => [

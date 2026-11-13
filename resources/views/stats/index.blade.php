@@ -54,7 +54,8 @@
          x-data="statsZones({
              initialFrom: '{{ $from ? $from->format('Y-m-d') : '' }}',
              initialTo: '{{ $to ? $to->format('Y-m-d') : '' }}',
-             mode: '{{ request('mode') === 'all' ? 'all' : 'my' }}'
+             mode: '{{ request('mode') === 'all' ? 'all' : 'my' }}',
+             zoneFilters: @js($zoneFilters ?? [])
          })">
 
         {{-- ФИЛЬТРЫ --}}
@@ -87,7 +88,7 @@
                 @endif
 
                 <button type="submit" class="ui-btn ui-btn--primary ui-btn--sm">Применить</button>
-                <a href="{{ route('stats.index') }}" class="text-sm text-gray-500 hover:text-gray-800 underline px-2 py-1">Сбросить</a>
+                <a href="{{ route('stats.index', ['reset' => 1]) }}" class="text-sm text-gray-500 hover:text-gray-800 underline px-2 py-1">Сбросить</a>
             </form>
 
             @if(auth()->user()->isExecutor())
@@ -560,8 +561,36 @@
                 document.addEventListener('themechange', applyChartTheme);
             })();
 
+            // Сохранённый в сессии фильтр зоны; если его нет — берём основной период
+            function zoneDate(opts, zone, key) {
+                const z = (opts.zoneFilters || {})[zone];
+                if (z && typeof z[key] === 'string') return z[key];
+                return (key === 'from' ? opts.initialFrom : opts.initialTo) || '';
+            }
+
+            function saveZoneFilter(zone, from, to) {
+                const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                fetch('{{ route("stats.saveFilters") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
+                    body: JSON.stringify({ zone, from: from || '', to: to || '' }),
+                    keepalive: true,
+                }).catch(e => console.error('[stats filters]', e));
+            }
+
             function statsZones(opts = {}) {
                 return {
+                    init() {
+                        // Запоминаем даты зон в сессии, чтобы они не сбрасывались при обновлении/уходе со страницы
+                        [['zone2', 'dateFrom2', 'dateTo2'], ['zone4', 'dateFrom', 'dateTo'],
+                         ['zone5', 'dateFrom5', 'dateTo5'], ['zone6', 'dateFrom6', 'dateTo6']]
+                            .forEach(([zone, f, t]) => {
+                                const save = () => saveZoneFilter(zone, this[f], this[t]);
+                                this.$watch(f, save);
+                                this.$watch(t, save);
+                            });
+                    },
+
                     initialFrom: opts.initialFrom || '',
                     initialTo:   opts.initialTo   || '',
                     statsMode:   opts.mode        || 'my',
@@ -578,8 +607,8 @@
                     loaded2: false, loading2: false,
                     zone2Rows: [], zone2Total: 0,
                     selectedExecutor: '', zone2ChartObj: null,
-                    dateFrom2: opts.initialFrom || '',
-                    dateTo2: opts.initialTo || '',
+                    dateFrom2: zoneDate(opts, 'zone2', 'from'),
+                    dateTo2: zoneDate(opts, 'zone2', 'to'),
                     chartError: '',
 
                     loadingDetails: false,
@@ -589,8 +618,8 @@
                     expandedCategories: {},
 
                     loaded4: false,
-                    dateFrom: opts.initialFrom || '',
-                    dateTo: opts.initialTo || '',
+                    dateFrom: zoneDate(opts, 'zone4', 'from'),
+                    dateTo: zoneDate(opts, 'zone4', 'to'),
                     zone4ChartObj: null,
                     zone4Error: '',
                     zone4Data: null,
@@ -602,13 +631,13 @@
 
                     loaded5: false, loading5: false,
                     zone5Rows: [], selectedCategory: '',
-                    dateFrom5: opts.initialFrom || '',
-                    dateTo5: opts.initialTo || '',
+                    dateFrom5: zoneDate(opts, 'zone5', 'from'),
+                    dateTo5: zoneDate(opts, 'zone5', 'to'),
 
                     loaded6: false, loading6: false,
                     zone6Rows: [], selectedCategory6: '',
-                    dateFrom6: opts.initialFrom || '',
-                    dateTo6: opts.initialTo || '',
+                    dateFrom6: zoneDate(opts, 'zone6', 'from'),
+                    dateTo6: zoneDate(opts, 'zone6', 'to'),
 
                     toggleZone1() { this.expanded1 = !this.expanded1; },
                     toggleZone2() { this.expanded2 = !this.expanded2; if (this.expanded2 && !this.loaded2 && !this.loading2) this.loadZone2(); },

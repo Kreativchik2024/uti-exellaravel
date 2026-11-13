@@ -109,8 +109,69 @@ class StatsController extends Controller
         return Employee::query()->active()->where('short_name', $name)->exists();
     }
 
+    /** Ключи основных фильтров страницы статистики, которые храним в сессии. */
+    private const MAIN_FILTER_KEYS = ['from', 'to', 'worker', 'mode'];
+
+    /** Зоны с собственными фильтрами по дате (сохраняются через saveFilters). */
+    private const ZONE_FILTER_KEYS = ['zone2', 'zone4', 'zone5', 'zone6'];
+
+    private function sessionKey(string $suffix): string
+    {
+        return 'stats.filters.' . $this->sectionKey() . '.' . $suffix;
+    }
+
+    private function cleanDate($v): string
+    {
+        $v = trim((string) $v);
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : '';
+    }
+
+    /**
+     * Фильтры статистики живут в сессии: переживают обновление и уход со страницы,
+     * сбрасываются при выходе из учётной записи (session()->invalidate()) или истечении сессии.
+     */
+    public function saveFilters(Request $r)
+    {
+        $zone = (string) $r->input('zone');
+        if (!in_array($zone, self::ZONE_FILTER_KEYS, true)) {
+            return response()->json(['ok' => false], 422);
+        }
+
+        $r->session()->put($this->sessionKey($zone), [
+            'from' => $this->cleanDate($r->input('from')),
+            'to'   => $this->cleanDate($r->input('to')),
+        ]);
+
+        return response()->json(['ok' => true]);
+    }
+
     public function index(Request $r, StatsService $s)
     {
+        $mainKey = $this->sessionKey('main');
+
+        // «Сбросить» — очищаем сохранённые фильтры (основные и зон)
+        if ($r->boolean('reset')) {
+            $r->session()->forget($mainKey);
+            foreach (self::ZONE_FILTER_KEYS as $z) $r->session()->forget($this->sessionKey($z));
+            return redirect()->route('stats.index');
+        }
+
+        if ($r->hasAny(self::MAIN_FILTER_KEYS)) {
+            // Пришли явные фильтры — запоминаем
+            $r->session()->put($mainKey, array_filter(
+                $r->only(self::MAIN_FILTER_KEYS),
+                fn ($v) => $v !== null && $v !== ''
+            ));
+        } elseif ($saved = $r->session()->get($mainKey)) {
+            // Чистый заход на страницу — восстанавливаем сохранённые
+            return redirect()->route('stats.index', $saved);
+        }
+
+        $zoneFilters = [];
+        foreach (self::ZONE_FILTER_KEYS as $z) {
+            $zoneFilters[$z] = $r->session()->get($this->sessionKey($z));
+        }
+
         [$from, $to] = $this->resolveDateRange($r);
         $targetUser  = $this->resolveTargetUser($r);
 
@@ -136,7 +197,7 @@ class StatsController extends Controller
         return view('stats.index', compact(
             'from', 'to', 'periodLabel',
             'perSheet', 'totals', 'byPosts',
-            'targetUser', 'worker', 'workersList', 'canSeeWorkersStats'
+            'targetUser', 'worker', 'workersList', 'canSeeWorkersStats', 'zoneFilters'
         ));
     }
 
