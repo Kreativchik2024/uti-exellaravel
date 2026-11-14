@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class NightCameraAssemblyRecord extends Model
 {
     protected $fillable = [
-        'record_date', 'qty', 'flashed_with_day',
+        'record_date', 'camera_serial', 'qty', 'flashed_with_day',
         'worker1', 'worker2', 'worker3', 'worker4', 'worker5',
         'notes', 'fault_code', 'created_by', 'updated_by',
     ];

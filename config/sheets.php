@@ -384,6 +384,8 @@ $map = [
             'fields' => array_merge([
                 'record_date'         => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
                 'serial_number'       => ['label'=>'S/N кронштейна','type'=>'text','rules'=>'nullable|string|max:120'],
+                'camera_serial'       => ['label'=>'№ камеры','type'=>'text','rules'=>'nullable|string|max:120',
+                                            'placeholder'=>'Например MK0773PAZ02805 — заполняет считыватель'],
                 'camera_status'       => ['label'=>'Камера','type'=>'select','rules'=>'nullable',
                                             'options'=>['Работает','Не работает','Требует ремонта']],
                 'night_camera_status' => ['label'=>'Ночная камера','type'=>'select','rules'=>'nullable',
@@ -402,7 +404,7 @@ $map = [
                 'speed_sensor_status',
                 'suspension_status',
             ],
-            'list_columns' => ['record_date','serial_number'],
+            'list_columns' => ['record_date','serial_number','camera_serial'],
         ],
 
         // =====================================================
@@ -415,12 +417,14 @@ $map = [
             'fields' => array_merge([
                 'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
                 'qty'         => ['label'=>'Кол-во за день','type'=>'number','rules'=>'required|integer|min:1'],
+                'camera_serial' => ['label'=>'№ камеры','type'=>'text','rules'=>'nullable|string|max:120',
+                                    'placeholder'=>'Заполняет флешер после прошивки (одна камера — одна запись)'],
                 'flashed_with_day' => ['label'=>'Дневная камера прошита','type'=>'select','bool'=>true,'rules'=>'required|boolean',
                                  'options'=>['1'=>'Да','0'=>'Нет']],
             ], $workers, [
                 'notes' => ['label'=>'Примечание','type'=>'textarea','rules'=>'nullable|string'],
             ], $faultCode),
-            'list_columns' => ['record_date','qty','flashed_with_day','fault_code'],
+            'list_columns' => ['record_date','camera_serial','qty','flashed_with_day','fault_code'],
         ],
 
         // =====================================================

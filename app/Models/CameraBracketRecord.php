@@ -9,6 +9,7 @@ class CameraBracketRecord extends Model
     protected $fillable = [
         'record_date',
         'serial_number',
+        'camera_serial',
         'camera_status',
         'night_camera_status',
         'speed_sensor_status',

@@ -65,7 +65,7 @@ class RecordAuditObserver
     /** Чем запись узнаётся человеком: номер борта, серийник… */
     private static function identity(Model $record): string
     {
-        foreach (['board_number', 'serial_number', 'serial', 'device_number', 'number', 'fuselage_number'] as $f) {
+        foreach (['board_number', 'serial_number', 'camera_serial', 'serial', 'device_number', 'number', 'fuselage_number'] as $f) {
             $v = $record->getAttribute($f);
             if (filled($v)) return ' · ' . $v;
         }

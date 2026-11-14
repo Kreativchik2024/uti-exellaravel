@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Employee;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Справочник сотрудников для форм записей и выбора рабочего места.
@@ -47,6 +48,40 @@ class EmployeeDirectory
             ->filter()->unique()->values()->all();
 
         return [$names($with), $names($without)];
+    }
+
+    /**
+     * Проверка ПИН сотрудника (форма записи на сайте и программы на станциях).
+     * После 5 ошибок подряд — пауза 15 минут, с какой бы учётки и с какого компьютера ни вводили.
+     *
+     * @return array{0: ?Employee, 1: ?string, 2: int} [сотрудник, текст ошибки, HTTP-код]
+     */
+    public function verifyPin(string $shortName, string $pin): array
+    {
+        $shortName = trim($shortName);
+        $pin = trim($pin);
+
+        if ($shortName === '' || $pin === '')   return [null, 'Укажите сотрудника и ПИН.', 422];
+        if (!preg_match('/^\d{4,6}$/', $pin))    return [null, 'ПИН — 4–6 цифр.', 422];
+
+        $employee = Employee::query()->where('short_name', $shortName)->active()->with('user')->first();
+
+        if (!$employee)                 return [null, 'Сотрудник не найден.', 404];
+        if (!$employee->user)           return [null, 'Сотрудник не привязан к учётной записи.', 422];
+        if (!$employee->user->hasPin()) return [null, 'У сотрудника не установлен ПИН.', 422];
+
+        $lockKey = 'pin-employee:' . $employee->id;
+        if (RateLimiter::tooManyAttempts($lockKey, 5)) {
+            $min = (int) ceil(RateLimiter::availableIn($lockKey) / 60);
+            return [null, "Слишком много неверных попыток ПИН этого сотрудника. Подождите {$min} мин.", 429];
+        }
+        if (!$employee->user->checkPin($pin)) {
+            RateLimiter::hit($lockKey, 900);
+            return [null, 'Неверный ПИН.', 422];
+        }
+        RateLimiter::clear($lockKey);
+
+        return [$employee, null, 200];
     }
 
     /** Короткое имя сотрудника, привязанного к текущему пользователю. */
