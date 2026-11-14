@@ -40,7 +40,7 @@
             'icon'     => 'chip',
             'fields'   => [
                 'cross3_number', 'bracket_serial', 'manet_number',
-                'serial_number', 'pc_version', 'ahrs', 'compass_version',
+                'serial_number', 'camera_serial', 'assembled_by', 'pc_version', 'ahrs', 'compass_version',
                 'device_type', 'runs_count',
             ],
         ],

@@ -26,9 +26,9 @@
 
         {{-- Подгруппы и разделы --}}
         <section class="ui-card overflow-hidden" x-data="{ adding: false }">
-            <div class="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 pb-2">
                 <h3 class="font-semibold" style="color: var(--ui-text)">Подгруппы и разделы</h3>
-                <span class="flex gap-2">
+                <span class="flex flex-wrap gap-2">
                     <a href="{{ route('fault-codes.export') }}" class="ui-btn ui-btn--ghost ui-btn--sm">Выгрузить в Excel</a>
                     @if($total)
                         <form method="POST" action="{{ route('fault-codes.wipe') }}"
