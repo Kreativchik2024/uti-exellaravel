@@ -11,7 +11,12 @@
         </div>
     </x-slot>
 
-    @php $pct = fn ($p, $t) => \App\Exports\ShiftReportExport::pct($p, $t); $t = $data['totals']; @endphp
+    @php
+        $pct = fn ($p, $t) => \App\Exports\ShiftReportExport::pct($p, $t); $t = $data['totals'];
+        // ссылка на список записей, из которых сложено число
+        $rec = fn (array $f = []) => route('reports.shift.records', ['date' => $date->format('Y-m-d'), 'shift' => $shift] + $f);
+        $link = 'color: var(--ui-accent-text); text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px';
+    @endphp
 
     <div class="py-6 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
         <form method="GET" class="ui-card p-4 flex flex-wrap gap-3 items-end">
@@ -44,11 +49,12 @@
         </form>
 
         <div class="grid gap-3 sm:grid-cols-4">
-            @foreach([['Записей', $t['total']], ['Изделий', $t['items']], ['Брак', $t['defect']], ['% брака', $pct($t['defect'], $t['total'])]] as [$label, $value])
-                <div class="ui-card p-4">
+            @foreach([['Записей', $t['total'], $rec()], ['Изделий', $t['items'], $rec()], ['Брак', $t['defect'], $rec(['defect' => 1])], ['% брака', $pct($t['defect'], $t['total']), null]] as [$label, $value, $href])
+                @php $tag = $href && $value ? 'a' : 'div'; @endphp
+                <{{ $tag }} @if($tag === 'a') href="{{ $href }}" title="Открыть список записей" @endif class="ui-card p-4 block {{ $tag === 'a' ? 'transition hover:shadow-md' : '' }}">
                     <div class="text-xs" style="color: var(--ui-muted)">{{ $label }}</div>
                     <div class="text-2xl font-bold mt-1" style="color: {{ $label === 'Брак' && $value ? 'var(--ui-bad)' : 'var(--ui-text)' }}">{{ $value }}</div>
-                </div>
+                </{{ $tag }}>
             @endforeach
         </div>
 
@@ -71,18 +77,20 @@
                                         @if(empty($w['known']))<span class="ui-badge-warn" title="Такого сотрудника нет в справочнике — проверьте написание в записях">нет в справочнике</span>@endif
                                         @if(!empty($w['variants']))<div class="text-xs font-normal" style="color: var(--ui-muted)">также записан: {{ implode(', ', array_slice($w['variants'], 0, 4)) }}@if(count($w['variants']) > 4) и ещё {{ count($w['variants']) - 4 }}@endif</div>@endif
                                     </td>
-                                    <td class="text-right">{{ $w['total'] }}</td>
-                                    <td class="text-right">{{ $w['items'] }}</td>
-                                    <td class="text-right" style="{{ $w['defect'] ? 'color: var(--ui-bad); font-weight: 600' : '' }}">{{ $w['defect'] }}</td>
+                                    <td class="text-right"><a href="{{ $rec(['worker' => $name]) }}" style="{{ $link }}" title="Открыть записи исполнителя">{{ $w['total'] }}</a></td>
+                                    <td class="text-right"><a href="{{ $rec(['worker' => $name]) }}" style="{{ $link }}" title="Открыть записи исполнителя">{{ $w['items'] }}</a></td>
+                                    <td class="text-right" style="{{ $w['defect'] ? 'color: var(--ui-bad); font-weight: 600' : '' }}">
+                                        @if($w['defect'])<a href="{{ $rec(['worker' => $name, 'defect' => 1]) }}" style="color: inherit; text-decoration: underline dotted; text-underline-offset: 3px" title="Открыть брак исполнителя">{{ $w['defect'] }}</a>@else{{ $w['defect'] }}@endif
+                                    </td>
                                     <td class="text-right">{{ $pct($w['defect'], $w['total']) }}</td>
                                     <td>
                                         <div class="flex flex-wrap gap-1.5">
                                             @foreach($w['sheets'] as $slug => $s)
-                                                <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-xs" style="background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-text-2)">
+                                                <a href="{{ $rec(['worker' => $name, 'sheet' => $slug]) }}" title="Открыть записи" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-xs transition hover:opacity-80" style="background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-text-2)">
                                                     {{ $data['sheets'][$slug]['title'] ?? $slug }}
                                                     <b style="color: var(--ui-text)">{{ $s['total'] }}</b>
                                                     @if($s['defect'])<span style="color: var(--ui-bad)" title="Брак">· брак {{ $s['defect'] }}</span>@endif
-                                                </span>
+                                                </a>
                                             @endforeach
                                         </div>
                                     </td>
@@ -105,17 +113,19 @@
                             @foreach($data['sheets'] as $slug => $s)
                                 <tr>
                                     <td><a href="{{ route('records.index', $slug) }}" style="color: var(--ui-accent-text)">{{ $s['title'] }}</a></td>
-                                    <td class="text-right">{{ $s['total'] }}</td>
-                                    <td class="text-right">{{ $s['items'] }}</td>
-                                    <td class="text-right" style="{{ $s['defect'] ? 'color: var(--ui-bad); font-weight: 600' : '' }}">{{ $s['defect'] }}</td>
+                                    <td class="text-right"><a href="{{ $rec(['sheet' => $slug]) }}" style="{{ $link }}" title="Открыть записи вкладки за смену">{{ $s['total'] }}</a></td>
+                                    <td class="text-right"><a href="{{ $rec(['sheet' => $slug]) }}" style="{{ $link }}" title="Открыть записи вкладки за смену">{{ $s['items'] }}</a></td>
+                                    <td class="text-right" style="{{ $s['defect'] ? 'color: var(--ui-bad); font-weight: 600' : '' }}">
+                                        @if($s['defect'])<a href="{{ $rec(['sheet' => $slug, 'defect' => 1]) }}" style="color: inherit; text-decoration: underline dotted; text-underline-offset: 3px" title="Открыть брак вкладки">{{ $s['defect'] }}</a>@else{{ $s['defect'] }}@endif
+                                    </td>
                                     <td class="text-right">{{ $pct($s['defect'], $s['total']) }}</td>
                                 </tr>
                             @endforeach
                             @if(count($data['sheets']) > 1)
                                 <tr class="font-semibold" style="background: var(--ui-surface-2)">
                                     <td style="color: var(--ui-text)">Итого</td>
-                                    <td class="text-right" style="color: var(--ui-text)">{{ $t['total'] }}</td>
-                                    <td class="text-right" style="color: var(--ui-text)">{{ $t['items'] }}</td>
+                                    <td class="text-right"><a href="{{ $rec() }}" style="{{ $link }}">{{ $t['total'] }}</a></td>
+                                    <td class="text-right"><a href="{{ $rec() }}" style="{{ $link }}">{{ $t['items'] }}</a></td>
                                     <td class="text-right" style="{{ $t['defect'] ? 'color: var(--ui-bad)' : 'color: var(--ui-text)' }}">{{ $t['defect'] }}</td>
                                     <td class="text-right" style="color: var(--ui-text)">{{ $pct($t['defect'], $t['total']) }}</td>
                                 </tr>

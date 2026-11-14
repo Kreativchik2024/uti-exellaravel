@@ -35,6 +35,63 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * Записи смены, из которых сложены числа отчёта: по вкладке и/или исполнителю, можно только брак.
+     * Набор записей берётся из того же ShiftReport::build(), поэтому список всегда совпадает с цифрой в отчёте.
+     */
+    public function shiftRecords(Request $r, ShiftReport $report, SectionContext $sections)
+    {
+        [$date, $shift] = $this->params($r);
+        $r->validate(['sheet' => ['nullable', 'string', 'max:60'], 'worker' => ['nullable', 'string', 'max:200']]);
+        [$from, $to] = ShiftReport::bounds($date, $shift);
+        $data = $report->build($from, $to);
+
+        $sheet = $r->input('sheet');
+        $worker = $r->input('worker');
+        $onlyDefect = $r->boolean('defect');
+        $key = $onlyDefect ? 'defect_ids' : 'ids';
+
+        // какие ids показывать по каждой вкладке
+        $source = $worker !== null && $worker !== ''
+            ? $data['workers'][$worker]['sheets'] ?? []
+            : $data['sheets'];
+        if ($sheet) $source = array_intersect_key($source, [$sheet => true]);
+
+        $cfgs = $sections->sheets();
+        $groups = [];
+        foreach ($source as $slug => $s) {
+            $cfg = $cfgs[$slug] ?? null;
+            $ids = $s[$key] ?? [];
+            if (! $cfg || empty($cfg['model']) || ! $ids) continue;
+
+            $columns = array_values(array_filter($cfg['list_columns'] ?? [],
+                fn ($c) => ! in_array($c, ['health_indicator', 'created_by', 'fault_code'], true) && ! str_starts_with($c, 'worker')));
+            $records = $cfg['model']::query()->with('creator')->whereIn('id', $ids)->orderBy('created_at')->get();
+            $defectIds = array_flip($s['defect_ids'] ?? []);
+            foreach ($records as $rec) {
+                $rec->is_defect = isset($defectIds[$rec->id]);
+                $rec->workers_list = collect(['worker1', 'worker2', 'worker3', 'worker4', 'worker5'])
+                    ->map(fn ($f) => isset($cfg['fields'][$f]) ? trim((string) $rec->{$f}) : '')
+                    ->filter()->implode(', ');
+            }
+
+            $groups[$slug] = ['title' => $data['sheets'][$slug]['title'] ?? $cfg['title'], 'cfg' => $cfg,
+                              'columns' => $columns, 'records' => $records];
+        }
+
+        return view('reports.shift-records', [
+            'groups' => $groups,
+            'date'   => $date,
+            'shift'  => $shift,
+            'from'   => $from,
+            'to'     => $to,
+            'sheet'  => $sheet,
+            'worker' => $worker,
+            'onlyDefect' => $onlyDefect,
+            'sheetTitle' => $sheet ? ($data['sheets'][$sheet]['title'] ?? $cfgs[$sheet]['title'] ?? $sheet) : null,
+        ]);
+    }
+
     /** Соседняя смена (dir = -1 / 1): после последней смены дня — первая смена следующего дня и наоборот. */
     private function neighbour(Carbon $date, int $shift, int $dir): array
     {

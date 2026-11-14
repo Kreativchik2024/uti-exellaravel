@@ -28,8 +28,8 @@ class ShiftReport
 
     public function build(Carbon $from, Carbon $to): array
     {
-        $workers = [];   // ключ исполнителя => [total, items, defect, sheets => [slug => [total, defect]]]
-        $sheets = [];    // slug => [title, total, items, defect]
+        $workers = [];   // ключ исполнителя => [total, items, defect, sheets => [slug => [total, defect, ids]]]
+        $sheets = [];    // slug => [title, total, items, defect, ids] — ids записей, чтобы из отчёта открыть список
         $names = new \App\Support\WorkerNames();   // разные написания одного ФИО — один исполнитель
         $unassigned = 0; // записи без исполнителя — никому не засчитаны
 
@@ -51,13 +51,15 @@ class ShiftReport
             $rows = $query->get();
             if ($rows->isEmpty()) continue;
 
-            $s = ['title' => $cfg['title'], 'total' => 0, 'items' => 0, 'defect' => 0];
+            $s = ['title' => $cfg['title'], 'total' => 0, 'items' => 0, 'defect' => 0, 'ids' => []];
             foreach ($rows as $row) {
                 $items = $hasQty ? max(1, (int) $row->qty) : 1;
                 $isDefect = (int) ($row->is_defect ?? 0);
                 $s['total']++;
                 $s['items'] += $items;
                 $s['defect'] += $isDefect;
+                $s['ids'][] = $row->id;
+                if ($isDefect) $s['defect_ids'][] = $row->id;
 
                 $ids = [];
                 foreach ($wf as $f) {
@@ -72,8 +74,10 @@ class ShiftReport
                     $w['total']++;
                     $w['items'] += $items;
                     $w['defect'] += $isDefect;
-                    $w['sheets'][$slug] ??= ['total' => 0, 'defect' => 0];
+                    $w['sheets'][$slug] ??= ['total' => 0, 'defect' => 0, 'ids' => [], 'defect_ids' => []];
                     $w['sheets'][$slug]['total']++;
+                    $w['sheets'][$slug]['ids'][] = $row->id;
+                    if ($isDefect) $w['sheets'][$slug]['defect_ids'][] = $row->id;
                     $w['sheets'][$slug]['defect'] += $isDefect;
                     unset($w);
                 }

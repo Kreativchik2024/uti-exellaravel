@@ -44,6 +44,29 @@ class ReportsTest extends TestCase
             ->assertOk()->assertDownload();
     }
 
+    public function test_shift_records_list_opens_from_report_numbers(): void
+    {
+        $day = now()->startOfDay();
+        $this->pgp('Иванов И.', 'Сдан', null, $day->copy()->setTime(9, 0));
+        $this->pgp('Иванов И.', 'Не сдан', 'нет связи', $day->copy()->setTime(10, 0));
+        $this->pgp('Петров П.', 'Сдан', null, $day->copy()->setTime(11, 0));
+        $this->pgp('Сидоров С.', 'Сдан', null, $day->copy()->setTime(21, 0));   // ночная смена
+        $base = '/reports/shift/records?date=' . $day->format('Y-m-d') . '&shift=1';
+        $count = fn ($res) => collect($res->viewData('groups'))->sum(fn ($g) => $g['records']->count());
+
+        $this->asUser($this->master())->get('/reports/shift?date=' . $day->format('Y-m-d') . '&shift=1')
+            ->assertOk()->assertSee('/reports/shift/records', false);
+
+        $all = $this->asUser($this->master())->get($base)->assertOk();
+        $this->assertSame(3, $count($all));
+        $all->assertSee('/records/pgp/', false);
+
+        $this->assertSame(2, $count($this->asUser($this->master())->get($base . '&worker=' . urlencode('Иванов И.'))));
+        $this->assertSame(1, $count($this->asUser($this->master())->get($base . '&worker=' . urlencode('Иванов И.') . '&defect=1')));
+        $this->assertSame(3, $count($this->asUser($this->master())->get($base . '&sheet=pgp')));
+        $this->assertSame(0, $count($this->asUser($this->master())->get($base . '&sheet=nope')));
+    }
+
     public function test_defect_reasons_are_grouped_case_insensitive(): void
     {
         $this->pgp('Иванов И.', 'Не сдан', 'Нет связи');

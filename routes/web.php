@@ -161,6 +161,7 @@ Route::middleware(['auth', 'workers'])->group(function () {
 
     // Отчёты мастера: смена и анализ брака (по текущему участку)
     Route::get('/reports/shift',   [\App\Http\Controllers\ReportController::class, 'shift'])->middleware('role:admin,master')->name('reports.shift');
+    Route::get('/reports/shift/records', [\App\Http\Controllers\ReportController::class, 'shiftRecords'])->middleware('role:admin,master')->name('reports.shift.records');
     Route::get('/reports/defects', [\App\Http\Controllers\ReportController::class, 'defects'])->middleware('role:admin,master')->name('reports.defects');
 
     Route::get('/records/{sheet}',           [RecordController::class, 'index'])->name('records.index');
