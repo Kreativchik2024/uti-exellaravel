@@ -14,10 +14,15 @@
                     </p>
                 </div>
             </div>
+            <div class="flex flex-wrap gap-2">
+            @if($sheet === 'pgp' && auth()->user()->canManageContent())
+                <a href="{{ route('pgp.import.form') }}" class="ui-btn ui-btn--ghost">Загрузить из Excel</a>
+            @endif
             <a href="{{ route('records.create', $sheet) }}" class="ui-btn ui-btn--primary">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 4v16m8-8H4"/></svg>
                 Добавить запись
             </a>
+            </div>
         </div>
     </x-slot>
 

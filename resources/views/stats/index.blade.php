@@ -21,6 +21,8 @@
         .sheet-card__bar-bad  { background: #ef4444; }
         .sheet-card__split { display: flex; justify-content: space-between; gap: .5rem; font-size: .8125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
         .sheet-card__good  { color: #059669; }
+        .sheet-card__link  { color: inherit; text-decoration: underline dotted; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+        .sheet-card__link:hover { opacity: .75; }
         .sheet-card__bad   { color: #dc2626; }
         .sheet-card__muted { color: #9ca3af; font-weight: 400; }
 
@@ -135,11 +137,17 @@
             </div>
             <div x-show="expanded1" x-cloak>
                 {{-- Борта ПГП: общее количество и по типам (типы — config/board_types.php) --}}
+                @php
+                    // ссылки с карточек на список записей — с теми же фильтрами, что у сводки
+                    $statFilters = array_filter(['from' => $from?->format('Y-m-d'), 'to' => $to?->format('Y-m-d'),
+                        'worker' => $worker ?: null, 'mode' => request('mode')], fn ($v) => $v !== null && $v !== '');
+                    $recUrl = fn ($slug, $kind = 'all', $board = null) => route('stats.records', $statFilters + array_filter(['sheet' => $slug, 'kind' => $kind, 'board' => $board]));
+                @endphp
                 @if(!empty($boardTypes))
                     @php
-                        $btCards = [['label' => 'Всего бортов', 'total' => $boardTypes['total'], 'delivered' => $boardTypes['delivered'], 'accent' => true]];
-                        foreach ($boardTypes['types'] as $code => $t) $btCards[] = $t + ['accent' => false];
-                        if ($boardTypes['none']['total'] > 0) $btCards[] = ['label' => 'Тип не указан', 'accent' => false] + $boardTypes['none'];
+                        $btCards = [['label' => 'Всего бортов', 'total' => $boardTypes['total'], 'delivered' => $boardTypes['delivered'], 'accent' => true, 'code' => '_all']];
+                        foreach ($boardTypes['types'] as $code => $t) $btCards[] = $t + ['accent' => false, 'code' => (string) $code];
+                        if ($boardTypes['none']['total'] > 0) $btCards[] = ['label' => 'Тип не указан', 'accent' => false, 'code' => '_none'] + $boardTypes['none'];
                     @endphp
                     <div class="board-types">
                         <div class="board-types__head">
@@ -157,15 +165,15 @@
                                     <div class="sheet-card__title" title="{{ $card['label'] }}">
                                         {{ $card['label'] }}@if(!$card['accent'] && $bt > 0) <span class="sheet-card__muted">· {{ $btShare }}%</span>@endif
                                     </div>
-                                    <div class="sheet-card__total">{{ number_format($bt, 0, ',', ' ') }}<span class="sheet-card__unit">шт.</span></div>
+                                    <div class="sheet-card__total">@if($bt > 0)<a href="{{ $recUrl('pgp', 'all', $card['code']) }}" class="sheet-card__link" title="Открыть список бортов">{{ number_format($bt, 0, ',', ' ') }}</a>@else{{ number_format($bt, 0, ',', ' ') }}@endif<span class="sheet-card__unit">шт.</span></div>
                                     @if($bt > 0)
                                         <div class="sheet-card__bar" role="img" aria-label="Сдано {{ $btOk }}, не сдано {{ $btBad }}">
                                             <span class="sheet-card__bar-good" style="width: {{ 100 - $btPct }}%"></span>
                                             <span class="sheet-card__bar-bad"  style="width: {{ $btPct }}%"></span>
                                         </div>
                                         <div class="sheet-card__split">
-                                            <span class="sheet-card__good">✓ {{ number_format($btOk, 0, ',', ' ') }}</span>
-                                            <span class="sheet-card__bad">✕ {{ number_format($btBad, 0, ',', ' ') }}</span>
+                                            @if($btOk)<a href="{{ $recUrl('pgp', 'good', $card['code']) }}" class="sheet-card__good sheet-card__link" title="Открыть сданные">✓ {{ number_format($btOk, 0, ',', ' ') }}</a>@else<span class="sheet-card__good">✓ 0</span>@endif
+                                            @if($btBad)<a href="{{ $recUrl('pgp', 'defect', $card['code']) }}" class="sheet-card__bad sheet-card__link" title="Открыть несданные">✕ {{ number_format($btBad, 0, ',', ' ') }}</a>@else<span class="sheet-card__bad">✕ 0</span>@endif
                                         </div>
                                     @else
                                         <div class="sheet-card__split"><span class="sheet-card__muted">нет данных</span></div>
@@ -189,7 +197,11 @@
                         <div class="sheet-card {{ $total === 0 ? 'sheet-card--empty' : '' }}">
                             <div class="sheet-card__title" title="{{ $data['title'] }}">{{ $data['title'] }}</div>
                             <div class="sheet-card__total">
-                                {{ number_format($total, 0, ',', ' ') }}
+                                @if($total > 0)
+                                    <a href="{{ $recUrl($slug) }}" class="sheet-card__link" title="Открыть список записей">{{ number_format($total, 0, ',', ' ') }}</a>
+                                @else
+                                    {{ number_format($total, 0, ',', ' ') }}
+                                @endif
                                 <span class="sheet-card__unit">{{ $unit }}</span>
                             </div>
 
@@ -200,9 +212,13 @@
                                     <span class="sheet-card__bar-bad"  style="width: {{ $pct }}%"></span>
                                 </div>
                                 <div class="sheet-card__split">
-                                    <span class="sheet-card__good">✓ {{ number_format($good, 0, ',', ' ') }}</span>
+                                    <a href="{{ $recUrl($slug, 'good') }}" class="sheet-card__good sheet-card__link" title="Открыть исправные">✓ {{ number_format($good, 0, ',', ' ') }}</a>
                                     @if($data['hasDefects'] ?? true)
-                                        <span class="sheet-card__bad">✕ {{ number_format($defects, 0, ',', ' ') }} · {{ $pct }}%</span>
+                                        @if($defects > 0)
+                                            <a href="{{ $recUrl($slug, 'defect') }}" class="sheet-card__bad sheet-card__link" title="Открыть брак">✕ {{ number_format($defects, 0, ',', ' ') }} · {{ $pct }}%</a>
+                                        @else
+                                            <span class="sheet-card__bad">✕ {{ number_format($defects, 0, ',', ' ') }} · {{ $pct }}%</span>
+                                        @endif
                                     @else
                                         <span class="sheet-card__muted">брак не учитывается</span>
                                     @endif

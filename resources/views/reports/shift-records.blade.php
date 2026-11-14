@@ -33,49 +33,7 @@
                     <a href="{{ route('records.index', $slug) }}" style="color: var(--ui-accent-text)">{{ $g['title'] }}</a>
                     <span>· {{ $g['records']->count() }}</span>
                 </h3>
-                <div class="overflow-x-auto">
-                    <table class="ui-table">
-                        <thead>
-                            <tr>
-                                <th class="w-20">Внесено</th>
-                                @foreach($g['columns'] as $col)
-                                    <th>{{ $g['cfg']['fields'][$col]['label'] ?? $col }}</th>
-                                @endforeach
-                                <th>Исполнители</th>
-                                <th>Брак</th>
-                                <th class="w-10"><span class="sr-only">Открыть</span></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($g['records'] as $rec)
-                                @php $url = route('records.show', [$slug, $rec->id]); @endphp
-                                <tr onclick="window.location='{{ $url }}'" class="group cursor-pointer">
-                                    <td class="tabular-nums whitespace-nowrap"><a href="{{ $url }}">{{ $rec->created_at?->format('H:i') }}</a></td>
-                                    @foreach($g['columns'] as $col)
-                                        @php
-                                            $v = $rec->$col ?? null;
-                                            $type = $g['cfg']['fields'][$col]['type'] ?? '';
-                                            if ($type === 'checkbox' || !empty($g['cfg']['fields'][$col]['bool']) || $col === 'is_repaired') $v = $v ? 'Да' : 'Нет';
-                                            elseif ($col === 'record_date' && $v) $v = \Carbon\Carbon::parse($v)->format('d.m.Y');
-                                        @endphp
-                                        <td><div class="break-words">{{ $v !== null && $v !== '' ? $v : '—' }}</div></td>
-                                    @endforeach
-                                    <td><div class="break-words max-w-[22rem]">{{ $rec->workers_list ?: '—' }}</div></td>
-                                    <td>
-                                        @if($rec->is_defect)
-                                            <span class="font-semibold" style="color: var(--ui-bad)">{{ $rec->fault_code ?: 'брак' }}</span>
-                                        @else
-                                            <span class="ui-table__muted">—</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-right">
-                                        <svg class="w-4 h-4 ml-auto transition-transform group-hover:translate-x-0.5" style="color: var(--ui-faint)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                @include('reports._records-table', ['slug' => $slug, 'cfg' => $g['cfg'], 'columns' => $g['columns'], 'records' => $g['records'], 'defectIds' => $g['defectIds'], 'timeOnly' => true])
             </section>
         @empty
             <div class="ui-card p-8 text-center text-sm" style="color: var(--ui-muted)">Записей нет</div>

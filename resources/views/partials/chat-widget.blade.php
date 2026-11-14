@@ -330,8 +330,7 @@
                     <button type="button" x-show="canPin" class="ui-iconbtn" style="width: 28px; height: 28px" @click="togglePin(pinned)" title="Открепить" aria-label="Открепить">✕</button>
                 </div>
 
-                <div class="ui-chat__scroll ui-chat__messages ui-nocopy" x-ref="list" @scroll.passive="onScroll()" @click.self="actionsFor = null"
-                     @copy.prevent @cut.prevent @contextmenu.prevent @dragstart.prevent>
+                <div class="ui-chat__scroll ui-chat__messages" x-ref="list" @scroll.passive="onScroll()" @click.self="actionsFor = null">
                     <div class="text-center py-2" x-show="hasMore">
                         <button type="button" class="ui-chat__link" @click="loadOlder()" :disabled="loadingOlder"
                                 x-text="loadingOlder ? 'Загрузка…' : 'Показать ранние сообщения'"></button>
@@ -635,13 +634,38 @@ document.addEventListener('alpine:init', () => {
 
             // ---- @упоминания ----
             formatBody(text) {
-                const esc = String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+                const escape = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
                 const me = (this.mentionName || '').toLowerCase();
-                return esc.replace(/\/games\/battleship\/(\d+)/g, '<a href="/games/battleship/$1" class="ui-chat__game-link">Открыть игру</a>')
-                          .replace(/(^|[\s(,.;:!?])@([\p{L}\-]{2,40})/gu, (all, pre, name) => {
-                    const mine = name.toLowerCase() === me || name.toLowerCase() === 'все';
-                    return pre + '<span class="ui-chat__mention' + (mine ? ' ui-chat__mention--me' : '') + '">@' + name + '</span>';
-                });
+                const plain = s => escape(s)
+                    .replace(/\/games\/battleship\/(\d+)/g, '<a href="/games/battleship/$1" class="ui-chat__game-link">Открыть игру</a>')
+                    .replace(/(^|[\s(,.;:!?])@([\p{L}\-]{2,40})/gu, (all, pre, name) => {
+                        const mine = name.toLowerCase() === me || name.toLowerCase() === 'все';
+                        return pre + '<span class="ui-chat__mention' + (mine ? ' ui-chat__mention--me' : '') + '">@' + name + '</span>';
+                    });
+                // Ссылки: http(s)://… и www.… — кликабельные, открываются в новой вкладке.
+                // Знаки препинания в конце («…/page.», «(…/page)») к ссылке не относятся.
+                const url = /(?:https?:\/\/|www\.)[^\s<>"']+/giu;
+                let out = '', last = 0, m;
+                const src = String(text);
+                while ((m = url.exec(src))) {
+                    let link = m[0];
+                    // хвостовая пунктуация и непарные «)» — не часть ссылки (а «…/a_(b)» — часть)
+                    for (;;) {
+                        const t = /[.,;:!?\]}»"']+$/u.exec(link);
+                        if (t) { link = link.slice(0, -t[0].length); continue; }
+                        if (link.endsWith(')') && link.split(')').length > link.split('(').length) { link = link.slice(0, -1); continue; }
+                        break;
+                    }
+                    if (!link) continue;
+                    const href = /^www\./i.test(link) ? 'https://' + link : link;
+                    const game = /^https?:\/\/[^/]+\/games\/battleship\/(\d+)\/?$/i.exec(href);
+                    out += plain(src.slice(last, m.index)) + (game && href.startsWith(location.origin)
+                        ? '<a href="/games/battleship/' + game[1] + '" class="ui-chat__game-link">Открыть игру</a>'
+                        : '<a href="' + escape(href) + '" class="ui-chat__url" target="_blank" rel="noopener noreferrer nofollow">' + escape(link) + '</a>');
+                    last = m.index + link.length;
+                    url.lastIndex = last;
+                }
+                return out + plain(src.slice(last));
             },
             onMentionInput(t) {
                 const m = /(^|\s)@([\p{L}\-]{0,30})$/u.exec(t.value.slice(0, t.selectionStart));
@@ -999,6 +1023,9 @@ document.addEventListener('alpine:init', () => {
             // ---- реакции и ответы ----
             toggleActions(m, e) {
                 if (m.pending || m.failed || e.target.closest('a,button')) return;
+                // выделяют текст для копирования — меню реакций не открываем
+                const sel = window.getSelection && window.getSelection();
+                if (sel && !sel.isCollapsed && e.currentTarget.contains(sel.anchorNode)) return;
                 this.actionsFor = this.actionsFor === m.id ? null : m.id;
             },
             isBump(m, emoji) { return !!this.bump && this.bump.id === m.id && this.bump.emoji === emoji; },

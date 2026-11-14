@@ -118,36 +118,69 @@ class StatsService
         });
     }
 
+    /** Все написания ФИО исполнителя (для фильтра по worker1..5); [] — фильтра нет. */
+    private function workerVariants(?string $worker): array
+    {
+        if ($worker === null || $worker === '') return [];
+        $index = $this->workersIndex();
+        return $index[$this->normalizeName($worker)]['variants'] ?? [$worker];
+    }
+
+    /**
+     * Записи вкладки за период с фильтрами сводки (свои записи исполнителя, ФИО исполнителя).
+     * null — вкладка не подходит под фильтр (нет модели или нет полей исполнителей при фильтре по ФИО).
+     */
+    private function periodQuery(array $cfg, ?Carbon $from, ?Carbon $to, ?User $user, array $workerVariants)
+    {
+        if (empty($cfg['model']) || !class_exists($cfg['model'])) return null;
+        $meta = $this->metaFor($cfg);
+
+        $q = $cfg['model']::query();
+        $this->applyRange($q, $meta['dateField'], $from, $to);
+        if ($user && $user->isExecutor()) $this->applyUserScope($q, $cfg, $user);
+        if ($workerVariants) {
+            if (empty($meta['workerFields'])) return null;
+            $this->applyWorkerFilter($q, $meta['workerFields'], $workerVariants);
+        }
+
+        return $q;
+    }
+
+    /**
+     * Записи, из которых сложены цифры карточки вкладки в сводке (forPeriod): $kind = all | good | defect.
+     * null — вкладки нет или она не попадает под фильтр.
+     */
+    public function periodRecords(string $slug, ?Carbon $from, ?Carbon $to, ?User $user, ?string $worker, string $kind = 'all')
+    {
+        $cfg = $this->sheets()[$slug] ?? null;
+        if (! $cfg) return null;
+        $q = $this->periodQuery($cfg, $from, $to, $user, $this->workerVariants($worker));
+        if (! $q) return null;
+
+        $rule = $this->defectSql($cfg)['defect'];
+        if ($kind === 'defect') {
+            $rule ? $q->whereRaw("({$rule['sql']})", $rule['bindings']) : $q->whereRaw('1 = 0');
+        } elseif ($kind === 'good' && $rule) {
+            $q->whereRaw("(CASE WHEN {$rule['sql']} THEN 1 ELSE 0 END) = 0", $rule['bindings']);
+        }
+
+        $dateField = $this->metaFor($cfg)['dateField'];
+        return $q->orderByDesc($dateField)->orderByDesc('id');
+    }
+
     public function forPeriod(?Carbon $from, ?Carbon $to = null, ?User $user = null, ?string $worker = null): array
     {
         $map = $this->sheets();
         $result = [];
 
-        $workerVariants = [];
-        if ($worker !== null && $worker !== '') {
-            $key = $this->normalizeName($worker);
-            $index = $this->workersIndex();
-            $workerVariants = isset($index[$key]) ? $index[$key]['variants'] : [$worker];
-        }
+        $workerVariants = $this->workerVariants($worker);
 
         foreach ($map as $slug => $cfg) {
-            if (empty($cfg['model']) || !class_exists($cfg['model'])) continue;
+            $q = $this->periodQuery($cfg, $from, $to, $user, $workerVariants);
+            if (! $q) continue;
 
-            $model  = $cfg['model'];
             $meta   = $this->metaFor($cfg);
             $hasQty = $meta['hasQty'];
-
-            $q = $model::query();
-            $this->applyRange($q, $meta['dateField'], $from, $to);
-
-            if ($user && $user->isExecutor()) {
-                $this->applyUserScope($q, $cfg, $user);
-            }
-
-            if (!empty($workerVariants)) {
-                if (empty($meta['workerFields'])) continue;
-                $this->applyWorkerFilter($q, $meta['workerFields'], $workerVariants);
-            }
 
             // Один запрос: по created_by сразу и выпуск, и брак (условная сумма)
             $amount = $hasQty ? 'COALESCE(qty, 0)' : '1';
@@ -206,22 +239,39 @@ class StatsService
      *
      * @return array{total:int, delivered:int, types: array<string, array{label:string,total:int,delivered:int}>, none: array{total:int,delivered:int}}|null
      */
+    /** Записи ПГП с фильтрами карточек «Борта по типам». */
+    private function boardQuery(array $cfg, ?Carbon $from, ?Carbon $to, ?User $user, ?string $worker)
+    {
+        // без полей исполнителей фильтр по ФИО не применяется (как и раньше в boardTypes)
+        return $this->periodQuery($cfg, $from, $to, $user, $this->workerVariants($worker))
+            ?? $this->periodQuery($cfg, $from, $to, $user, []);
+    }
+
+    /**
+     * Борта за цифрой карточки «Борта по типам»: $type — код типа, '_none' (не указан) или null (все);
+     * $kind = all | good (сдано) | defect (не сдано). null — на участке нет ПГП с типами.
+     */
+    public function boardRecords(?string $type, ?Carbon $from, ?Carbon $to, ?User $user, ?string $worker, string $kind = 'all')
+    {
+        $cfg = $this->sheets()['pgp'] ?? null;
+        if (!$cfg || empty($cfg['model']) || !isset($cfg['fields']['board_type'])) return null;
+
+        $q = $this->boardQuery($cfg, $from, $to, $user, $worker);
+        if ($type === '_none') $q->where(fn ($w) => $w->whereNull('board_type')->orWhere('board_type', ''));
+        elseif ($type !== null && $type !== '') $q->where('board_type', $type);
+
+        if ($kind === 'good') $q->where('status', 'Сдан');
+        elseif ($kind === 'defect') $q->where(fn ($w) => $w->whereNull('status')->orWhere('status', '<>', 'Сдан'));
+
+        return $q->orderByDesc($this->metaFor($cfg)['dateField'])->orderByDesc('id');
+    }
+
     public function boardTypes(?Carbon $from, ?Carbon $to, ?User $user, ?string $worker = null): ?array
     {
         $cfg = $this->sheets()['pgp'] ?? null;
         if (!$cfg || empty($cfg['model']) || !isset($cfg['fields']['board_type'])) return null;
 
-        $model = $cfg['model'];
-        $meta  = $this->metaFor($cfg);
-
-        $q = $model::query();
-        $this->applyRange($q, $meta['dateField'], $from, $to);
-        if ($user && $user->isExecutor()) $this->applyUserScope($q, $cfg, $user);
-        if ($worker !== null && $worker !== '' && $meta['workerFields']) {
-            $index = $this->workersIndex();
-            $key   = $this->normalizeName($worker);
-            $this->applyWorkerFilter($q, $meta['workerFields'], isset($index[$key]) ? $index[$key]['variants'] : [$worker]);
-        }
+        $q = $this->boardQuery($cfg, $from, $to, $user, $worker);
 
         $rows = $q->selectRaw("COALESCE(NULLIF(board_type, ''), '_none') as t")
             ->selectRaw('COUNT(*) as total')

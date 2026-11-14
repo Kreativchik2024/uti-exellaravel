@@ -164,6 +164,12 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/reports/shift/records', [\App\Http\Controllers\ReportController::class, 'shiftRecords'])->middleware('role:admin,master')->name('reports.shift.records');
     Route::get('/reports/defects', [\App\Http\Controllers\ReportController::class, 'defects'])->middleware('role:admin,master')->name('reports.defects');
 
+    // Загрузка бортов ПГП из Excel-журнала (до /records/{sheet}/{id}, чтобы «import» не принялся за id)
+    Route::middleware('role:admin,master')->group(function () {
+        Route::get('/records/pgp/import',          [\App\Http\Controllers\PgpImportController::class, 'form'])->name('pgp.import.form');
+        Route::post('/records/pgp/import/preview', [\App\Http\Controllers\PgpImportController::class, 'preview'])->name('pgp.import.preview');
+        Route::post('/records/pgp/import',         [\App\Http\Controllers\PgpImportController::class, 'save'])->name('pgp.import.save');
+    });
     Route::get('/records/{sheet}',           [RecordController::class, 'index'])->name('records.index');
     Route::get('/records/{sheet}/create',    [RecordController::class, 'create'])->name('records.create');
     Route::post('/records/{sheet}',          [RecordController::class, 'store'])->name('records.store');
@@ -178,6 +184,7 @@ Route::middleware(['auth', 'workers'])->group(function () {
 Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/stats',                [StatsController::class, 'index'])->name('stats.index');
     Route::get('/stats/export',         [StatsController::class, 'export'])->name('stats.export');
+    Route::get('/stats/records',        [StatsController::class, 'records'])->name('stats.records');
     Route::post('/stats/filters',       [StatsController::class, 'saveFilters'])->middleware('throttle:120,1')->name('stats.saveFilters');
     Route::get('/stats/zone1',          [StatsController::class, 'zone1'])->name('stats.zone1');
     Route::get('/stats/zone2',          [StatsController::class, 'zone2'])->name('stats.zone2');

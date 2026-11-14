@@ -205,6 +205,61 @@ class StatsController extends Controller
         ));
     }
 
+    /**
+     * Записи за цифрой карточки вкладки в сводке (выпуск / исправные / брак) — с теми же фильтрами,
+     * что у сводки: период, исполнитель (только мастеру/админу), «мои записи» для исполнителя.
+     */
+    public function records(Request $r, StatsService $s)
+    {
+        $r->validate(['sheet' => ['required', 'string', 'max:60'], 'kind' => ['nullable', 'in:all,good,defect'],
+                      'from' => ['nullable', 'date'], 'to' => ['nullable', 'date'], 'worker' => ['nullable', 'string', 'max:200'],
+                      'board' => ['nullable', 'string', 'max:20']]);
+        $slug = (string) $r->input('sheet');
+        $cfg  = $this->sheetCfg($slug);
+        abort_unless($cfg && ! empty($cfg['model']), 404);
+
+        [$from, $to] = $this->resolveDateRange($r);
+        $targetUser  = $this->resolveTargetUser($r);
+        $canSeeWorkersStats = auth()->user()->isAdmin() || auth()->user()->isMaster();
+        $worker = $canSeeWorkersStats ? trim((string) $r->input('worker', '')) : '';
+        $kind   = $r->input('kind', 'all');
+
+        // board — карточки «Борта по типам» (ПГП): код типа, '_none' или '_all'; там ✓/✕ — «сдан / не сдан»
+        $board = $slug === 'pgp' && $r->filled('board') ? (string) $r->input('board') : null;
+        $query = $board !== null
+            ? $s->boardRecords($board === '_all' ? null : $board, $from, $to, $targetUser, $worker ?: null, $kind)
+            : $s->periodRecords($slug, $from, $to, $targetUser, $worker ?: null, $kind);
+        abort_if($board !== null && ! $query, 404);
+        $records = $query
+            ? $query->with('creator')->paginate(100)->withQueryString()
+            : new \Illuminate\Pagination\LengthAwarePaginator([], 0, 100);
+
+        // какие записи на странице — брак (для отметки в таблице)
+        $defectIds = [];
+        if ($kind === 'defect' && $board === null) {
+            $defectIds = array_fill_keys($records->pluck('id')->all(), true);
+        } elseif ($records->count()) {
+            $defectIds = array_fill_keys(
+                $s->periodRecords($slug, $from, $to, $targetUser, $worker ?: null, 'defect')
+                    ->whereIn('id', $records->pluck('id'))->pluck('id')->all(), true);
+        }
+
+        return view('stats.records', [
+            'slug'    => $slug,
+            'cfg'     => $cfg,
+            'columns' => ReportController::listColumns($cfg),
+            'records' => $records,
+            'defectIds' => $defectIds,
+            'kind'    => $kind,
+            'board'   => $board,
+            'boardLabel' => $board === null ? null
+                : ($board === '_all' ? 'все борта' : ($board === '_none' ? 'тип не указан' : 'тип ' . $board)),
+            'worker'  => $worker,
+            'periodLabel' => $this->periodLabel($from, $to),
+            'filters' => array_filter($r->only(['from', 'to', 'worker', 'mode']), fn ($v) => $v !== null && $v !== ''),
+        ]);
+    }
+
     public function export(Request $r, StatsService $s)
     {
         [$from, $to] = $this->resolveDateRange($r);

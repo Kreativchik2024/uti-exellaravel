@@ -96,6 +96,32 @@ class StatsTest extends TestCase
         $this->assertSame(1, $pgp['defects']);   // один «Не сдан»
     }
 
+    public function test_summary_card_numbers_open_record_lists(): void
+    {
+        $master = $this->worker('master');
+        $this->seedPgp($master);
+
+        $this->asUser($master)->get('/stats?from=2000-01-01')->assertOk()->assertSee('/stats/records?', false);
+
+        $count = fn (string $kind) => $this->asUser($master)->get('/stats/records?sheet=pgp&kind=' . $kind)
+            ->assertOk()->viewData('records')->total();
+        $this->assertSame(3, $count('all'));
+        $this->assertSame(2, $count('good'));
+        $this->assertSame(1, $count('defect'));
+
+        $this->asUser($master)->get('/stats/records?sheet=pgp')->assertSee('/records/pgp/', false);
+        $this->asUser($master)->get('/stats/records?sheet=nope')->assertNotFound();
+
+        // карточки «Борта по типам»: ✓ — сдано, ✕ — не сдано
+        $boards = fn (string $q) => $this->asUser($master)->get('/stats/records?sheet=pgp&' . $q)->assertOk()->viewData('records')->total();
+        $this->assertSame(3, $boards('board=_all'));
+        $this->assertSame(2, $boards('board=_all&kind=good'));
+        $this->assertSame(1, $boards('board=_all&kind=defect'));
+        $types = \App\Models\PgpRecord::query()->selectRaw("COALESCE(NULLIF(board_type, ''), '_none') as t, COUNT(*) as c")
+            ->groupBy('t')->pluck('c', 't');
+        foreach ($types as $t => $c) $this->assertSame((int) $c, $boards('board=' . urlencode($t)));
+    }
+
     /** Раньше без дат («за всё время» — как страница открывается по умолчанию) падало с 500. */
     public function test_excel_export_downloads_with_and_without_dates(): void
     {

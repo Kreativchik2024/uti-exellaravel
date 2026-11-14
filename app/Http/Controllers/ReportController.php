@@ -64,19 +64,11 @@ class ReportController extends Controller
             $ids = $s[$key] ?? [];
             if (! $cfg || empty($cfg['model']) || ! $ids) continue;
 
-            $columns = array_values(array_filter($cfg['list_columns'] ?? [],
-                fn ($c) => ! in_array($c, ['health_indicator', 'created_by', 'fault_code'], true) && ! str_starts_with($c, 'worker')));
+            $columns = self::listColumns($cfg);
             $records = $cfg['model']::query()->with('creator')->whereIn('id', $ids)->orderBy('created_at')->get();
-            $defectIds = array_flip($s['defect_ids'] ?? []);
-            foreach ($records as $rec) {
-                $rec->is_defect = isset($defectIds[$rec->id]);
-                $rec->workers_list = collect(['worker1', 'worker2', 'worker3', 'worker4', 'worker5'])
-                    ->map(fn ($f) => isset($cfg['fields'][$f]) ? trim((string) $rec->{$f}) : '')
-                    ->filter()->implode(', ');
-            }
-
             $groups[$slug] = ['title' => $data['sheets'][$slug]['title'] ?? $cfg['title'], 'cfg' => $cfg,
-                              'columns' => $columns, 'records' => $records];
+                              'columns' => $columns, 'records' => $records,
+                              'defectIds' => array_fill_keys($s['defect_ids'] ?? [], true)];
         }
 
         return view('reports.shift-records', [
@@ -90,6 +82,13 @@ class ReportController extends Controller
             'onlyDefect' => $onlyDefect,
             'sheetTitle' => $sheet ? ($data['sheets'][$sheet]['title'] ?? $cfgs[$sheet]['title'] ?? $sheet) : null,
         ]);
+    }
+
+    /** Колонки вкладки для списков из отчётов (исполнители, автор и код брака выводятся отдельно). */
+    public static function listColumns(array $cfg): array
+    {
+        return array_values(array_filter($cfg['list_columns'] ?? [],
+            fn ($c) => ! in_array($c, ['health_indicator', 'created_by', 'fault_code'], true) && ! str_starts_with($c, 'worker')));
     }
 
     /** Соседняя смена (dir = -1 / 1): после последней смены дня — первая смена следующего дня и наоборот. */

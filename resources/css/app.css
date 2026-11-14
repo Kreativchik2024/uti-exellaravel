@@ -360,7 +360,10 @@ html.dark {
         background: linear-gradient(135deg, #6366f1, #4f46e5);
     }
     .ui-chat__author { font-size: .72rem; font-weight: 700; color: var(--ui-accent-text); margin-bottom: .1rem; }
-    .ui-chat__text { font-size: .875rem; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .ui-chat__text { font-size: .875rem; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere;
+                     -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; cursor: text; }
+    .ui-chat__url { color: var(--ui-accent-text); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+    .ui-chat__msg--mine .ui-chat__url { color: inherit; }
     .ui-chat__time { font-size: .65rem; text-align: right; margin-top: .1rem; color: var(--ui-faint); }
     .ui-chat__msg--mine .ui-chat__time { color: rgba(255, 255, 255, .75); }
     .ui-chat__meta { display: flex; align-items: center; justify-content: flex-end; gap: .25rem; margin-top: .1rem; font-size: .65rem; color: var(--ui-faint); }

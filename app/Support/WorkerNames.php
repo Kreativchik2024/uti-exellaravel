@@ -104,6 +104,55 @@ class WorkerNames
         return array_values(array_filter(array_keys($this->seen[$id] ?? []), fn ($v) => $v !== $label));
     }
 
+    /**
+     * Сотрудник из справочника для написания из внешнего файла.
+     * exact — то же ФИО (с учётом инициалов, регистра, порядка слов, «Иванов» при единственном Иванове);
+     * similar — фамилия отличается на 1 букву (у длинных — до 2), инициалы не противоречат, кандидат один;
+     * unknown — не нашли, возвращается исходное написание (без лишних пробелов); null — пусто / не ФИО.
+     *
+     * @return array{name: string, kind: 'exact'|'similar'|'unknown'}|null
+     */
+    public function resolve(string $raw): ?array
+    {
+        $clean = trim(preg_replace('/\s+/u', ' ', $raw));
+        $key = self::key($clean);
+        if ($key === '') return null;
+
+        $id = $this->matchDirectory($key);
+        if (isset($this->directory[$id])) return ['name' => $this->directory[$id], 'kind' => 'exact'];
+
+        [$surname, $initials] = array_pad(explode(' ', $key, 2), 2, '');
+        $limit = mb_strlen($surname) >= 7 ? 2 : 1;
+        $best = []; $bestDist = PHP_INT_MAX;
+        foreach ($this->directory as $k => $name) {
+            [$s, $i] = array_pad(explode(' ', $k, 2), 2, '');
+            if ($initials !== '' && $i !== '' && ! str_starts_with($i, $initials) && ! str_starts_with($initials, $i)) continue;
+            $d = self::distance($surname, $s);
+            if ($d > $limit || $d > $bestDist) continue;
+            if ($d < $bestDist) { $best = []; $bestDist = $d; }
+            $best[] = $name;
+        }
+        if (count($best) === 1) return ['name' => $best[0], 'kind' => 'similar'];
+
+        return ['name' => $clean, 'kind' => 'unknown'];
+    }
+
+    /** Расстояние Левенштейна по буквам (а не байтам, как levenshtein() для кириллицы). */
+    private static function distance(string $a, string $b): int
+    {
+        $a = mb_str_split($a); $b = mb_str_split($b);
+        $prev = range(0, count($b));
+        foreach ($a as $i => $ca) {
+            $cur = [$i + 1];
+            foreach ($b as $j => $cb) {
+                $cur[] = min($prev[$j + 1] + 1, $cur[$j] + 1, $prev[$j] + ($ca === $cb ? 0 : 1));
+            }
+            $prev = $cur;
+        }
+
+        return $prev[count($b)];
+    }
+
     private function matchDirectory(string $key): string
     {
         if (isset($this->directory[$key])) return $key;

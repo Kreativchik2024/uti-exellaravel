@@ -36,13 +36,15 @@ class PhotoPreviewTest extends TestCase
         $this->assertSame('Вижу трещину', $last['body']);
     }
 
-    public function test_chat_text_not_copyable_and_printing_blocked(): void
+    public function test_chat_text_copyable_with_links_and_printing_blocked(): void
     {
         $user = User::factory()->admin()->create();
         $html = $this->actingAs($user)->get('/profile')->assertOk()->getContent();
 
-        $this->assertStringContainsString('ui-chat__messages ui-nocopy', $html, 'переписку нельзя выделить');
-        $this->assertStringContainsString('@copy.prevent', $html);
+        // текст переписки можно выделить и скопировать, ссылки в нём кликабельные
+        $this->assertStringNotContainsString('ui-chat__messages ui-nocopy', $html);
+        $this->assertStringNotContainsString('@copy.prevent', $html);
+        $this->assertStringContainsString('ui-chat__url', $html);
         $this->assertStringContainsString('Печать страниц системы запрещена', $html);
         $this->assertStringContainsString("ui-print-blocked", file_get_contents(resource_path('css/app.css')));
     }
