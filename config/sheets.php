@@ -77,7 +77,13 @@ $map = [
                     'label'=>'S/N камеры',
                     'type'=>'text',
                     'rules'=>'nullable|string|max:120',
-                    'lookup'=>['sheet'=>'camera_bracket','match_by'=>'serial_number','prefix'=>'bracket'],
+                    // Кроме проверки кронштейна — кто его собрал и кто прошил камеру (по № камеры в кронштейне)
+                    'lookup'=>['sheet'=>'camera_bracket','match_by'=>'serial_number','prefix'=>'bracket',
+                               'details'=>[
+                                   ['label'=>'Собрал', 'field'=>'assembled_by'],
+                                   ['label'=>'Прошил камеру', 'via'=>['field'=>'camera_serial',
+                                       'sheet'=>'night_camera_assembly', 'match_by'=>'camera_serial']],
+                               ]],
                 ],
                 'defect_reason'   => ['label'=>'Причина неисправности','type'=>'textarea',
                                       'rules'=>'nullable|string'],
@@ -384,8 +390,14 @@ $map = [
             'fields' => array_merge([
                 'record_date'         => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
                 'serial_number'       => ['label'=>'S/N кронштейна','type'=>'text','rules'=>'nullable|string|max:120'],
+                // Подсказка рядом с полем: кто и когда прошил камеру (из «Ночная камера в сборе с дневной»)
                 'camera_serial'       => ['label'=>'№ камеры','type'=>'text','rules'=>'nullable|string|max:120',
-                                            'placeholder'=>'Например MK0773PAZ02805 — заполняет считыватель'],
+                                            'placeholder'=>'Например MK0773PAZ02805 — заполняет считыватель',
+                                            'lookup'=>['sheet'=>'night_camera_assembly','match_by'=>'camera_serial',
+                                                       'prefix'=>'flash','caption'=>'Прошил']],
+                // Пока необязательное. Список — сотрудники, можно вписать своё
+                'assembled_by'        => ['label'=>'Кто собирал кронштейн','type'=>'combo','rules'=>'nullable|string|max:120',
+                                            'options_from'=>'employees','placeholder'=>'Выберите сотрудника или впишите'],
                 'camera_status'       => ['label'=>'Камера','type'=>'select','rules'=>'nullable',
                                             'options'=>['Работает','Не работает','Требует ремонта']],
                 'night_camera_status' => ['label'=>'Ночная камера','type'=>'select','rules'=>'nullable',

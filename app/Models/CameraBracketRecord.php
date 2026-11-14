@@ -10,6 +10,8 @@ class CameraBracketRecord extends Model
         'record_date',
         'serial_number',
         'camera_serial',
+        'assembled_by',
+        'flash_worker', 'flash_record_date', 'flash_health', 'flash_status_text',
         'camera_status',
         'night_camera_status',
         'speed_sensor_status',
@@ -25,7 +27,8 @@ class CameraBracketRecord extends Model
     protected function casts(): array
     {
         return [
-            'record_date' => 'date',
+            'record_date'       => 'date',
+            'flash_record_date' => 'date',
         ];
     }
 

@@ -7,6 +7,8 @@ use App\Models\Employee;
 use App\Models\NightCameraAssemblyRecord;
 use App\Models\Section;
 use App\Services\EmployeeDirectory;
+use App\Services\FaultCodes;
+use App\Services\SectionContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -114,12 +116,14 @@ class StationController extends Controller
         $data = $r->validate([
             'camera_serial'       => ['required', 'string', 'max:120', 'regex:/^[A-Za-z0-9._-]+$/'],
             'serial_number'       => ['nullable', 'string', 'max:120'],
+            'assembled_by'        => ['nullable', 'string', 'max:120'],
             'camera_status'       => $status('camera_status'),
             'night_camera_status' => $status('night_camera_status'),
             'speed_sensor_status' => $status('speed_sensor_status'),
             'suspension_status'   => $status('suspension_status'),
             'notes'               => ['nullable', 'string', 'max:2000'],
             'comments'            => ['nullable', 'string', 'max:2000'],
+            'fault_code'          => ['nullable', 'string', 'max:100'],
             'record_date'         => ['nullable', 'date', 'before_or_equal:today'],
             'uid'                 => ['nullable', 'string', 'max:64'],
         ] + self::WORKER_RULES);
@@ -128,19 +132,65 @@ class StationController extends Controller
         if ($fail) return $fail;
         if ($done = $this->alreadySaved($data, 'camera_bracket')) return $done;
 
+        // Код неисправности — как в форме сайта: код из справочника, код похожей неисправности
+        // или новый код, если вписано описание новой
+        if (filled($data['fault_code'] ?? null)) {
+            $this->pinSection('camera_bracket');
+            $data['fault_code'] = app(FaultCodes::class)->resolve('camera_bracket', $data['fault_code'], Auth::id());
+        }
+
         $record = CameraBracketRecord::create(array_merge(
             collect($data)->only([
-                'camera_serial', 'serial_number', 'camera_status', 'night_camera_status',
-                'speed_sensor_status', 'suspension_status', 'notes', 'comments',
+                'camera_serial', 'serial_number', 'assembled_by', 'camera_status', 'night_camera_status',
+                'speed_sensor_status', 'suspension_status', 'notes', 'comments', 'fault_code',
             ])->all(),
             [
                 'record_date' => $data['record_date'] ?? now()->toDateString(),
                 'created_by'  => Auth::id(),
             ],
             $workers,
+            $this->flashSnapshot($data['camera_serial']),
         ));
 
         return $this->saved($data, 'camera_bracket', $record->id);
+    }
+
+    /** Справочник кодов неисправностей вкладки (как выпадающий список в форме сайта). */
+    public function faultCodes(Request $r): JsonResponse
+    {
+        $data = $r->validate(['sheet' => ['required', Rule::in(array_keys(self::SHEETS))]]);
+        $this->pinSection($data['sheet']);
+
+        return response()->json(['ok' => true, 'codes' => array_map(
+            fn ($c) => array_intersect_key($c, array_flip(['code', 'description', 'hint', 'group'])),
+            app(FaultCodes::class)->optionsForSheet($data['sheet']),
+        )]);
+    }
+
+    /** Участок вкладки — для справочника кодов (у запроса станции нет сессии с выбранным участком). */
+    private function pinSection(string $sheet): void
+    {
+        $slug = config("sheets.map.$sheet.section", Section::DEFAULT_SLUG);
+        $section = Section::where('slug', $slug)->first();
+        if ($section) app(SectionContext::class)->pin($section);
+    }
+
+    /** Подсказка «Прошил» для кронштейна (как при сохранении формы на сайте): кто и когда прошил камеру. */
+    private function flashSnapshot(string $serial): array
+    {
+        $rec = NightCameraAssemblyRecord::where('camera_serial', $serial)
+            ->orderByDesc('record_date')->orderByDesc('id')->first();
+        if (!$rec) return [];
+
+        $workers = collect(['worker1', 'worker2', 'worker3', 'worker4', 'worker5'])
+            ->map(fn ($w) => $rec->{$w})->filter()->implode(', ');
+
+        return [
+            'flash_worker'      => $workers ?: null,
+            'flash_record_date' => $rec->record_date?->toDateString(),
+            'flash_health'      => filled($rec->fault_code) ? 'red' : 'green',
+            'flash_status_text' => filled($rec->fault_code) ? 'Неисправность: ' . $rec->fault_code : 'Всё в порядке',
+        ];
     }
 
     /** Цепочка по номеру камеры: все записи прошивки и сборки. */

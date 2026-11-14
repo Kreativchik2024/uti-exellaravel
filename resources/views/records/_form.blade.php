@@ -347,12 +347,16 @@
                                     @endphp
                                     <div class="inline-flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-md border {{ $cls }} text-xs font-medium">
                                         <span class="font-bold">{{ $icon }}</span>
-                                        <span>{{ $lookupData['worker1'] ?? '—' }}</span>
+                                        @if(!empty($lookupData['caption']))<span class="opacity-70">{{ $lookupData['caption'] }}:</span>@endif
+                                        <span>{{ $lookupData['workers'] ?? $lookupData['worker1'] ?? '—' }}</span>
                                         <span class="opacity-50">·</span>
                                         <span>{{ $lookupData['record_date'] ?? '—' }}</span>
                                         <span class="opacity-50">·</span>
                                         <span>{{ $lookupData['status_text'] ?? '' }}</span>
                                     </div>
+                                    @foreach($lookupData['details'] ?? [] as $d)
+                                        <div class="mt-1 text-xs" style="color: var(--ui-text-2)"><span class="opacity-70">{{ $d['label'] }}:</span> {{ $d['value'] }}</div>
+                                    @endforeach
                                 @endif
                             </div>
 
@@ -480,12 +484,17 @@ document.addEventListener('DOMContentLoaded', function () {
             resultEl.innerHTML =
                 '<div class="inline-flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-md border ' + cls + ' text-xs font-medium">'
                 + '<span class="font-bold">' + icon + '</span>'
-                + '<span>' + esc(data.worker1 || '—') + '</span>'
+                + (data.caption ? '<span class="opacity-70">' + esc(data.caption) + ':</span>' : '')
+                + '<span>' + esc(data.workers || data.worker1 || '—') + '</span>'
                 + '<span class="opacity-50">·</span>'
                 + '<span>' + esc(data.record_date || '—') + '</span>'
                 + '<span class="opacity-50">·</span>'
                 + '<span>' + esc(data.status_text || '') + '</span>'
-                + '</div>';
+                + '</div>'
+                + (data.details || []).map(function (d) {
+                    return '<div class="mt-1 text-xs" style="color: var(--ui-text-2)"><span class="opacity-70">'
+                        + esc(d.label) + ':</span> ' + esc(d.value) + '</div>';
+                }).join('');
         }
 
         function doLookup() {

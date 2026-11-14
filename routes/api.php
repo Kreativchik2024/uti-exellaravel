@@ -9,6 +9,7 @@ Route::prefix('station')->middleware([StationKey::class, 'throttle:120,1'])->gro
     Route::get('/ping',               [StationController::class, 'ping']);
     Route::get('/employees',          [StationController::class, 'employees']);
     Route::post('/verify',            [StationController::class, 'verify']);
+    Route::get('/fault-codes',        [StationController::class, 'faultCodes']);
     Route::get('/camera/{serial}',    [StationController::class, 'camera'])->where('serial', '[A-Za-z0-9._-]{1,120}');
     Route::post('/camera-flash',      [StationController::class, 'cameraFlash']);
     Route::post('/camera-bracket',    [StationController::class, 'cameraBracket']);

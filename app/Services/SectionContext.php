@@ -86,6 +86,17 @@ class SectionContext
         $this->resolved = true;
     }
 
+    /**
+     * Участок без сессии — для API станций: справочник кодов неисправностей и т. п. по участку
+     * вкладки. Доступ проверяет вызывающий (StationController). Вызывать после Auth::setUser.
+     */
+    public function pin(Section $section): void
+    {
+        $this->user();   // сброс кеша при смене пользователя — до закрепления
+        $this->current = $section;
+        $this->resolved = true;
+    }
+
     /** Вкладки учёта выбранного участка: [slug => cfg]. */
     public function sheets(): array
     {

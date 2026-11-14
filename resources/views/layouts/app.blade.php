@@ -12,6 +12,9 @@
         {{-- Тема (авто / светлая / тёмная) — синхронно, до отрисовки, без мигания --}}
         <script src="{{ asset('js/theme.js') }}?v={{ filemtime(public_path('js/theme.js')) }}"></script>
 
+        {{-- После сохранения страница остаётся на том же месте, а не прыгает наверх --}}
+        <script src="{{ asset('js/keep-scroll.js') }}?v={{ filemtime(public_path('js/keep-scroll.js')) }}"></script>
+
         {{-- Шрифт Inter (с кириллицей) подключается из resources/css/app.css --}}
         @include('partials.pwa-head')
         @auth
@@ -60,6 +63,11 @@
             </main>
         </div>
 
+
+        {{-- Текст для всплывающего сообщения, когда страница осталась внизу (js/keep-scroll.js) --}}
+        <div id="keep-scroll-flash" hidden
+             data-ok="{{ session('ok') }}"
+             data-error="{{ session('error') ?: (isset($errors) && $errors->any() ? $errors->first() : '') }}"></div>
 
         {{-- ПАНЕЛЬ ОНЛАЙН --}}
         @include('partials.presence')

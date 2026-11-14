@@ -129,11 +129,14 @@
                                             @php $lookupGood = ($lookupData['health'] ?? 'green') === 'green'; @endphp
                                             <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" style="color: var(--ui-muted)">
                                                 <x-status-pill :value="$lookupGood ? 'В порядке' : 'Внимание'" :tone="$lookupGood ? 'good' : 'bad'" />
-                                                <span>{{ $lookupData['workers'] ?? $lookupData['worker1'] ?? '—' }}</span>
+                                                <span>@if(!empty($lookupData['caption'])){{ $lookupData['caption'] }}: @endif{{ $lookupData['workers'] ?? $lookupData['worker1'] ?? '—' }}</span>
                                                 <span>· {{ $lookupData['record_date'] ?? '—' }}</span>
                                                 @if(!$lookupGood && !empty($lookupData['status_text']))
                                                     <span class="basis-full" style="color: var(--ui-bad)">{{ $lookupData['status_text'] }}</span>
                                                 @endif
+                                                @foreach($lookupData['details'] ?? [] as $d)
+                                                    <span class="basis-full">{{ $d['label'] }}: {{ $d['value'] }}</span>
+                                                @endforeach
                                             </div>
                                         @endif
                                     </dd>

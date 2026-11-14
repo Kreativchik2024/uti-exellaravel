@@ -141,7 +141,10 @@ class RecordController extends Controller
                 ->map(fn ($v) => trim((string) $v))
                 ->all();
 
-            foreach (array_merge($f['options'] ?? [], $used) as $v) {
+            // 'options_from' => 'employees' — сотрудники из справочника первыми
+            $fromDirectory = ($f['options_from'] ?? null) === 'employees' ? $this->employees->namesForSelect() : [];
+
+            foreach (array_merge($fromDirectory, $f['options'] ?? [], $used) as $v) {
                 $v = trim((string) $v);
                 // Коды из справочника другой категории не подмешиваем
                 if ($v !== '' && ! array_key_exists($v, $known) && ! isset($allDirectory[$v])) $known[$v] = '';
@@ -280,7 +283,47 @@ class RecordController extends Controller
         return 'green';
     }
 
-    private function buildLookupResult(array $targetCfg, $found): array
+    /** Исполнители записи через запятую. */
+    private function workersOf($record): string
+    {
+        $all = [];
+        foreach (self::WORKER_FIELDS as $wf) {
+            $v = $record->{$wf} ?? null;
+            if (!empty($v)) $all[] = $v;
+        }
+        return implode(', ', $all);
+    }
+
+    /**
+     * Доп. строки подсказки ('details' в lookup): поле найденной записи ('field') или исполнители
+     * записи другой вкладки, найденной по полю найденной ('via' — например, кто прошил камеру кронштейна).
+     *
+     * @return array<int, array{label: string, value: string}>
+     */
+    private function lookupDetails(array $lookup, $found): array
+    {
+        $out = [];
+        foreach ($lookup['details'] ?? [] as $d) {
+            $value = null;
+            if (!empty($d['field'])) {
+                $value = trim((string) ($found->{$d['field']} ?? ''));
+            } elseif (!empty($d['via'])) {
+                $key = trim((string) ($found->{$d['via']['field']} ?? ''));
+                $viaCfg = $key !== '' ? config("sheets.map.{$d['via']['sheet']}") : null;
+                $rec = $viaCfg ? $viaCfg['model']::query()->where($d['via']['match_by'], $key)
+                    ->orderByDesc('record_date')->orderByDesc('id')->first() : null;
+                if ($rec) {
+                    $value = $this->workersOf($rec) . ($rec->record_date ? ' · ' . $rec->record_date->format('d.m.Y') : '');
+                } elseif ($key !== '') {
+                    $value = "нет записи ({$key})";
+                }
+            }
+            if ($value !== null && $value !== '') $out[] = ['label' => $d['label'], 'value' => $value];
+        }
+        return $out;
+    }
+
+    private function buildLookupResult(array $targetCfg, $found, array $lookup = []): array
     {
         $healthFields = $targetCfg['health_fields'] ?? [];
         $goodValues   = $targetCfg['health_good_values'] ?? ['Работает'];
@@ -325,6 +368,8 @@ class RecordController extends Controller
             'record_date_iso' => $recordDateIso,
             'health'          => $health,
             'status_text'     => $statusText,
+            'caption'         => $lookup['caption'] ?? null,
+            'details'         => $this->lookupDetails($lookup, $found),
         ];
     }
 
@@ -366,7 +411,7 @@ class RecordController extends Controller
 
             if (!$found) continue;
 
-            $res = $this->buildLookupResult($targetCfg, $found);
+            $res = $this->buildLookupResult($targetCfg, $found, $f['lookup']);
             $data[$prefix.'_worker']      = $res['workers'] ?: null;
             $data[$prefix.'_record_date'] = $res['record_date_iso'] ?? null;
             $data[$prefix.'_health']      = $res['health'];
@@ -389,12 +434,24 @@ class RecordController extends Controller
 
             if ($worker === null && $date === null && $health === null) continue;
 
+            // Доп. строки (кто собрал кронштейн, кто прошил камеру) — по текущим данным, не из снимка
+            $details = [];
+            $value = trim((string) ($record->{$name} ?? ''));
+            $targetCfg = config("sheets.map.{$f['lookup']['sheet']}");
+            if (!empty($f['lookup']['details']) && $value !== '' && $targetCfg) {
+                $found = $targetCfg['model']::query()->where($f['lookup']['match_by'], $value)
+                    ->orderByDesc('record_date')->first();
+                if ($found) $details = $this->lookupDetails($f['lookup'], $found);
+            }
+
             $result[$name] = [
                 'worker1'     => $worker,
                 'workers'     => $worker,
                 'record_date' => $date ? \Carbon\Carbon::parse($date)->format('d.m.Y') : null,
                 'health'      => $health ?: 'green',
                 'status_text' => $text ?: 'Всё в порядке',
+                'caption'     => $f['lookup']['caption'] ?? null,
+                'details'     => $details,
             ];
         }
         return $result;
@@ -420,7 +477,7 @@ class RecordController extends Controller
 
         return response()->json(array_merge(
             ['found' => true],
-            $this->buildLookupResult($targetCfg, $found)
+            $this->buildLookupResult($targetCfg, $found, $lookup)
         ));
     }
 
