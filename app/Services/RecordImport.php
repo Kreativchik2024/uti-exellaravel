@@ -41,6 +41,9 @@ class RecordImport
 
     private WorkerNames $names;
 
+    /** Записи базы по датам — для проверки дублей без запроса на каждую строку файла. */
+    private array $byDate = [];
+
     public function __construct(private string $slug, private array $cfg)
     {
         $this->names = new WorkerNames();
@@ -84,7 +87,7 @@ class RecordImport
         }
 
         $rows = []; $seen = [];
-        foreach (array_slice($sheet, $headerIdx + 1, null, true) as $i => $cells) {
+        foreach (array_filter($sheet, fn ($k) => $k > $headerIdx, ARRAY_FILTER_USE_KEY) as $i => $cells) {
             if (! array_filter($map, fn ($col) => trim((string) ($cells[$col] ?? '')) !== '')) continue;
             $row = $this->row(fn (string $f) => isset($map[$f]) ? ($cells[$map[$f]] ?? null) : null, $i + 1, $map);
             if (! $row['error']) {
@@ -113,7 +116,21 @@ class RecordImport
         $created = 0; $skipped = 0; $seen = [];
         $model = $this->cfg['model'];
         $fillable = array_flip((new $model)->getFillable());
-        foreach ($rows as $row) {
+        $this->byDate = [];   // перепроверка по свежим данным базы
+        // пачками в транзакции — на слабом сервере в разы быстрее, чем фиксировать каждую запись отдельно
+        foreach (array_chunk($rows, 300) as $chunk) {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($chunk, $userId, $fillable, &$created, &$skipped, &$seen) {
+                $this->saveChunk($chunk, $userId, $fillable, $created, $skipped, $seen);
+            });
+        }
+
+        return ['created' => $created, 'skipped' => $skipped];
+    }
+
+    private function saveChunk(array $chunk, int $userId, array $fillable, int &$created, int &$skipped, array &$seen): void
+    {
+        $model = $this->cfg['model'];
+        foreach ($chunk as $row) {
             if ($row['error'] || $row['duplicate']) { $skipped++; continue; }
             $key = $this->dupKey($row['data']);
             if (isset($seen[$key]) || $this->existsInDb($row['data'])) { $skipped++; continue; }
@@ -134,8 +151,6 @@ class RecordImport
                 $skipped++;
             }
         }
-
-        return ['created' => $created, 'skipped' => $skipped];
     }
 
     // ---------------------------------------------------------------------
@@ -329,18 +344,21 @@ class RecordImport
         return md5(mb_strtolower(json_encode(array_filter($d, fn ($v) => $v !== null && $v !== ''), JSON_UNESCAPED_UNICODE)));
     }
 
-    /** Та же запись уже есть: совпадают дата и все заполненные поля строки. */
+    /** Та же запись уже есть: совпадают дата и все заполненные поля строки (записи даты читаются из базы один раз). */
     private function existsInDb(array $d): ?string
     {
-        $q = $this->cfg['model']::query()->whereDate('record_date', $d['record_date']);
-        foreach ($d as $f => $v) {
-            if ($f === 'record_date' || $v === null || $v === '' || $f === 'fault_code') continue;
-            in_array($this->cfg['fields'][$f]['type'] ?? '', ['time'], true)
-                ? $q->whereTime($f, $v . ':00')
-                : $q->where($f, $v);
+        $this->byDate[$d['record_date']] ??= $this->cfg['model']::query()->whereDate('record_date', $d['record_date'])->toBase()->get()->all();
+        foreach ($this->byDate[$d['record_date']] as $r) {
+            $same = true;
+            foreach ($d as $f => $v) {
+                if ($f === 'record_date' || $f === 'fault_code' || $v === null || $v === '') continue;
+                $db = $r->{$f} ?? null;
+                if (($this->cfg['fields'][$f]['type'] ?? '') === 'time') $db = $db === null ? null : substr((string) $db, 0, 5);
+                if (mb_strtolower(trim((string) $db)) !== mb_strtolower(trim((string) $v))) { $same = false; break; }
+            }
+            if ($same) return 'такая запись уже есть (запись #' . $r->id . ')';
         }
-        $id = $q->value('id');
 
-        return $id ? 'такая запись уже есть (запись #' . $id . ')' : null;
+        return null;
     }
 }

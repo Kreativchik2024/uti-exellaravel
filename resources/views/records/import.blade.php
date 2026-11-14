@@ -137,6 +137,22 @@
                 <span class="text-sm" style="color: var(--ui-muted)">{{ $fileName ?? '' }}@if(!empty($sheet)) · лист «{{ $sheet }}»@endif · предпросмотр действует час</span>
             </form>
 
+            @php
+                // большой журнал целиком браузер не покажет: сначала строки с ошибками и замечаниями, затем остальные — всего до 500
+                $limit = 500;
+                $shown = $rows;
+                if (count($rows) > $limit) {
+                    $problem = array_filter($rows, fn ($x) => $x['error'] || $x['warnings'] || collect($x['workers'])->contains('kind', 'similar'));
+                    $shown = array_slice($problem, 0, $limit, true);
+                    foreach ($rows as $k => $x) { if (count($shown) >= $limit) break; $shown[$k] ??= $x; }
+                    ksort($shown);
+                }
+            @endphp
+            @if(count($rows) > count($shown))
+                <p class="text-sm" style="color: var(--ui-muted)">
+                    Показано {{ count($shown) }} из {{ count($rows) }} строк: сначала строки с ошибками и замечаниями. Загружены будут все строки без ошибок и дублей — цифры выше по всему файлу.
+                </p>
+            @endif
             <section class="ui-card overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="ui-table text-sm">
@@ -144,7 +160,7 @@
                             <tr><th>Стр.</th><th>Итог</th>@foreach($columns as $label)<th>{{ $label }}</th>@endforeach<th>Исполнители</th><th>Замечания</th></tr>
                         </thead>
                         <tbody>
-                            @foreach($rows as $row)
+                            @foreach($shown as $row)
                                 @php $d = $row['data']; @endphp
                                 <tr style="{{ $row['error'] ? 'background: var(--ui-bad-soft)' : ($row['duplicate'] ? 'opacity: .6' : '') }}">
                                     <td class="tabular-nums">{{ $row['line'] }}</td>

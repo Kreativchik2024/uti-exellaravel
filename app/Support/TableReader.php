@@ -20,7 +20,22 @@ class TableReader
     public static function sheets(UploadedFile $file): array
     {
         $ext = strtolower($file->getClientOriginalExtension());
-        if ($ext === 'ods') return self::sheetsFromPath($file->getRealPath(), $ext);
+        if ($ext === 'ods') {
+            $out = [];
+            // старым импортам (сотрудники и т.п.) — как раньше: строки подряд, пустые ячейки — null
+            foreach (self::sheetNamesFromPath($file->getRealPath(), $ext) as $name) {
+                $rows = self::sheetFromPath($file->getRealPath(), $ext, $name);
+                $width = $rows ? max(array_map(fn ($r) => $r ? max(array_keys($r)) + 1 : 0, $rows)) : 0;
+                $dense = [];
+                if ($rows) {
+                    for ($i = 0, $last = max(array_keys($rows)); $i <= $last; $i++) {
+                        $dense[] = $width ? array_replace(array_fill(0, $width, null), $rows[$i] ?? []) : [];
+                    }
+                }
+                $out[$name] = $dense;
+            }
+            return $out;
+        }
         if (in_array($ext, ['xlsx', 'xls'], true)) {
             $sheets = Excel::toArray(new class implements ToArray { public function array(array $array): void {} }, $file);
             try {
@@ -37,27 +52,56 @@ class TableReader
         return ['CSV' => self::csv($file)];
     }
 
+    /** Сколько колонок читаем: в журналах их пара десятков, а пустые оформленные колонки до AMJ съедают память. */
+    public const MAX_COLUMNS = 60;
+
+    /** Названия листов файла на диске (xlsx / xls / ods; у csv — один лист «CSV»), без чтения содержимого. */
+    public static function sheetNamesFromPath(string $path, string $ext): array
+    {
+        $ext = strtolower($ext);
+        if (! in_array($ext, ['xlsx', 'xls', 'ods'], true)) return ['CSV'];
+        if ($ext === 'ods') return OdsReader::sheetNames($path);
+
+        return \PhpOffice\PhpSpreadsheet\IOFactory::createReader(ucfirst($ext))->listWorksheetNames($path);
+    }
+
     /**
-     * Все листы файла на диске (xlsx / xls / ods / csv): [название листа => строки].
+     * Строки одного листа файла на диске. $maxRows — прочитать только начало (для поиска заголовков).
+     * Читается только этот лист, только первые MAX_COLUMNS колонок и без пустых ячеек — иначе .ods из LibreOffice
+     * (с «повторёнными» пустыми строками и колонками) не помещается в память небольшого сервера.
      * Значения «сырые»: даты и время — числа Excel (как и при чтении через Laravel Excel).
      */
-    public static function sheetsFromPath(string $path, string $ext): array
+    public static function sheetFromPath(string $path, string $ext, string $sheet, ?int $maxRows = null): array
     {
         $ext = strtolower($ext);
         if (! in_array($ext, ['xlsx', 'xls', 'ods'], true)) {
-            return ['CSV' => self::csvText((string) file_get_contents($path))];
+            $rows = self::csvText((string) file_get_contents($path));
+            return $maxRows ? array_slice($rows, 0, $maxRows) : $rows;
         }
+        if ($ext === 'ods') return OdsReader::sheet($path, $sheet, $maxRows, self::MAX_COLUMNS);
 
         $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader(ucfirst($ext));
         $reader->setReadDataOnly(true);
-        $book = $reader->load($path);
-        $out = [];
-        foreach ($book->getWorksheetIterator() as $ws) {
-            $out[$ws->getTitle()] = $ws->toArray(null, true, false, false);
-        }
-        $book->disconnectWorksheets();
+        $reader->setReadEmptyCells(false);
+        $reader->setLoadSheetsOnly([$sheet]);
+        $reader->setReadFilter(new class($maxRows) implements \PhpOffice\PhpSpreadsheet\Reader\IReadFilter {
+            public function __construct(private ?int $maxRows) {}
+            public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
+            {
+                return ($this->maxRows === null || $row <= $this->maxRows)
+                    && \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($columnAddress) <= TableReader::MAX_COLUMNS;
+            }
+        });
 
-        return $out;
+        $book = $reader->load($path);
+        $ws = $book->getSheetByName($sheet) ?? $book->getActiveSheet();
+        $lastRow = $ws->getHighestDataRow();
+        $lastCol = $ws->getHighestDataColumn();
+        $rows = $lastRow > 0 ? $ws->rangeToArray("A1:{$lastCol}{$lastRow}", null, true, false, false) : [];
+        $book->disconnectWorksheets();
+        unset($book, $ws);
+
+        return $rows;
     }
 
     private static function csv(UploadedFile $file): array

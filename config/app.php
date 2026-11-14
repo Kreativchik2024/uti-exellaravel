@@ -97,6 +97,9 @@ return [
 
     'cipher' => 'AES-256-CBC',
 
+    // Лимит памяти PHP для загрузки записей из файла (только эти запросы; остальной сайт — по php.ini)
+    'import_memory_limit' => env('IMPORT_MEMORY_LIMIT', '384M'),
+
     'key' => env('APP_KEY'),
 
     'previous_keys' => [

@@ -58,8 +58,34 @@ class RecordImportController extends Controller
         return $this->view($sheet);
     }
 
+    /**
+     * Большой журнал на слабом сервере (Orange Pi) разбирается и пишется дольше стандартных 30 секунд
+     * и не помещается в 128 МБ — лимиты поднимаются только для запросов загрузки, не для всего сайта.
+     */
+    private function longRequest(): void
+    {
+        @set_time_limit(600);
+        $limit = (string) config('app.import_memory_limit', '384M');
+        $current = ini_get('memory_limit');
+        if ($current !== '-1' && $this->bytes($current) < $this->bytes($limit)) @ini_set('memory_limit', $limit);
+    }
+
+    private function bytes(string $v): int
+    {
+        $v = trim($v);
+        $n = (int) $v;
+        return match (strtolower(substr($v, -1))) { 'g' => $n << 30, 'm' => $n << 20, 'k' => $n << 10, default => $n };
+    }
+
+    /** Разобранные строки предпросмотра — файлом рядом с загруженным (в кеше десятки тысяч строк не держим). */
+    private function rowsPath(array $state): string
+    {
+        return $state['path'] . '.rows';
+    }
+
     public function upload(Request $r, string $sheet)
     {
+        $this->longRequest();
         $this->importer($sheet);
         $r->validate(['file' => ['required', 'file', 'max:20480']]);
         $file = $r->file('file');
@@ -82,6 +108,7 @@ class RecordImportController extends Controller
 
     public function sheet(Request $r, string $sheet)
     {
+        $this->longRequest();
         $r->validate(['token' => ['required', 'string', 'size:32'], 'sheet' => ['required', 'string', 'max:200']]);
 
         return $this->preview($sheet, $r->input('token'), $r->input('sheet'));
@@ -95,26 +122,34 @@ class RecordImportController extends Controller
             return redirect()->route('records.import.form', $sheet)->withErrors(['file' => 'Предпросмотр устарел — выберите файл заново.']);
         }
 
+        // Листы читаются по одному: для выбора листа — только первые строки каждого, целиком — только выбранный.
+        $file = Storage::disk('local')->path($state['path']);
         try {
-            $sheets = TableReader::sheetsFromPath(Storage::disk('local')->path($state['path']), $state['ext']);
+            $heads = [];
+            foreach (TableReader::sheetNamesFromPath($file, $state['ext']) as $name) {
+                $heads[(string) $name] = TableReader::sheetFromPath($file, $state['ext'], (string) $name, 15);
+            }
+            if (! $heads) return redirect()->route('records.import.form', $sheet)->withErrors(['file' => 'В файле нет листов.']);
+
+            if ($sheetName === null || ! array_key_exists($sheetName, $heads)) $sheetName = $import->pickSheet($heads);
+            $rows = TableReader::sheetFromPath($file, $state['ext'], $sheetName);
         } catch (\Throwable $e) {
             report($e);
             return redirect()->route('records.import.form', $sheet)->withErrors(['file' => 'Не удалось прочитать файл — проверьте, что это таблица .ods / .xlsx / .xls / .csv.']);
         }
-        if (! $sheets) return redirect()->route('records.import.form', $sheet)->withErrors(['file' => 'В файле нет листов.']);
-
-        if ($sheetName === null || ! array_key_exists($sheetName, $sheets)) $sheetName = $import->pickSheet($sheets);
-        $result = $import->parse($sheets[$sheetName] ?? []);
+        $result = $import->parse($rows);
+        unset($rows);
 
         $state['sheet'] = $sheetName;
-        $state['rows'] = $result['error'] ? [] : $result['rows'];
+        $state['count'] = $result['error'] ? 0 : count($result['rows']);
+        Storage::disk('local')->put($this->rowsPath($state), serialize($result['error'] ? [] : $result['rows']));
         Cache::put($this->cacheKey($sheet, $token), $state, now()->addHour());
 
         return $this->view($sheet, [
             'result'   => $result,
             'token'    => $token,
             'fileName' => $state['name'],
-            'sheets'   => array_map(fn ($rows) => $import->hasHeader($rows), $sheets),   // лист => есть ли колонки этой вкладки
+            'sheets'   => array_map(fn ($rows) => $import->hasHeader($rows), $heads),   // лист => есть ли колонки этой вкладки
             'sheet'    => $sheetName,
         ]);
     }
@@ -123,13 +158,17 @@ class RecordImportController extends Controller
     {
         $import = $this->importer($sheet);
         $r->validate(['token' => ['required', 'string', 'size:32']]);
+        $this->longRequest();
         $state = Cache::pull($this->cacheKey($sheet, $r->input('token')));
-        if (! $state || empty($state['rows'])) {
+        $disk = Storage::disk('local');
+        $rows = $state && $disk->exists($this->rowsPath($state))
+            ? unserialize($disk->get($this->rowsPath($state)), ['allowed_classes' => false]) : [];
+        if (! $state || ! $rows) {
             return redirect()->route('records.import.form', $sheet)->withErrors(['file' => 'Предпросмотр устарел или уже загружен — выберите файл заново.']);
         }
-        Storage::disk('local')->delete($state['path']);
+        $disk->delete([$state['path'], $this->rowsPath($state)]);
 
-        $res = $import->save($state['rows'], auth()->id());
+        $res = $import->save($rows, auth()->id());
 
         return redirect()->route('records.index', $sheet)
             ->with('ok', "Загрузка из файла («{$state['name']}», лист «{$state['sheet']}»): добавлено {$res['created']}, пропущено {$res['skipped']} (дубли и строки с ошибками).");

@@ -40,6 +40,12 @@ class PgpImport
 
     private WorkerNames $names;
 
+    /** Номера бортов в базе (в нижнем регистре) => id записи — один запрос вместо запроса на каждую строку. */
+    private ?array $boards = null;
+
+    /** Записи без номера борта по датам — для проверки дублей без запроса на каждую строку. */
+    private array $byDate = [];
+
     public function __construct()
     {
         $this->names = new WorkerNames();
@@ -58,7 +64,7 @@ class PgpImport
 
         $rows = [];
         $seen = [];   // ключи дублей внутри файла
-        foreach (array_slice($sheet, $headerIdx + 1, null, true) as $i => $cells) {
+        foreach (array_filter($sheet, fn ($k) => $k > $headerIdx, ARRAY_FILTER_USE_KEY) as $i => $cells) {
             $get = fn (string $f) => isset($map[$f]) ? ($cells[$map[$f]] ?? null) : null;
             if (! array_filter($map, fn ($col) => trim((string) ($cells[$col] ?? '')) !== '')) continue;   // пустая строка
 
@@ -112,19 +118,25 @@ class PgpImport
     {
         $created = 0; $skipped = 0;
         $seen = [];
-        foreach ($rows as $row) {
-            if ($row['error'] || $row['duplicate']) { $skipped++; continue; }
-            $key = $this->dupKey($row['data']);
-            if (isset($seen[$key]) || $this->existsInDb($row['data'])) { $skipped++; continue; }
-            $seen[$key] = true;
+        $this->boards = null; $this->byDate = [];   // перепроверка по свежим данным базы
+        // пачками в транзакции — на слабом сервере в разы быстрее, чем фиксировать каждую запись отдельно
+        foreach (array_chunk($rows, 300) as $chunk) {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($chunk, $userId, &$created, &$skipped, &$seen) {
+                foreach ($chunk as $row) {
+                    if ($row['error'] || $row['duplicate']) { $skipped++; continue; }
+                    $key = $this->dupKey($row['data']);
+                    if (isset($seen[$key]) || $this->existsInDb($row['data'])) { $skipped++; continue; }
+                    $seen[$key] = true;
 
-            $data = $row['data'];
-            // время внесения — по дате и времени работ из журнала, чтобы запись попала в свою смену в отчётах
-            $at = Carbon::parse($data['record_date'] . ' ' . ($data['work_end'] ?? $data['work_start'] ?? '12:00'));
-            $record = new PgpRecord($data + ['created_by' => $userId]);
-            $record->forceFill(['created_at' => $at, 'updated_at' => now()]);
-            $record->save();
-            $created++;
+                    $data = $row['data'];
+                    // время внесения — по дате и времени работ из журнала, чтобы запись попала в свою смену в отчётах
+                    $at = Carbon::parse($data['record_date'] . ' ' . ($data['work_end'] ?? $data['work_start'] ?? '12:00'));
+                    $record = new PgpRecord($data + ['created_by' => $userId]);
+                    $record->forceFill(['created_at' => $at, 'updated_at' => now()]);
+                    $record->save();
+                    $created++;
+                }
+            });
         }
 
         return ['created' => $created, 'skipped' => $skipped];
@@ -290,17 +302,25 @@ class PgpImport
     private function existsInDb(array $d): ?string
     {
         if (! empty($d['board_number'])) {
-            $id = PgpRecord::where('board_number', $d['board_number'])->value('id');
+            if ($this->boards === null) {
+                $this->boards = [];
+                foreach (PgpRecord::query()->whereNotNull('board_number')->where('board_number', '<>', '')->toBase()->get(['id', 'board_number']) as $r) {
+                    $this->boards[mb_strtolower(trim($r->board_number))] ??= $r->id;
+                }
+            }
+            $id = $this->boards[mb_strtolower(trim($d['board_number']))] ?? null;
             return $id ? 'борт уже есть в базе (запись #' . $id . ')' : null;
         }
 
-        $q = PgpRecord::whereDate('record_date', $d['record_date'])->where('worker1', $d['worker1']);
-        $d['post_number'] === null ? $q->whereNull('post_number') : $q->where('post_number', $d['post_number']);
-        empty($d['fuselage_number'])
-            ? $q->where(fn ($w) => $w->whereNull('fuselage_number')->orWhere('fuselage_number', ''))
-            : $q->where('fuselage_number', $d['fuselage_number']);
-        $id = $q->value('id');
+        $this->byDate[$d['record_date']] ??= PgpRecord::query()->whereDate('record_date', $d['record_date'])
+            ->toBase()->get(['id', 'post_number', 'fuselage_number', 'worker1'])->all();
+        foreach ($this->byDate[$d['record_date']] as $r) {
+            if ((string) $r->worker1 === (string) $d['worker1'] && (string) $r->post_number === (string) $d['post_number']
+                && (string) $r->fuselage_number === (string) ($d['fuselage_number'] ?? '')) {
+                return 'такая запись уже есть (запись #' . $r->id . ')';
+            }
+        }
 
-        return $id ? 'такая запись уже есть (запись #' . $id . ')' : null;
+        return null;
     }
 }
