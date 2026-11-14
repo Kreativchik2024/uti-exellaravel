@@ -100,6 +100,26 @@ class CameraChainTest extends TestCase
         $this->assertSame('K.3', CameraBracketRecord::find($id)->fault_code);
     }
 
+    public function test_flasher_defect_recorded_with_fault_code_and_cleared_after_repair(): void
+    {
+        config(['services.stations.key' => 'k']);
+        $section = \App\Models\Section::where('slug', \App\Models\Section::DEFAULT_SLUG)->first();
+        $g = \App\Models\FaultCodeGroup::create(['name' => 'Ночная камера', 'prefix' => 'N', 'sheets' => ['night_camera_assembly'], 'section_id' => $section->id]);
+        \App\Models\FaultCode::create(['code' => 'N.1', 'description' => 'Шум тепловизора', 'group_id' => $g->id, 'section_id' => $section->id]);
+        $this->worker('executor', 'Петров П.П.');
+        $api = fn ($data) => $this->withHeaders(['X-Station-Key' => 'k', 'Accept' => 'application/json'])
+            ->postJson('/api/station/camera-flash', $data + ['camera_serial' => 'MK9', 'workers' => [['employee' => 'Петров П.П.', 'pin' => '1234']]]);
+
+        $id = $api(['fault_code' => 'N.1', 'notes' => 'БРАК: шум'])->assertCreated()->json('id');
+        $this->assertSame('N.1', NightCameraAssemblyRecord::find($id)->fault_code);
+        $this->assertSame('БРАК: шум', NightCameraAssemblyRecord::find($id)->notes);
+
+        // в тот же день после ремонта прошита успешно — та же запись, без кода неисправности
+        $this->assertSame($id, $api(['notes' => 'прошита'])->assertOk()->json('id'));
+        $this->assertNull(NightCameraAssemblyRecord::find($id)->fault_code);
+        $this->assertSame(1, NightCameraAssemblyRecord::count());
+    }
+
     public function test_reader_api_fills_flash_snapshot_and_assembler(): void
     {
         config(['services.stations.key' => 'k']);

@@ -79,6 +79,8 @@ class StationController extends Controller
             'camera_serial' => ['required', 'string', 'max:120', 'regex:/^[A-Za-z0-9._-]+$/'],
             'record_date'   => ['nullable', 'date', 'before_or_equal:today'],
             'notes'         => ['nullable', 'string', 'max:2000'],
+            // брак: оператор решил занести камеру с кодом неисправности (код / описание — как в форме сайта)
+            'fault_code'    => ['nullable', 'string', 'max:100'],
             'uid'           => ['nullable', 'string', 'max:64'],
         ] + self::WORKER_RULES);
 
@@ -87,11 +89,21 @@ class StationController extends Controller
         if ($done = $this->alreadySaved($data, 'night_camera_assembly')) return $done;
 
         $date = $data['record_date'] ?? now()->toDateString();
+        $fault = null;
+        if (filled($data['fault_code'] ?? null)) {
+            $this->pinSection('night_camera_assembly');
+            $fault = app(FaultCodes::class)->resolve('night_camera_assembly', $data['fault_code'], Auth::id());
+        }
 
-        // Ту же камеру в тот же день повторно не считаем (повтор отправки, перезапуск прошивки)
+        // Ту же камеру в тот же день — одна запись (повтор отправки, перезапуск прошивки). Если её
+        // состояние сменилось (была брак → после ремонта прошита, или наоборот) — запись обновляется.
         $existing = NightCameraAssemblyRecord::where('camera_serial', $data['camera_serial'])
             ->whereDate('record_date', $date)->first();
         if ($existing) {
+            if ((string) $existing->fault_code !== (string) $fault) {
+                $existing->update(['fault_code' => $fault, 'notes' => $data['notes'] ?? $existing->notes,
+                                   'updated_by' => Auth::id()] + $workers);
+            }
             return $this->saved($data, 'night_camera_assembly', $existing->id, true);
         }
 
@@ -101,6 +113,7 @@ class StationController extends Controller
             'qty'              => 1,
             'flashed_with_day' => true,
             'notes'            => $data['notes'] ?? null,
+            'fault_code'       => $fault,
             'created_by'       => Auth::id(),
         ] + $workers);
 
