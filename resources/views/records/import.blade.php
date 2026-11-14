@@ -5,7 +5,7 @@
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
             </span>
             <div>
-                <h2>Загрузка бортов ПГП из Excel</h2>
+                <h2>Загрузка из файла · {{ $tabs[$tab] ?? $tab }}</h2>
                 <p class="text-sm mt-0.5" style="color: var(--ui-muted)">Сначала предпросмотр — в базу ничего не пишется, пока не нажмёте «Загрузить»</p>
             </div>
         </div>
@@ -18,34 +18,55 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('pgp.import.preview') }}" enctype="multipart/form-data" class="ui-card p-4 space-y-3">
-            @csrf
-            <p class="text-sm" style="color: var(--ui-text-2)">
-                Таблица <b>.ods</b> (LibreOffice), <b>.xlsx / .xls</b> или <b>.csv</b>. Если листов несколько — берётся лист «ПГП» (или первый лист с такими колонками), его можно сменить в предпросмотре. Колонки: Дата, Номер поста, ФИО 1–3, Время начала / завершения работ, Номер борта,
-                IP адрес модуля связи, Номер фюзеляжа, Сдан, Неисправен, Причина неисправности, Действия.
-                Порядок колонок не важен, лишние (например, «Время ожидания ОТК») пропускаются.
-            </p>
-            <ul class="text-xs list-disc list-inside space-y-0.5" style="color: var(--ui-muted)">
-                <li>Дубль — тот же номер борта; без номера борта — та же дата, пост, № фюзеляжа и ФИО 1. Дубли не загружаются.</li>
-                <li>ФИО сверяются со справочником сотрудников, в том числе с опечаткой в фамилии; не найденные записываются как в файле.</li>
-                <li>Тип борта определяется по номеру борта, время внесения записи — по дате и времени завершения (для отчёта по смене).</li>
-            </ul>
-            <div class="flex flex-wrap items-center gap-2">
-                <input type="file" name="file" accept=".ods,.xlsx,.xls,.csv" required class="ui-input">
-                <button class="ui-btn ui-btn--primary">Проверить файл</button>
-                <a href="{{ route('records.index', 'pgp') }}" class="ui-btn ui-btn--ghost">Отмена</a>
-            </div>
-        </form>
+        @php $cfgFields = app(\App\Services\SectionContext::class)->sheets()[$tab]['fields'] ?? []; @endphp
+        <div class="ui-card p-4 space-y-3">
+            <label class="block max-w-md">
+                <span class="ui-label">В какую вкладку загружать</span>
+                <select class="ui-input" onchange="location.href = this.value">
+                    @foreach($tabs as $slug => $title)
+                        <option value="{{ route('records.import.form', $slug) }}" @selected($slug === $tab)>{{ $title }}</option>
+                    @endforeach
+                </select>
+            </label>
+
+            <form method="POST" action="{{ route('records.import.preview', $tab) }}" enctype="multipart/form-data" class="space-y-3">
+                @csrf
+                <p class="text-sm" style="color: var(--ui-text-2)">
+                    Таблица <b>.ods</b> (LibreOffice), <b>.xlsx / .xls</b> или <b>.csv</b>. Если листов несколько — берётся лист с названием вкладки
+                    (или первый лист с её колонками), его можно сменить в предпросмотре. Загружаются только колонки, которые есть во вкладке
+                    «{{ $tabs[$tab] ?? $tab }}», остальные пропускаются — новые поля и вкладки не создаются.
+                </p>
+                @if($tab === 'pgp')
+                    <p class="text-xs" style="color: var(--ui-muted)">Колонки журнала ПГП: Дата, Номер поста, ФИО 1–3, Время начала / завершения работ, Номер борта, IP адрес модуля связи, Номер фюзеляжа, Сдан, Неисправен, Причина неисправности, Действия.</p>
+                @else
+                    <p class="text-xs" style="color: var(--ui-muted)">Колонки вкладки: {{ implode(', ', array_map(fn ($f) => $f['label'], array_filter($cfgFields, fn ($f, $k) => !in_array($k, ['worker2','worker3','worker4','worker5'], true), ARRAY_FILTER_USE_BOTH))) }} (исполнители — «ФИО 1», «ФИО 2»… или «Исполнитель 1»…).</p>
+                @endif
+                <ul class="text-xs list-disc list-inside space-y-0.5" style="color: var(--ui-muted)">
+                    @if($tab === 'pgp')
+                        <li>Дубль — тот же номер борта; без номера борта — та же дата, пост, № фюзеляжа и ФИО 1. Дубли не загружаются.</li>
+                    @else
+                        <li>Дубль — такая же запись уже есть (та же дата и те же значения всех заполненных колонок) или повторяется в файле. Дубли не загружаются.</li>
+                    @endif
+                    <li>ФИО сверяются со справочником сотрудников, в том числе с опечаткой в фамилии; не найденные записываются как в файле.</li>
+                    <li>Время внесения записи — дата из файла и время завершения работ (если есть, иначе 12:00): так записи попадают в свою смену в отчётах.</li>
+                </ul>
+                <div class="flex flex-wrap items-center gap-2">
+                    <input type="file" name="file" accept=".ods,.xlsx,.xls,.csv" required class="ui-input">
+                    <button class="ui-btn ui-btn--primary">Проверить файл</button>
+                    <a href="{{ route('records.index', $tab) }}" class="ui-btn ui-btn--ghost">Отмена</a>
+                </div>
+            </form>
+        </div>
 
         @if($result && count($sheets ?? []) > 1)
-            <form method="POST" action="{{ route('pgp.import.sheet') }}" class="ui-card p-4 flex flex-wrap items-end gap-3">
+            <form method="POST" action="{{ route('records.import.sheet', $tab) }}" class="ui-card p-4 flex flex-wrap items-end gap-3">
                 @csrf
                 <input type="hidden" name="token" value="{{ $token }}">
                 <label class="block">
                     <span class="ui-label">Лист в файле «{{ $fileName }}»</span>
                     <select name="sheet" class="ui-input" onchange="this.form.submit()">
                         @foreach($sheets as $name => $looksLikePgp)
-                            <option value="{{ $name }}" @selected($name === $sheet)>{{ $name }}{{ $looksLikePgp ? '' : ' — нет колонок журнала ПГП' }}</option>
+                            <option value="{{ $name }}" @selected($name === $sheet)>{{ $name }}{{ $looksLikePgp ? '' : ' — нет колонок этой вкладки' }}</option>
                         @endforeach
                     </select>
                 </label>
@@ -67,7 +88,6 @@
                 $errs = array_filter($rows, fn ($x) => $x['error']);
                 $similar = collect($rows)->flatMap(fn ($x) => $x['workers'])->where('kind', 'similar')->unique('raw');
                 $unknown = collect($rows)->flatMap(fn ($x) => $x['workers'])->where('kind', 'unknown')->unique('raw');
-                $missingLabels = ['record_date' => 'Дата', 'post_number' => 'Номер поста', 'worker1' => 'ФИО 1', 'board_number' => 'Номер борта', 'delivered' => 'Сдан', 'faulty' => 'Неисправен'];
             @endphp
 
             <div class="grid gap-3 sm:grid-cols-4">
@@ -81,7 +101,7 @@
 
             @if($result['missing'])
                 <div class="ui-card px-4 py-3 text-sm" style="color: var(--ui-text-2)">
-                    В файле не найдены колонки: <b>{{ implode(', ', array_map(fn ($m) => $missingLabels[$m] ?? $m, $result['missing'])) }}</b> — эти поля останутся пустыми.
+                    В файле не найдены колонки: <b>{{ implode(', ', $result['missing']) }}</b> — эти поля останутся пустыми.
                 </div>
             @endif
 
@@ -110,7 +130,7 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('pgp.import.save') }}" class="flex flex-wrap items-center gap-3">
+            <form method="POST" action="{{ route('records.import.save', $tab) }}" class="flex flex-wrap items-center gap-3">
                 @csrf
                 <input type="hidden" name="token" value="{{ $token }}">
                 <button class="ui-btn ui-btn--primary" @disabled(!count($new))>Загрузить новые записи ({{ count($new) }})</button>
@@ -121,7 +141,7 @@
                 <div class="overflow-x-auto">
                     <table class="ui-table text-sm">
                         <thead>
-                            <tr><th>Стр.</th><th>Итог</th><th>Дата</th><th>Пост</th><th>Исполнители</th><th>Борт</th><th>Тип</th><th>Статус</th><th>Замечания</th></tr>
+                            <tr><th>Стр.</th><th>Итог</th>@foreach($columns as $label)<th>{{ $label }}</th>@endforeach<th>Исполнители</th><th>Замечания</th></tr>
                         </thead>
                         <tbody>
                             @foreach($rows as $row)
@@ -133,8 +153,17 @@
                                         @elseif($row['duplicate'])<span style="color: var(--ui-muted)">дубль</span>
                                         @else<span style="color: var(--ui-good); font-weight: 600">добавится</span>@endif
                                     </td>
-                                    <td class="whitespace-nowrap tabular-nums">{{ !empty($d['record_date']) ? \Carbon\Carbon::parse($d['record_date'])->format('d.m.Y') : '—' }}</td>
-                                    <td>{{ $d['post_number'] ?? '—' }}</td>
+                                    @foreach($columns as $col => $label)
+                                        @php
+                                            $v = $d[$col] ?? null;
+                                            $opts = $cfgFields[$col]['options'] ?? null;
+                                            if ($col === 'record_date' && $v) $v = \Carbon\Carbon::parse($v)->format('d.m.Y');
+                                            elseif ($v !== null && is_array($opts) && array_key_exists($v, $opts) && !array_is_list($opts)) $v = $opts[$v];
+                                        @endphp
+                                        <td class="{{ $col === 'record_date' ? 'whitespace-nowrap tabular-nums' : '' }}">
+                                            @if($col === 'status' && $v)<x-status-pill :value="$v" />@else{{ $v !== null && $v !== '' ? $v : '—' }}@endif
+                                        </td>
+                                    @endforeach
                                     <td>
                                         @foreach($row['workers'] as $w)
                                             <div class="whitespace-nowrap">
@@ -144,9 +173,6 @@
                                             </div>
                                         @endforeach
                                     </td>
-                                    <td class="whitespace-nowrap">{{ $d['board_number'] ?? '—' }}</td>
-                                    <td>{{ $d['board_type'] ?? '—' }}</td>
-                                    <td>@if(!empty($d['status']))<x-status-pill :value="$d['status']" />@endif</td>
                                     <td class="text-xs" style="color: var(--ui-text-2)">
                                         @if($row['error'])<div style="color: var(--ui-bad)">{{ $row['error'] }}</div>@endif
                                         @if($row['duplicate'])<div>{{ $row['duplicate'] }}</div>@endif

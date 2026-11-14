@@ -164,12 +164,12 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/reports/shift/records', [\App\Http\Controllers\ReportController::class, 'shiftRecords'])->middleware('role:admin,master')->name('reports.shift.records');
     Route::get('/reports/defects', [\App\Http\Controllers\ReportController::class, 'defects'])->middleware('role:admin,master')->name('reports.defects');
 
-    // Загрузка бортов ПГП из Excel-журнала (до /records/{sheet}/{id}, чтобы «import» не принялся за id)
-    Route::middleware('role:admin,master')->group(function () {
-        Route::get('/records/pgp/import',          [\App\Http\Controllers\PgpImportController::class, 'form'])->name('pgp.import.form');
-        Route::post('/records/pgp/import/preview', [\App\Http\Controllers\PgpImportController::class, 'upload'])->name('pgp.import.preview');
-        Route::post('/records/pgp/import/sheet',   [\App\Http\Controllers\PgpImportController::class, 'sheet'])->name('pgp.import.sheet');
-        Route::post('/records/pgp/import',         [\App\Http\Controllers\PgpImportController::class, 'save'])->name('pgp.import.save');
+    // Загрузка записей вкладки из таблицы (до /records/{sheet}/{id}, чтобы «import» не принялся за id)
+    Route::middleware('role:admin,master')->controller(\App\Http\Controllers\RecordImportController::class)->group(function () {
+        Route::get('/records/{sheet}/import',          'form')->name('records.import.form');
+        Route::post('/records/{sheet}/import/preview', 'upload')->name('records.import.preview');
+        Route::post('/records/{sheet}/import/sheet',   'sheet')->name('records.import.sheet');
+        Route::post('/records/{sheet}/import',         'save')->name('records.import.save');
     });
     Route::get('/records/{sheet}',           [RecordController::class, 'index'])->name('records.index');
     Route::get('/records/{sheet}/create',    [RecordController::class, 'create'])->name('records.create');

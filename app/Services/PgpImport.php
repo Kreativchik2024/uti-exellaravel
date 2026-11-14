@@ -53,7 +53,7 @@ class PgpImport
     {
         [$headerIdx, $map] = $this->findHeader($sheet);
         if ($headerIdx === null) {
-            return ['rows' => [], 'missing' => [], 'error' => 'Не нашли строку заголовков: нужны хотя бы колонки «Дата», «Номер поста», «ФИО 1» и «Номер борта».'];
+            return ['rows' => [], 'missing' => [], 'error' => 'не нашли строку заголовков: нужны хотя бы колонки «Дата», «Номер поста», «ФИО 1» и «Номер борта».'];
         }
 
         $rows = [];
@@ -75,9 +75,16 @@ class PgpImport
             $rows[] = $row;
         }
 
-        $missing = array_keys(array_diff_key(array_flip(['record_date', 'post_number', 'worker1', 'board_number', 'delivered', 'faulty']), $map));
+        $labels = ['record_date' => 'Дата', 'post_number' => 'Номер поста', 'worker1' => 'ФИО 1', 'board_number' => 'Номер борта', 'delivered' => 'Сдан', 'faulty' => 'Неисправен'];
+        $missing = array_values(array_diff_key($labels, $map));
 
-        return ['rows' => $rows, 'missing' => $missing, 'error' => $rows ? null : 'В файле нет строк с данными под заголовками.'];
+        return ['rows' => $rows, 'missing' => $missing, 'error' => $rows ? null : 'под заголовками нет строк с данными'];
+    }
+
+    /** Колонки таблицы предпросмотра: поле => подпись. */
+    public function previewColumns(): array
+    {
+        return ['record_date' => 'Дата', 'post_number' => 'Пост', 'board_number' => 'Борт', 'board_type' => 'Тип', 'status' => 'Статус'];
     }
 
     /** Похож ли лист на журнал ПГП (нашлась строка заголовков) — для автовыбора листа. */
