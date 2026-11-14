@@ -30,6 +30,16 @@ class StationController extends Controller
         'camera_bracket'        => CameraBracketRecord::class,
     ];
 
+    /** До 3 исполнителей, у каждого свой ПИН: workers = [{employee, pin}, …]; один — можно employee + pin. */
+    private const MAX_WORKERS = 3;
+    private const WORKER_RULES = [
+        'employee'           => ['required_without:workers', 'nullable', 'string', 'max:120'],
+        'pin'                => ['required_with:employee', 'nullable', 'string'],
+        'workers'            => ['nullable', 'array', 'min:1', 'max:' . self::MAX_WORKERS],
+        'workers.*.employee' => ['required', 'string', 'max:120'],
+        'workers.*.pin'      => ['required', 'string'],
+    ];
+
     public function __construct(private EmployeeDirectory $employees) {}
 
     public function ping(): JsonResponse
@@ -54,9 +64,10 @@ class StationController extends Controller
             'sheet'    => ['required', Rule::in(array_keys(self::SHEETS))],
         ]);
 
-        if ($fail = $this->authorizeEmployee($data, $data['sheet'])) return $fail;
+        [$user, $fail] = $this->authorizeEmployee($data['employee'], $data['pin'], $data['sheet']);
+        if ($fail) return $fail;
 
-        return response()->json(['ok' => true, 'employee' => Auth::user()->employee->short_name]);
+        return response()->json(['ok' => true, 'employee' => $user->employee->short_name]);
     }
 
     /** Флешер: камера прошита (дневная вместе с ночной). */
@@ -64,14 +75,13 @@ class StationController extends Controller
     {
         $data = $r->validate([
             'camera_serial' => ['required', 'string', 'max:120', 'regex:/^[A-Za-z0-9._-]+$/'],
-            'employee'      => ['required', 'string', 'max:120'],
-            'pin'           => ['required', 'string'],
             'record_date'   => ['nullable', 'date', 'before_or_equal:today'],
             'notes'         => ['nullable', 'string', 'max:2000'],
             'uid'           => ['nullable', 'string', 'max:64'],
-        ]);
+        ] + self::WORKER_RULES);
 
-        if ($fail = $this->authorizeEmployee($data, 'night_camera_assembly')) return $fail;
+        [$workers, $fail] = $this->authorizeWorkers($data, 'night_camera_assembly');
+        if ($fail) return $fail;
         if ($done = $this->alreadySaved($data, 'night_camera_assembly')) return $done;
 
         $date = $data['record_date'] ?? now()->toDateString();
@@ -88,10 +98,9 @@ class StationController extends Controller
             'camera_serial'    => $data['camera_serial'],
             'qty'              => 1,
             'flashed_with_day' => true,
-            'worker1'          => Auth::user()->employee->short_name,
             'notes'            => $data['notes'] ?? null,
             'created_by'       => Auth::id(),
-        ]);
+        ] + $workers);
 
         return $this->saved($data, 'night_camera_assembly', $record->id);
     }
@@ -111,13 +120,12 @@ class StationController extends Controller
             'suspension_status'   => $status('suspension_status'),
             'notes'               => ['nullable', 'string', 'max:2000'],
             'comments'            => ['nullable', 'string', 'max:2000'],
-            'employee'            => ['required', 'string', 'max:120'],
-            'pin'                 => ['required', 'string'],
             'record_date'         => ['nullable', 'date', 'before_or_equal:today'],
             'uid'                 => ['nullable', 'string', 'max:64'],
-        ]);
+        ] + self::WORKER_RULES);
 
-        if ($fail = $this->authorizeEmployee($data, 'camera_bracket')) return $fail;
+        [$workers, $fail] = $this->authorizeWorkers($data, 'camera_bracket');
+        if ($fail) return $fail;
         if ($done = $this->alreadySaved($data, 'camera_bracket')) return $done;
 
         $record = CameraBracketRecord::create(array_merge(
@@ -127,9 +135,9 @@ class StationController extends Controller
             ])->all(),
             [
                 'record_date' => $data['record_date'] ?? now()->toDateString(),
-                'worker1'     => Auth::user()->employee->short_name,
                 'created_by'  => Auth::id(),
             ],
+            $workers,
         ));
 
         return $this->saved($data, 'camera_bracket', $record->id);
@@ -160,28 +168,62 @@ class StationController extends Controller
 
     // ------------------------------------------------------------------
 
-    /** ПИН сотрудника + доступ к участку вкладки. Успех — null и вход от имени сотрудника на этот запрос. */
-    private function authorizeEmployee(array $data, string $sheet): ?JsonResponse
+    /**
+     * Все исполнители записи: ПИН каждого + доступ к участку. Успех — [['worker1' => …, …], null]
+     * и вход от имени первого исполнителя на этот запрос (created_by, журнал действий).
+     *
+     * @return array{0: array<string, string>, 1: ?JsonResponse}
+     */
+    private function authorizeWorkers(array $data, string $sheet): array
+    {
+        $list = $data['workers'] ?? [['employee' => $data['employee'], 'pin' => $data['pin']]];
+
+        $workers = [];
+        $first = null;
+        foreach (array_values($list) as $i => $w) {
+            [$user, $fail] = $this->authorizeEmployee($w['employee'], $w['pin'], $sheet);
+            if ($fail) {
+                $err = $fail->getData(true);
+                $err['error'] = trim($w['employee']) . ': ' . ($err['error'] ?? 'ошибка');
+                return [[], response()->json($err, $fail->getStatusCode())];
+            }
+            $name = $user->employee->short_name;
+            if (in_array($name, $workers, true)) {
+                return [[], response()->json(['ok' => false, 'error' => "{$name} указан дважды."], 422)];
+            }
+            $workers['worker' . ($i + 1)] = $name;
+            $first ??= $user;
+        }
+
+        Auth::setUser($first);
+
+        return [$workers, null];
+    }
+
+    /**
+     * ПИН сотрудника + доступ к участку вкладки.
+     *
+     * @return array{0: ?\App\Models\User, 1: ?JsonResponse}
+     */
+    private function authorizeEmployee(string $name, string $pin, string $sheet): array
     {
         /** @var ?Employee $employee */
-        [$employee, $error, $status] = $this->employees->verifyPin($data['employee'], $data['pin']);
+        [$employee, $error, $status] = $this->employees->verifyPin($name, $pin);
         if (!$employee) {
-            return response()->json(['ok' => false, 'error' => $error], $status);
+            return [null, response()->json(['ok' => false, 'error' => $error], $status)];
         }
 
         $user = $employee->user;
         if (!$user->is_active) {
-            return response()->json(['ok' => false, 'error' => 'Учётная запись сотрудника отключена.'], 403);
+            return [null, response()->json(['ok' => false, 'error' => 'Учётная запись сотрудника отключена.'], 403)];
         }
 
         $sectionSlug = config("sheets.map.$sheet.section", Section::DEFAULT_SLUG);
         if (!$user->isAdmin() && !$user->sections()->where('slug', $sectionSlug)->exists()) {
-            return response()->json(['ok' => false, 'error' => 'У сотрудника нет доступа к участку этой вкладки.'], 403);
+            return [null, response()->json(['ok' => false, 'error' => 'У сотрудника нет доступа к участку этой вкладки.'], 403)];
         }
 
-        Auth::setUser($user);
-
-        return null;
+        return [$user, null];
     }
 
     /** Повторная отправка с тем же uid (очередь программы после обрыва связи) — без дубля. */

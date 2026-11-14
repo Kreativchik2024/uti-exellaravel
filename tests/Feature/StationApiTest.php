@@ -72,7 +72,7 @@ class StationApiTest extends TestCase
         $this->worker('executor', 'Иванов И.И.');
 
         $this->api('POST', 'camera-flash', ['camera_serial' => 'MK1', 'employee' => 'Иванов И.И.', 'pin' => '9999'])
-            ->assertStatus(422)->assertJson(['error' => 'Неверный ПИН.']);
+            ->assertStatus(422)->assertJson(['error' => 'Иванов И.И.: Неверный ПИН.']);
         $this->api('POST', 'camera-flash', ['camera_serial' => 'MK1', 'employee' => 'Никто Н.Н.', 'pin' => '1234'])
             ->assertStatus(404);
         $this->api('POST', 'verify', ['employee' => 'Иванов И.И.', 'pin' => '9999', 'sheet' => 'camera_bracket'])->assertStatus(422);
@@ -103,6 +103,35 @@ class StationApiTest extends TestCase
         $chain = $this->api('GET', 'camera/MK0773PAZ02636')->assertOk()->json('chain');
         $this->assertSame(['night_camera_assembly', 'camera_bracket'], array_column($chain, 'sheet'));
         $this->assertSame([['Иванов И.И.'], ['Петров П.П.']], array_column($chain, 'workers'));
+    }
+
+    public function test_up_to_three_workers_each_with_pin(): void
+    {
+        $first = $this->worker('executor', 'Иванов И.И.');
+        $this->worker('executor', 'Петров П.П.');
+        $this->worker('executor', 'Сидоров С.С.');
+        $this->worker('executor', 'Кузнецов К.К.');
+        $w = fn (string $n, string $pin = '1234') => ['employee' => $n, 'pin' => $pin];
+
+        $res = $this->api('POST', 'camera-flash', ['camera_serial' => 'MK7',
+            'workers' => [$w('Иванов И.И.'), $w('Петров П.П.'), $w('Сидоров С.С.')]])->assertCreated();
+        $rec = NightCameraAssemblyRecord::findOrFail($res->json('id'));
+        $this->assertSame(['Иванов И.И.', 'Петров П.П.', 'Сидоров С.С.', null], [$rec->worker1, $rec->worker2, $rec->worker3, $rec->worker4]);
+        $this->assertSame($first->id, $rec->created_by, 'запись — от имени первого');
+
+        $res = $this->api('POST', 'camera-bracket', ['camera_serial' => 'MK7', 'workers' => [$w('Петров П.П.'), $w('Иванов И.И.')]])->assertCreated();
+        $this->assertSame('Иванов И.И.', CameraBracketRecord::findOrFail($res->json('id'))->worker2);
+
+        // неверный ПИН второго — ничего не записано, в ошибке видно, у кого
+        $this->api('POST', 'camera-flash', ['camera_serial' => 'MK8', 'workers' => [$w('Иванов И.И.'), $w('Петров П.П.', '9999')]])
+            ->assertStatus(422)->assertJson(['error' => 'Петров П.П.: Неверный ПИН.']);
+        $this->api('POST', 'camera-flash', ['camera_serial' => 'MK8', 'workers' => [$w('Иванов И.И.'), $w('Иванов И.И.')]])
+            ->assertStatus(422);
+        $this->api('POST', 'camera-flash', ['camera_serial' => 'MK8',
+            'workers' => [$w('Иванов И.И.'), $w('Петров П.П.'), $w('Сидоров С.С.'), $w('Кузнецов К.К.')]])
+            ->assertStatus(422)->assertJsonValidationErrors('workers');
+        $this->api('POST', 'camera-flash', ['camera_serial' => 'MK8'])->assertStatus(422)->assertJsonValidationErrors('employee');
+        $this->assertSame(0, NightCameraAssemblyRecord::where('camera_serial', 'MK8')->count());
     }
 
     public function test_site_form_accepts_camera_serial(): void
