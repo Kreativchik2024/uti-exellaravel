@@ -30,7 +30,21 @@ class ReportController extends Controller
             'from'   => $from,
             'to'     => $to,
             'shifts' => config('shifts.list'),
+            'prev'   => $this->neighbour($date, $shift, -1),
+            'next'   => $this->neighbour($date, $shift, 1),
         ]);
+    }
+
+    /** Соседняя смена (dir = -1 / 1): после последней смены дня — первая смена следующего дня и наоборот. */
+    private function neighbour(Carbon $date, int $shift, int $dir): array
+    {
+        $keys = array_keys(config('shifts.list'));
+        $i = array_search($shift, $keys, true) + $dir;
+        $day = $date->copy();
+        if ($i < 0) { $i = count($keys) - 1; $day->subDay(); }
+        if ($i >= count($keys)) { $i = 0; $day->addDay(); }
+
+        return ['date' => $day->format('Y-m-d'), 'shift' => $keys[$i]];
     }
 
     public function defects(Request $r, \App\Services\DefectAnalysis $analysis, SectionContext $sections)

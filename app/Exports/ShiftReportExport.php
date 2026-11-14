@@ -11,8 +11,10 @@ class ShiftReportExport extends Workbook
 {
     public function __construct(array $data, Carbon $from, Carbon $to, string $section)
     {
-        $info = [['Участок', $section ?: '—'], ['Начало смены', $from->format('d.m.Y H:i')], ['Конец смены', $to->format('d.m.Y H:i')], Workbook::stamp()];
         $t = $data['totals'];
+        $info = [['Участок', $section ?: '—'], ['Начало смены', $from->format('d.m.Y H:i')], ['Конец смены', $to->format('d.m.Y H:i')]];
+        if (! empty($t['unassigned'])) $info[] = ['Записей без исполнителя', $t['unassigned'] . ' (никому не засчитаны)'];
+        $info[] = Workbook::stamp();
         $int = ['type' => 'int'];
         $pct = ['title' => 'Брак, %', 'type' => 'pct'];
 

@@ -252,6 +252,9 @@ html.dark {
         font-size: .7rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
         border-bottom: 1px solid var(--ui-border);
     }
+    /* выравнивание заголовка как у ячеек колонки (иначе text-left выше перебивает утилиту) */
+    .ui-table thead th.text-right  { text-align: right; }
+    .ui-table thead th.text-center { text-align: center; }
     .ui-table tbody td { padding: .8rem 1rem; color: var(--ui-text-2); vertical-align: middle; border-bottom: 1px solid var(--ui-border); }
     .ui-table tbody tr:last-child td { border-bottom: 0; }
     .ui-table tbody tr { transition: background-color .12s; }

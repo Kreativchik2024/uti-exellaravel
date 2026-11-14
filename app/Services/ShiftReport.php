@@ -31,6 +31,7 @@ class ShiftReport
         $workers = [];   // ключ исполнителя => [total, items, defect, sheets => [slug => [total, defect]]]
         $sheets = [];    // slug => [title, total, items, defect]
         $names = new \App\Support\WorkerNames();   // разные написания одного ФИО — один исполнитель
+        $unassigned = 0; // записи без исполнителя — никому не засчитаны
 
         foreach ($this->sections->sheets() as $slug => $cfg) {
             if (empty($cfg['model'])) continue;
@@ -40,7 +41,9 @@ class ShiftReport
             $defect = $this->stats->defectSql($cfg)['defect'];
 
             $select = array_merge(['id'], $wf, $hasQty ? ['qty'] : []);
-            $query = $cfg['model']::query()->select($select)->whereBetween('created_at', [$from, $to]);
+            // конец смены не включаем: запись ровно в 20:00 относится к следующей смене, а не к обеим
+            $query = $cfg['model']::query()->select($select)
+                ->where('created_at', '>=', $from)->where('created_at', '<', $to);
             if ($defect) {
                 $query->selectRaw("CASE WHEN {$defect['sql']} THEN 1 ELSE 0 END AS is_defect", $defect['bindings']);
             }
@@ -62,6 +65,7 @@ class ShiftReport
                         if ($id = $names->id($raw)) $ids[$id] = true;
                     }
                 }
+                if (! $ids) $unassigned++;
                 foreach (array_keys($ids) as $name) {
                     $w = &$workers[$name];
                     $w ??= ['total' => 0, 'items' => 0, 'defect' => 0, 'sheets' => []];
@@ -91,6 +95,7 @@ class ShiftReport
                 'total'  => array_sum(array_column($sheets, 'total')),
                 'items'  => array_sum(array_column($sheets, 'items')),
                 'defect' => array_sum(array_column($sheets, 'defect')),
+                'unassigned' => $unassigned,
             ],
         ];
     }

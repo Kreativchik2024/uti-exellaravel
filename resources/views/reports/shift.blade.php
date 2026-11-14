@@ -28,6 +28,15 @@
                 </select>
             </label>
             <button class="ui-btn ui-btn--primary">Показать</button>
+            @php $nextFuture = \App\Services\ShiftReport::bounds(\Carbon\Carbon::parse($next['date']), $next['shift'])[0]->isFuture(); @endphp
+            <div class="flex gap-2">
+                <a href="{{ route('reports.shift', $prev) }}" class="ui-btn ui-btn--ghost" title="Предыдущая смена">← Пред.</a>
+                @if($nextFuture)
+                    <span class="ui-btn ui-btn--ghost opacity-40 pointer-events-none" title="Смена ещё не началась">След. →</span>
+                @else
+                    <a href="{{ route('reports.shift', $next) }}" class="ui-btn ui-btn--ghost" title="Следующая смена">След. →</a>
+                @endif
+            </div>
             <a href="{{ route('reports.shift', ['date' => $date->format('Y-m-d'), 'shift' => $shift, 'excel' => 1]) }}" class="ui-btn ui-btn--ghost ml-auto">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 Скачать Excel
@@ -43,15 +52,18 @@
             @endforeach
         </div>
 
-        @if(!$data['workers'])
+        @if(!$data['sheets'])
             <div class="ui-card p-8 text-center text-sm" style="color: var(--ui-muted)">За эту смену записей нет</div>
         @else
             <section class="ui-card overflow-hidden">
                 <h3 class="px-4 pt-3 pb-2 text-xs font-semibold uppercase tracking-wide" style="color: var(--ui-muted)">Исполнители</h3>
                 <div class="overflow-x-auto">
                     <table class="ui-table">
-                        <thead><tr><th>Исполнитель</th><th class="text-right">Записей</th><th class="text-right">Изделий</th><th class="text-right">Брак</th><th class="text-right">% брака</th><th>По вкладкам</th></tr></thead>
+                        <thead><tr><th>Исполнитель</th><th class="text-right w-28">Записей</th><th class="text-right w-28">Изделий</th><th class="text-right w-28">Брак</th><th class="text-right w-28">% брака</th><th>По вкладкам</th></tr></thead>
                         <tbody>
+                            @if(!$data['workers'])
+                                <tr><td colspan="6" class="text-center" style="color: var(--ui-muted)">Ни в одной записи не указан исполнитель</td></tr>
+                            @endif
                             @foreach($data['workers'] as $name => $w)
                                 <tr>
                                     <td class="font-medium">
@@ -63,23 +75,32 @@
                                     <td class="text-right">{{ $w['items'] }}</td>
                                     <td class="text-right" style="{{ $w['defect'] ? 'color: var(--ui-bad); font-weight: 600' : '' }}">{{ $w['defect'] }}</td>
                                     <td class="text-right">{{ $pct($w['defect'], $w['total']) }}</td>
-                                    <td class="text-xs" style="color: var(--ui-muted)">
-                                        @foreach($w['sheets'] as $slug => $s)
-                                            <span class="whitespace-nowrap">{{ $data['sheets'][$slug]['title'] ?? $slug }}: {{ $s['total'] }}@if($s['defect']) <span style="color: var(--ui-bad)">(брак {{ $s['defect'] }})</span>@endif</span>@if(!$loop->last) · @endif
-                                        @endforeach
+                                    <td>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            @foreach($w['sheets'] as $slug => $s)
+                                                <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-xs" style="background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-text-2)">
+                                                    {{ $data['sheets'][$slug]['title'] ?? $slug }}
+                                                    <b style="color: var(--ui-text)">{{ $s['total'] }}</b>
+                                                    @if($s['defect'])<span style="color: var(--ui-bad)" title="Брак">· брак {{ $s['defect'] }}</span>@endif
+                                                </span>
+                                            @endforeach
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
                 </div>
+                @if($t['unassigned'])
+                    <p class="px-4 py-2 text-xs" style="color: var(--ui-muted); border-top: 1px solid var(--ui-border)">Записей без исполнителя: {{ $t['unassigned'] }} — они никому не засчитаны. Запись с несколькими исполнителями засчитывается каждому.</p>
+                @endif
             </section>
 
             <section class="ui-card overflow-hidden">
                 <h3 class="px-4 pt-3 pb-2 text-xs font-semibold uppercase tracking-wide" style="color: var(--ui-muted)">Вкладки</h3>
                 <div class="overflow-x-auto">
                     <table class="ui-table">
-                        <thead><tr><th>Вкладка</th><th class="text-right">Записей</th><th class="text-right">Изделий</th><th class="text-right">Брак</th><th class="text-right">% брака</th></tr></thead>
+                        <thead><tr><th>Вкладка</th><th class="text-right w-28">Записей</th><th class="text-right w-28">Изделий</th><th class="text-right w-28">Брак</th><th class="text-right w-28">% брака</th></tr></thead>
                         <tbody>
                             @foreach($data['sheets'] as $slug => $s)
                                 <tr>
@@ -90,6 +111,15 @@
                                     <td class="text-right">{{ $pct($s['defect'], $s['total']) }}</td>
                                 </tr>
                             @endforeach
+                            @if(count($data['sheets']) > 1)
+                                <tr class="font-semibold" style="background: var(--ui-surface-2)">
+                                    <td style="color: var(--ui-text)">Итого</td>
+                                    <td class="text-right" style="color: var(--ui-text)">{{ $t['total'] }}</td>
+                                    <td class="text-right" style="color: var(--ui-text)">{{ $t['items'] }}</td>
+                                    <td class="text-right" style="{{ $t['defect'] ? 'color: var(--ui-bad)' : 'color: var(--ui-text)' }}">{{ $t['defect'] }}</td>
+                                    <td class="text-right" style="color: var(--ui-text)">{{ $pct($t['defect'], $t['total']) }}</td>
+                                </tr>
+                            @endif
                         </tbody>
                     </table>
                 </div>
