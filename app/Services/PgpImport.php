@@ -80,6 +80,26 @@ class PgpImport
         return ['rows' => $rows, 'missing' => $missing, 'error' => $rows ? null : 'В файле нет строк с данными под заголовками.'];
     }
 
+    /** Похож ли лист на журнал ПГП (нашлась строка заголовков) — для автовыбора листа. */
+    public function hasHeader(array $sheet): bool
+    {
+        return $this->findHeader($sheet)[0] !== null;
+    }
+
+    /**
+     * Какой лист файла загружать: названный «ПГП» (с журналом внутри), иначе первый лист с заголовками журнала, иначе первый.
+     * @param array<string, array> $sheets название => строки
+     */
+    public function pickSheet(array $sheets): ?string
+    {
+        $withHeader = array_keys(array_filter($sheets, fn ($rows) => $this->hasHeader($rows)));
+        foreach ($withHeader as $name) {
+            if (str_contains($this->norm($name), 'пгп')) return $name;
+        }
+
+        return $withHeader[0] ?? (array_key_first($sheets) === null ? null : (string) array_key_first($sheets));
+    }
+
     /** Записывает строки без ошибок и не дубли (дубли перепроверяются — вдруг их внесли после предпросмотра). */
     public function save(array $rows, int $userId): array
     {

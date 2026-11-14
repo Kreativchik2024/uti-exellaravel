@@ -167,7 +167,8 @@ Route::middleware(['auth', 'workers'])->group(function () {
     // Загрузка бортов ПГП из Excel-журнала (до /records/{sheet}/{id}, чтобы «import» не принялся за id)
     Route::middleware('role:admin,master')->group(function () {
         Route::get('/records/pgp/import',          [\App\Http\Controllers\PgpImportController::class, 'form'])->name('pgp.import.form');
-        Route::post('/records/pgp/import/preview', [\App\Http\Controllers\PgpImportController::class, 'preview'])->name('pgp.import.preview');
+        Route::post('/records/pgp/import/preview', [\App\Http\Controllers\PgpImportController::class, 'upload'])->name('pgp.import.preview');
+        Route::post('/records/pgp/import/sheet',   [\App\Http\Controllers\PgpImportController::class, 'sheet'])->name('pgp.import.sheet');
         Route::post('/records/pgp/import',         [\App\Http\Controllers\PgpImportController::class, 'save'])->name('pgp.import.save');
     });
     Route::get('/records/{sheet}',           [RecordController::class, 'index'])->name('records.index');

@@ -21,7 +21,7 @@
         <form method="POST" action="{{ route('pgp.import.preview') }}" enctype="multipart/form-data" class="ui-card p-4 space-y-3">
             @csrf
             <p class="text-sm" style="color: var(--ui-text-2)">
-                Файл <b>.xlsx / .xls / .csv</b> с колонками: Дата, Номер поста, ФИО 1–3, Время начала / завершения работ, Номер борта,
+                Таблица <b>.ods</b> (LibreOffice), <b>.xlsx / .xls</b> или <b>.csv</b>. Если листов несколько — берётся лист «ПГП» (или первый лист с такими колонками), его можно сменить в предпросмотре. Колонки: Дата, Номер поста, ФИО 1–3, Время начала / завершения работ, Номер борта,
                 IP адрес модуля связи, Номер фюзеляжа, Сдан, Неисправен, Причина неисправности, Действия.
                 Порядок колонок не важен, лишние (например, «Время ожидания ОТК») пропускаются.
             </p>
@@ -31,13 +31,35 @@
                 <li>Тип борта определяется по номеру борта, время внесения записи — по дате и времени завершения (для отчёта по смене).</li>
             </ul>
             <div class="flex flex-wrap items-center gap-2">
-                <input type="file" name="file" accept=".xlsx,.xls,.csv" required class="ui-input">
+                <input type="file" name="file" accept=".ods,.xlsx,.xls,.csv" required class="ui-input">
                 <button class="ui-btn ui-btn--primary">Проверить файл</button>
                 <a href="{{ route('records.index', 'pgp') }}" class="ui-btn ui-btn--ghost">Отмена</a>
             </div>
         </form>
 
-        @if($result)
+        @if($result && count($sheets ?? []) > 1)
+            <form method="POST" action="{{ route('pgp.import.sheet') }}" class="ui-card p-4 flex flex-wrap items-end gap-3">
+                @csrf
+                <input type="hidden" name="token" value="{{ $token }}">
+                <label class="block">
+                    <span class="ui-label">Лист в файле «{{ $fileName }}»</span>
+                    <select name="sheet" class="ui-input" onchange="this.form.submit()">
+                        @foreach($sheets as $name => $looksLikePgp)
+                            <option value="{{ $name }}" @selected($name === $sheet)>{{ $name }}{{ $looksLikePgp ? '' : ' — нет колонок журнала ПГП' }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <noscript><button class="ui-btn ui-btn--ghost">Показать лист</button></noscript>
+            </form>
+        @endif
+
+        @if($result && $result['error'])
+            <div class="ui-card px-4 py-3 text-sm font-medium" role="alert" style="background: var(--ui-bad-soft); color: var(--ui-bad); border-color: transparent">
+                Лист «{{ $sheet }}»: {{ $result['error'] }}
+            </div>
+        @endif
+
+        @if($result && !$result['error'])
             @php
                 $rows = $result['rows'];
                 $new = array_filter($rows, fn ($x) => !$x['error'] && !$x['duplicate']);
@@ -92,7 +114,7 @@
                 @csrf
                 <input type="hidden" name="token" value="{{ $token }}">
                 <button class="ui-btn ui-btn--primary" @disabled(!count($new))>Загрузить новые записи ({{ count($new) }})</button>
-                <span class="text-sm" style="color: var(--ui-muted)">{{ $fileName ?? '' }} · предпросмотр действует час</span>
+                <span class="text-sm" style="color: var(--ui-muted)">{{ $fileName ?? '' }}@if(!empty($sheet)) · лист «{{ $sheet }}»@endif · предпросмотр действует час</span>
             </form>
 
             <section class="ui-card overflow-hidden">

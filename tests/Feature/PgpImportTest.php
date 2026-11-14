@@ -66,6 +66,42 @@ class PgpImportTest extends TestCase
         $this->assertSame(3, PgpRecord::count());
     }
 
+    public function test_ods_file_picks_pgp_sheet_and_sheet_can_be_switched(): void
+    {
+        $master = $this->worker('master');
+        Employee::create(['last_name' => 'Кузнецов', 'first_name' => 'Пётр', 'middle_name' => 'Ильич', 'short_name' => 'Кузнецов П.И.', 'is_active' => true]);
+
+        $book = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $book->getActiveSheet()->setTitle('Сводка')->fromArray([['Итого за месяц', 42]]);
+        $pgp = $book->createSheet()->setTitle('ПГП');
+        $pgp->fromArray([
+            ['Дата', 'Номер поста', 'ФИО 1', 'ФИО 2', 'ФИО 3', 'Время начала работ', 'Время завершения', 'Номер борта', 'Сдан', 'Неисправен'],
+            [\PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel(new \DateTime('2026-11-05')), 2, 'Кузнецов П.И.', '', '', 8.5 / 24, 9.75 / 24, 'СОН-55', 1, ''],
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'pgp') . '.ods';
+        (new \PhpOffice\PhpSpreadsheet\Writer\Ods($book))->save($path);
+        $file = new UploadedFile($path, 'журнал.ods', null, null, true);
+
+        $res = $this->asUser($master)->post('/records/pgp/import/preview', ['file' => $file])->assertOk();
+        $this->assertSame('ПГП', $res->viewData('sheet'), 'выбран лист «ПГП», а не первый');
+        $this->assertSame(['Сводка' => false, 'ПГП' => true], $res->viewData('sheets'));
+        $row = $res->viewData('result')['rows'][0];
+        $this->assertSame(['2026-11-05', 2, '08:30', '09:45', 'СОН'],
+            [$row['data']['record_date'], $row['data']['post_number'], $row['data']['work_start'], $row['data']['work_end'], $row['data']['board_type']]);
+
+        $token = $res->viewData('token');
+        // другой лист — ошибка «нет заголовков», загружать нечего
+        $other = $this->asUser($master)->post('/records/pgp/import/sheet', ['token' => $token, 'sheet' => 'Сводка'])->assertOk();
+        $this->assertNotNull($other->viewData('result')['error']);
+        // обратно на ПГП и загрузка
+        $this->asUser($master)->post('/records/pgp/import/sheet', ['token' => $token, 'sheet' => 'ПГП'])->assertOk();
+        $this->asUser($master)->post('/records/pgp/import', ['token' => $token])->assertRedirect(route('records.index', 'pgp'));
+
+        $rec = PgpRecord::firstOrFail();
+        $this->assertSame(['СОН-55', 'Кузнецов П.И.', '2026-11-05 09:45'], [$rec->board_number, $rec->worker1, $rec->created_at->format('Y-m-d H:i')]);
+        @unlink($path);
+    }
+
     public function test_import_is_for_master_and_admin_only(): void
     {
         $this->asUser($this->worker('executor'))->get('/records/pgp/import')->assertForbidden();
