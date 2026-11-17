@@ -50,3 +50,5 @@ auth.json
 
 # флаг «идёт обновление» (пишет scripts/uti-update.sh)
 /public/update-notice.json
+.env.bak
+.env
