@@ -61,6 +61,10 @@ class StatsPostsAndBoardNumberTest extends TestCase
                   'S50Z-100844-MH-02T', 'S-50-Z-100844-MH-02-T', 'S50Z100844-MH-02T', 'S50Z--100844MH--02T'] as $in) {
             $this->assertSame('S50Z100844MH-02T', BoardNumber::normalize($in), $in);
         }
+        foreach (['S50z-100-903-мн-02t-008-manet', 'S50Z100903MH02T008MANET', 's50z 100903 mh-02t-008 manet',
+                  'S50Z100903MH-02T-008-MANET'] as $in) {
+            $this->assertSame('S50Z100903MH-02T-008-MANET', BoardNumber::normalize($in), $in);
+        }
         $this->assertNull(BoardNumber::normalize(null));
 
         $this->pgp(1, 'Сдан', 's50z100844мн02т');
