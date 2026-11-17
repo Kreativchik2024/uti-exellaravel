@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./vendor/**)",
+      "Read(./node_modules/**)",
+      "Read(./public/build/**)",
+      "Read(./storage/framework/**)",
+      "Read(./releases/**)",
+      "Read(./.venv-import/**)",
+      "Read(./vendor.tgz)",
+      "Read(./composer.lock)",
+      "Read(./package-lock.json)"
+    ]
+  }
+}

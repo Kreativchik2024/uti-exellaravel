@@ -72,6 +72,10 @@ Route::middleware('auth')->group(function () {
 });
 
 // Админские разделы: убран 'workers', чтобы не блокировались при входе
+// Список сотрудников: админ — полный доступ, мастер — только просмотр (исполнителям закрыт)
+Route::get('/employees', [EmployeeController::class, 'index'])
+    ->middleware(['auth', 'role:admin,master'])->name('employees.index');
+
 Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/users',                     [UserController::class, 'index'])->name('users.index');
     Route::patch('/users/{user}/role',       [UserController::class, 'updateRole'])->name('users.role');
@@ -86,7 +90,6 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/employees/import',   [EmployeeController::class, 'importForm'])->name('employees.importForm');
     Route::post('/employees/import',  [EmployeeController::class, 'import'])->name('employees.import');
 
-    Route::get('/employees',                 [EmployeeController::class, 'index'])->name('employees.index');
     Route::get('/employees/create',          [EmployeeController::class, 'create'])->name('employees.create');
     Route::post('/employees',                [EmployeeController::class, 'store'])->name('employees.store');
     Route::get('/employees/{employee}/edit', [EmployeeController::class, 'edit'])->name('employees.edit');

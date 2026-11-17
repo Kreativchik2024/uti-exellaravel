@@ -2,6 +2,7 @@
     <x-slot name="header">
         <div class="flex flex-wrap justify-between items-center gap-2">
             <h2 class="font-semibold text-xl text-gray-800">Сотрудники</h2>
+            @if(auth()->user()->isAdmin())
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('employees.template') }}"
                    class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-2 rounded shadow text-sm">
@@ -20,6 +21,7 @@
                     Добавить сотрудника
                 </a>
             </div>
+            @endif
         </div>
     </x-slot>
 
@@ -71,7 +73,7 @@
                         <th class="p-3 text-left">Участок</th>
                         <th class="p-3 text-left">Учётка</th>
                         <th class="p-3 text-center">Активен</th>
-                        <th class="p-3 text-right">Действия</th>
+                        @if(auth()->user()->isAdmin())<th class="p-3 text-right">Действия</th>@endif
                     </tr>
                 </thead>
                 <tbody>
@@ -99,6 +101,7 @@
                                     <span class="text-red-600">✗</span>
                                 @endif
                             </td>
+                            @if(auth()->user()->isAdmin())
                             <td class="p-3 text-right whitespace-nowrap">
                                 <a href="{{ route('employees.edit', $e) }}"
                                    class="text-blue-600 hover:underline text-sm">Изменить</a>
@@ -109,6 +112,7 @@
                                     <button class="text-red-600 hover:underline text-sm ml-3">Удалить</button>
                                 </form>
                             </td>
+                            @endif
                         </tr>
                     @empty
                         <tr><td colspan="10" class="p-6 text-center text-gray-500">Сотрудников пока нет</td></tr>

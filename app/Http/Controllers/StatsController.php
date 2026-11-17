@@ -213,7 +213,7 @@ class StatsController extends Controller
     {
         $r->validate(['sheet' => ['required', 'string', 'max:60'], 'kind' => ['nullable', 'in:all,good,defect'],
                       'from' => ['nullable', 'date'], 'to' => ['nullable', 'date'], 'worker' => ['nullable', 'string', 'max:200'],
-                      'board' => ['nullable', 'string', 'max:20']]);
+                      'board' => ['nullable', 'string', 'max:20'], 'post' => ['nullable', 'integer', 'min:0']]);
         $slug = (string) $r->input('sheet');
         $cfg  = $this->sheetCfg($slug);
         abort_unless($cfg && ! empty($cfg['model']), 404);
@@ -230,6 +230,9 @@ class StatsController extends Controller
             ? $s->boardRecords($board === '_all' ? null : $board, $from, $to, $targetUser, $worker ?: null, $kind)
             : $s->periodRecords($slug, $from, $to, $targetUser, $worker ?: null, $kind);
         abort_if($board !== null && ! $query, 404);
+        // post — клик по цифре в «Детализации по постам»: только записи этого поста
+        $post = $r->filled('post') && isset($cfg['fields']['post_number']) ? (int) $r->input('post') : null;
+        if ($query && $post !== null) $query->where('post_number', $post);
         $records = $query
             ? $query->with('creator')->paginate(100)->withQueryString()
             : new \Illuminate\Pagination\LengthAwarePaginator([], 0, 100);
@@ -252,8 +255,12 @@ class StatsController extends Controller
             'defectIds' => $defectIds,
             'kind'    => $kind,
             'board'   => $board,
-            'boardLabel' => $board === null ? null
-                : ($board === '_all' ? 'все борта' : ($board === '_none' ? 'тип не указан' : 'тип ' . $board)),
+            'boardLabel' => implode(' · ', array_filter([
+                $post !== null ? 'пост ' . $post : null,
+                $board === null || ($board === '_all' && $post !== null) ? null
+                    : ($board === '_all' ? 'все борта' : ($board === '_none' ? 'тип не указан' : 'тип ' . $board)),
+            ])) ?: null,
+            'post'    => $post,
             'worker'  => $worker,
             'periodLabel' => $this->periodLabel($from, $to),
             'filters' => array_filter($r->only(['from', 'to', 'worker', 'mode']), fn ($v) => $v !== null && $v !== ''),
@@ -405,7 +412,10 @@ class StatsController extends Controller
 
         $model = $cfg['model'];
 
-        $query = $model::select('post_number', DB::raw('COUNT(*) AS cnt'))
+        // Топ постов — по СДАННЫМ бортам (status = «Сдан»), а не по общему прогону
+        $hasStatus = isset($cfg['fields']['status']);
+        $query = $model::select('post_number', DB::raw('COUNT(*) AS total'))
+            ->selectRaw($hasStatus ? "SUM(CASE WHEN `status` = 'Сдан' THEN 1 ELSE 0 END) AS cnt" : 'COUNT(*) AS cnt')
             ->whereNotNull('post_number');
 
         $targetUser = $this->resolveTargetUser($r);
@@ -414,9 +424,15 @@ class StatsController extends Controller
         }
         $this->applyDateRange($query, $from, $to);
 
-        return response()->json(
-            $query->groupBy('post_number')->orderByDesc('cnt')->orderBy('post_number')->get()
-        );
+        $rows = $query->groupBy('post_number')->orderByDesc('cnt')->orderByDesc('total')->orderBy('post_number')->get()
+            ->map(fn ($row) => [
+                'post_number' => $row->post_number,
+                'cnt'         => (int) $row->cnt,                       // сдано
+                'not_done'    => (int) $row->total - (int) $row->cnt,   // не сдано
+                'total'       => (int) $row->total,
+            ]);
+
+        return response()->json($rows);
     }
 
     public function zone4(Request $r)

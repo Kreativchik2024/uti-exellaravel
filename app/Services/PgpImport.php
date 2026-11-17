@@ -185,7 +185,7 @@ class PgpImport
             if (! $t && trim((string) $raw) !== '') $warnings[] = 'время «' . trim((string) $raw) . '» не распознано';
         }
 
-        $board = $this->text($get('board_number'), 80);
+        $board = \App\Support\BoardNumber::normalize($this->text($get('board_number'), 80));
         $data['board_number'] = $board;
         if ($board) {
             $data['board_type'] = BoardTypes::detect($board);

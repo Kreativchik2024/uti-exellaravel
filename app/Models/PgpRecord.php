@@ -39,6 +39,10 @@ class PgpRecord extends Model
     {
         // Тип борта не указан — определяем по номеру («УМН-12» → УМН), см. App\Support\BoardTypes
         static::saving(function (self $record) {
+            // Номер борта — к общему виду «RA-12345», чтобы потом удобно искать
+            if ($record->isDirty('board_number')) {
+                $record->board_number = \App\Support\BoardNumber::normalize($record->board_number);
+            }
             if (blank($record->board_type) && filled($record->board_number)) {
                 $record->board_type = \App\Support\BoardTypes::detect($record->board_number);
             }

@@ -27,7 +27,8 @@ class AdminTest extends TestCase
 
         foreach ($pages as $page) {
             $this->asUser($this->admin())->get($page)->assertOk();
-            $this->asUser($this->worker('master'))->get($page)->assertForbidden();
+            // список сотрудников мастеру открыт на просмотр (StatsPostsAndBoardNumberTest)
+            if ($page !== '/employees') $this->asUser($this->worker('master'))->get($page)->assertForbidden();
             $this->asUser($this->worker())->get($page)->assertForbidden();
         }
     }

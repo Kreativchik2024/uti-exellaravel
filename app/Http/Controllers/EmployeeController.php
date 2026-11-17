@@ -75,7 +75,7 @@ class EmployeeController extends Controller
                        ->orWhere('department', 'like', "%{$q}%");
                 });
             })
-            ->orderBy('short_name')
+            ->orderBy('last_name')->orderBy('first_name')->orderBy('middle_name')->orderBy('id')
             ->paginate(50)
             ->withQueryString();
 

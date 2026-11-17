@@ -250,7 +250,9 @@
                                 <tr>
                                     <th class="p-3 text-left">#</th>
                                     <th class="p-3 text-left">Пост</th>
-                                    <th class="p-3 text-right">Сделано бортов</th>
+                                    <th class="p-3 text-right">Сдано бортов</th>
+                                    <th class="p-3 text-right">Не сдано</th>
+                                    <th class="p-3 text-right">Всего</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -258,7 +260,17 @@
                                     <tr class="border-t hover:bg-gray-50">
                                         <td class="p-3 text-gray-400" x-text="idx + 1"></td>
                                         <td class="p-3 font-medium" x-text="'Пост ' + row.post_number"></td>
-                                        <td class="p-3 text-right font-bold text-blue-700" x-text="row.cnt"></td>
+                                        <td class="p-3 text-right font-bold">
+                                            <a x-show="row.cnt > 0" :href="postUrl(row.post_number, 'good')" class="text-green-700 hover:underline" title="Открыть сданные" x-text="'✓ ' + row.cnt"></a>
+                                            <span x-show="row.cnt === 0" class="text-gray-400">✓ 0</span>
+                                        </td>
+                                        <td class="p-3 text-right font-bold">
+                                            <a x-show="row.not_done > 0" :href="postUrl(row.post_number, 'defect')" class="text-red-600 hover:underline" title="Открыть несданные" x-text="'✕ ' + row.not_done"></a>
+                                            <span x-show="row.not_done === 0" class="text-gray-400">✕ 0</span>
+                                        </td>
+                                        <td class="p-3 text-right">
+                                            <a :href="postUrl(row.post_number, 'all')" class="text-blue-700 hover:underline" title="Открыть все борта поста" x-text="row.total"></a>
+                                        </td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -712,6 +724,15 @@
                     toggleZone4() { this.expanded4 = !this.expanded4; if (this.expanded4) this.loadZone4(); },
                     toggleZone5() { this.expanded5 = !this.expanded5; if (this.expanded5 && !this.loaded5 && !this.loading5) this.loadZone5(); },
                     toggleZone6() { this.expanded6 = !this.expanded6; if (this.expanded6 && !this.loaded6 && !this.loading6) this.loadZone6(); },
+
+                    // ссылка с цифры «Детализации по постам» на список бортов поста (как в «Бортах по типам»)
+                    postUrl(post, kind) {
+                        const p = new URLSearchParams({ sheet: 'pgp', board: '_all', kind: kind, post: post });
+                        if (this.initialFrom) p.set('from', this.initialFrom);
+                        if (this.initialTo)   p.set('to',   this.initialTo);
+                        if (this.statsMode)   p.set('mode', this.statsMode);
+                        return '{{ route("stats.records") }}?' + p.toString();
+                    },
 
                     async loadZone3() {
                         this.loading3 = true;

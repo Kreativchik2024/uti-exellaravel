@@ -26,8 +26,8 @@ class UserController extends Controller
                     ? $q->where('is_active', true)
                     : $q->where('is_active', false);
             })
-            ->orderByDesc('is_active')
-            ->orderBy('name')
+            ->orderBy('name')   // строго по алфавиту
+            ->orderBy('id')
             ->paginate(30)
             ->withQueryString();
 

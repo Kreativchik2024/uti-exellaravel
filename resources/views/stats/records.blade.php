@@ -21,7 +21,7 @@
         <div class="flex flex-wrap gap-2">
             <a href="{{ route('stats.index', $filters) }}" class="ui-btn ui-btn--ghost">← К статистике</a>
             @foreach($kinds as $k => $label)
-                <a href="{{ route('stats.records', $filters + array_filter(['sheet' => $slug, 'kind' => $k, 'board' => $board])) }}"
+                <a href="{{ route('stats.records', $filters + array_filter(['sheet' => $slug, 'kind' => $k, 'board' => $board, 'post' => $post ?? null], fn ($v) => $v !== null && $v !== '')) }}"
                    class="ui-btn ui-btn--sm {{ $kind === $k ? 'ui-btn--primary' : 'ui-btn--ghost' }}"
                    @if($kind === $k) aria-current="page" @endif>{{ $label }}</a>
             @endforeach

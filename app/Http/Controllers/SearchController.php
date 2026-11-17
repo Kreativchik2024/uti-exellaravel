@@ -32,8 +32,13 @@ class SearchController extends Controller
                     ->keys()->all();
                 if (! $fields) continue;
 
-                $query = $cfg['model']::query()->where(function ($w) use ($fields, $like, $q) {
+                // «ра 12345», «RA12345» → ищем и как «RA-12345» (номера бортов хранятся в общем виде)
+                $board = \App\Support\BoardNumber::normalize($q);
+                $query = $cfg['model']::query()->where(function ($w) use ($fields, $like, $q, $board) {
                     foreach ($fields as $f) $w->orWhere($f, 'like', $like);
+                    if ($board !== $q && in_array('board_number', $fields, true)) {
+                        $w->orWhere('board_number', 'like', '%' . addcslashes($board, '%_\\') . '%');
+                    }
                     if (ctype_digit(ltrim($q, '#'))) $w->orWhere('id', (int) ltrim($q, '#'));
                 });
 

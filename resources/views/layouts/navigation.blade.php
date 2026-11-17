@@ -86,6 +86,10 @@
                     </div>
                 @endif
 
+                @if($user->isMaster())
+                    <a href="{{ route('employees.index') }}" class="ui-navlink {{ request()->routeIs('employees.*') ? 'ui-navlink--active' : '' }}">Сотрудники</a>
+                @endif
+
                 @if($user->isAdmin())
                     <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
                         <button type="button" @click="open = !open" :aria-expanded="open"
@@ -276,6 +280,9 @@
             @if($user->canManageContent())
                 <a href="{{ route('reports.shift') }}" class="ui-menu__item {{ request()->routeIs('reports.shift') ? 'ui-menu__item--active' : '' }}">Отчёт по смене</a>
                 <a href="{{ route('reports.defects') }}" class="ui-menu__item {{ request()->routeIs('reports.defects') ? 'ui-menu__item--active' : '' }}">Причины брака</a>
+            @endif
+            @if($user->isMaster())
+                <a href="{{ route('employees.index') }}" class="ui-menu__item {{ request()->routeIs('employees.*') ? 'ui-menu__item--active' : '' }}">Сотрудники</a>
             @endif
 
             @if($user->isAdmin())
