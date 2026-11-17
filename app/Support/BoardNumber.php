@@ -18,6 +18,12 @@ class BoardNumber
         'О' => 'O', 'Р' => 'P', 'С' => 'C', 'Т' => 'T', 'Х' => 'X', 'У' => 'Y',
     ];
 
+    /** Таблица «русская буква → латинская» (для той же нормализации в форме, на JS). */
+    public static function toLatin(): array
+    {
+        return self::TO_LATIN;
+    }
+
     public static function normalize(?string $value): ?string
     {
         if ($value === null) return null;

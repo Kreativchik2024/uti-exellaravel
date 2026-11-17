@@ -591,6 +591,34 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+@if(isset($cfg['fields']['board_number']))
+<script>
+(function () {
+    // Номер борта — к общему виду при выходе из поля; то же правило, что на сервере (App\Support\BoardNumber)
+    var toLatin = @json(\App\Support\BoardNumber::toLatin());
+    function normalize(value) {
+        var plain = String(value || '').replace(/\s+/g, ' ').trim();
+        var v = plain.replace(/ /g, '').toUpperCase()
+            .replace(/./g, function (c) { return toLatin[c] || c; })
+            .replace(/[‐-―−_.\/-]+/g, '');
+        var m = v.match(/^(S\d+Z\d+[A-Z]+)(\d{2}[A-Z])(.*)$/);
+        if (!m) return plain;
+        return [m[1], m[2]].concat(m[3].match(/\d+|\p{L}+/gu) || []).join('-');
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        var input = document.querySelector('[name="board_number"]');
+        if (!input || input.disabled || input.readOnly) return;
+        input.addEventListener('blur', function () {
+            var n = normalize(input.value);
+            if (n !== input.value) {
+                input.value = n;
+                input.dispatchEvent(new Event('input'));   // пересчитать «Тип борта» и др.
+            }
+        });
+    });
+})();
+</script>
+@endif
 @php
     // Поля с автоопределением (например, «Тип борта» по номеру борта): правила — в config/sheets.php → 'autodetect'
     $autodetect = [];
