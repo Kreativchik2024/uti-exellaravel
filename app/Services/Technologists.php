@@ -2,10 +2,11 @@
 
 namespace App\Services;
 
-use App\Models\User;
+use App\Models\Employee;
 
 /**
- * Технологи — пользователи группы ОТК. Имя — короткое ФИО привязанного сотрудника, иначе имя учётной записи.
+ * Технологи — сотрудники с ролью ОТК (роль задаётся в карточке сотрудника, учётная запись не обязательна).
+ * Имя — короткое ФИО сотрудника.
  * names() — активные (для выпадающего списка), allNames() — все, в т.ч. отключённые (чтобы старые записи
  * с ушедшим технологом можно было сохранить без смены технолога).
  */
@@ -23,10 +24,10 @@ class Technologists
 
     private function list(bool $activeOnly): array
     {
-        return User::query()->where('role', 'otk')
+        return Employee::query()->where('role', 'otk')
             ->when($activeOnly, fn ($q) => $q->where('is_active', true))
-            ->with('employee')->get()
-            ->map(fn (User $u) => trim((string) ($u->employee?->short_name ?: $u->name)))
+            ->pluck('short_name')
+            ->map(fn ($n) => trim((string) $n))
             ->filter()->unique()->sort()->values()->all();
     }
 }

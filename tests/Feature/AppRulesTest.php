@@ -28,11 +28,12 @@ class AppRulesTest extends TestCase
         return $user;
     }
 
-    /** Технолог (группа ОТК) для обязательного поля записи ПГП. */
+    /** Технолог (сотрудник с ролью ОТК) для обязательного поля записи ПГП. */
     private function technologistName(): string
     {
-        if (! User::where('role', 'otk')->where('name', 'Технологов Т.Т.')->exists()) {
-            User::factory()->create(['role' => 'otk', 'is_active' => true, 'name' => 'Технологов Т.Т.']);
+        if (! \App\Models\Employee::where('short_name', 'Технологов Т.Т.')->exists()) {
+            (new \App\Models\Employee(['last_name' => 'Технологов', 'first_name' => 'Тест', 'short_name' => 'Технологов Т.Т.', 'is_active' => true]))
+                ->forceFill(['role' => 'otk'])->save();
         }
 
         return 'Технологов Т.Т.';

@@ -13,13 +13,14 @@ trait SiteHelpers
 {
     private int $employeeSeq = 0;
 
-    /** Технолог для записи ПГП (поле обязательное): первый из группы ОТК, а если их нет — создаётся. */
+    /** Технолог для записи ПГП (поле обязательное): первый сотрудник с ролью ОТК, а если их нет — создаётся. */
     protected function technologistName(): string
     {
         $names = app(\App\Services\Technologists::class)->allNames();
         if ($names) return $names[0];
 
-        User::factory()->create(['role' => 'otk', 'is_active' => true, 'name' => 'Технологов Т.Т.']);
+        (new Employee(['last_name' => 'Технологов', 'first_name' => 'Тест', 'short_name' => 'Технологов Т.Т.', 'is_active' => true]))
+            ->forceFill(['role' => 'otk'])->save();
 
         return 'Технологов Т.Т.';
     }

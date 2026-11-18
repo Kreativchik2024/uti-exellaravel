@@ -13,10 +13,11 @@ class TechnologistTest extends TestCase
 {
     use RefreshDatabase, SiteHelpers;
 
+    /** Технолог — сотрудник с ролью ОТК; $active — активна ли карточка сотрудника. */
     private function tech(string $short, bool $active = true): User
     {
         $u = $this->worker('otk', $short);
-        $u->forceFill(['is_active' => $active])->save();
+        $u->employee->forceFill(['is_active' => $active])->save();
 
         return $u;
     }
@@ -47,6 +48,33 @@ class TechnologistTest extends TestCase
         $this->assertStringNotContainsString('Исполнитель И.И.', $select);
     }
 
+    public function test_otk_role_set_on_employee_appears_in_technologist_list(): void
+    {
+        $admin = $this->worker('admin');
+        $worker = $this->worker('executor', 'Новикова Н.Н.');
+        $card = $worker->employee;
+        $select = function () use ($admin) {
+            $html = $this->asUser($admin)->get('/records/pgp/create')->assertOk()->getContent();
+            $start = mb_strpos($html, 'name="technologist"');
+            return mb_substr($html, $start, mb_strpos($html, '</select>', $start) - $start);
+        };
+        $this->assertStringNotContainsString('Новикова Н.Н.', $select());
+        $this->assertStringNotContainsString($card->last_name, $select());
+
+        // Роль ОТК в карточке сотрудника — сразу в списке технологов
+        $this->asUser($admin)->put("/employees/{$card->id}", [
+            'last_name' => $card->last_name, 'first_name' => $card->first_name, 'middle_name' => $card->middle_name,
+            'is_active' => 1, 'user_id' => $worker->id, 'role' => 'otk',
+        ])->assertSessionHasNoErrors();
+        // короткое ФИО при сохранении карточки собирается из фамилии и инициалов
+        $this->assertStringContainsString('<option value="' . $card->fresh()->short_name . '"', $select());
+
+        // Сотрудник ОТК без учётной записи — тоже технолог
+        $this->asUser($admin)->post('/employees', ['last_name' => 'Безучёткин', 'first_name' => 'Олег', 'is_active' => 1, 'role' => 'otk'])
+            ->assertSessionHasNoErrors();
+        $this->assertStringContainsString('<option value="Безучёткин О."', $select());
+    }
+
     public function test_technologist_is_required_and_must_be_from_list(): void
     {
         $this->tech('Петрова А.А.');
@@ -68,7 +96,7 @@ class TechnologistTest extends TestCase
     {
         $tech = $this->tech('Петрова А.А.');
         $rec = $this->pgp(['technologist' => 'Петрова А.А.']);
-        $tech->forceFill(['role' => 'executor'])->save();   // больше не технолог
+        $tech->employee->forceFill(['role' => 'executor'])->save();   // больше не технолог
 
         $master = $this->worker('master');
         $data = array_merge($this->validRecord('pgp', 'Иванов И.И.'), ['technologist' => 'Петрова А.А.', 'worker1' => $rec->worker1]);
