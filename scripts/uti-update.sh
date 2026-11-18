@@ -101,6 +101,15 @@ fi
 git fetch origin "$BRANCH"
 TARGET="$(git rev-parse "origin/$BRANCH")"
 git merge-base --is-ancestor HEAD "$TARGET" || die "на сервере есть свои коммиты, которых нет в GitHub — пришлите вывод «git log -3» разработчику"
+# composer нужен, только если менялись composer.json / composer.lock (или нет vendor):
+# иначе он не ставит ничего, но может надолго зависнуть на сети
+COMPOSER_NEEDED=1
+if [ -d vendor ] && git diff --quiet "$START" "$TARGET" -- composer.json composer.lock; then COMPOSER_NEEDED=0; fi
+# Ограничение по времени: зависший composer не держит сайт закрытым бесконечно (падение → откат)
+composer_install() {
+    local t=""; command -v timeout >/dev/null && t="timeout 900"
+    COMPOSER_IPRESOLVE="${COMPOSER_IPRESOLVE:-4}" $t composer install --no-dev --optimize-autoloader --no-interaction "$@"
+}
 if [ "$START" = "$TARGET" ]; then
     echo "   новых коммитов нет ($(git rev-parse --short HEAD)) — всё равно пересобираю"
 else
@@ -180,7 +189,8 @@ rollback() {
     drop_caches
     if [ "$SWITCHED" = 1 ]; then
         git reset --hard -q "$START" || true
-        command -v composer >/dev/null && composer install --no-dev --optimize-autoloader --no-interaction --no-progress -q || true
+        # vendor трогали, только если менялись зависимости — тогда и возвращаем
+        [ "$COMPOSER_NEEDED" = 1 ] && command -v composer >/dev/null && composer_install --no-progress -q || true
     fi
     if [ -d public/build.prev ]; then rm -rf public/build; mv public/build.prev public/build; fi
     php artisan package:discover >/dev/null 2>&1 || true
@@ -202,8 +212,11 @@ git checkout -- package-lock.json 2>/dev/null || true
 
 say "7. PHP-зависимости (composer)"
 drop_caches
-if command -v composer >/dev/null; then
-    composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+if [ "$COMPOSER_NEEDED" = 0 ]; then
+    echo "   composer.json и composer.lock не менялись — пропускаю (vendor прежний)"
+elif command -v composer >/dev/null; then
+    # прогресс скачивания виден — понятно, что composer не завис, а качает
+    composer_install || die "composer не справился за 15 минут или с ошибкой — проверьте интернет на сервере (curl -4 -sI https://repo.packagist.org)"
 else
     warn "composer не найден — пропускаю (vendor остаётся прежним)"
 fi
