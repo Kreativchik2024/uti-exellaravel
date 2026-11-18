@@ -520,6 +520,12 @@ class RecordController extends Controller
             $listFilter = $lf + ['current' => $current, 'counts' => $counts, 'total' => array_sum($counts)];
         }
 
+        // Ссылка из меню профиля: необработанные рекламации ПГП (см. App\Services\PgpComplaints)
+        $techOpen = $sheet === 'pgp' && $request->query('tech') === 'open';
+        if ($techOpen) {
+            $query->whereIn('id', app(\App\Services\PgpComplaints::class)->openQuery()->select('id'));
+        }
+
         if (array_key_exists('record_date', $cfg['fields'])) {
             $query->orderByDesc('record_date')->orderByDesc('id');
         } else {
@@ -544,7 +550,7 @@ class RecordController extends Controller
             }
         }
 
-        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter'));
+        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter', 'techOpen'));
     }
 
     public function show(string $sheet, int $id)
@@ -751,6 +757,34 @@ class RecordController extends Controller
         }
 
         return redirect()->route('records.index', $sheet)->with('ok', 'Запись обновлена');
+    }
+
+    /** Пометка технолога к записи ПГП: текст и отметка «обработан». Пишет только группа ОТК (маршрут role:otk). */
+    public function tech(Request $r, string $sheet, int $id)
+    {
+        abort_unless($sheet === 'pgp', 404);
+        $cfg    = $this->cfg($sheet);
+        $record = $cfg['model']::findOrFail($id);
+
+        $data = $r->validate([
+            'tech_note'      => ['nullable', 'string', 'max:2000'],
+            'tech_processed' => ['sometimes', 'boolean'],
+        ], [], ['tech_note' => 'Пометка технолога']);
+
+        $changes = [];
+        if (array_key_exists('tech_note', $data) && $data['tech_note'] !== $record->tech_note) $changes['пометка'] = 'изменена';
+        if (array_key_exists('tech_processed', $data) && (bool) $data['tech_processed'] !== (bool) $record->tech_processed) {
+            $changes['обработан'] = $data['tech_processed'] ? 'да' : 'нет';
+        }
+
+        $record->forceFill($data + ['tech_updated_by' => auth()->id(), 'tech_updated_at' => now()])->save();
+
+        if ($changes) {
+            \App\Models\AuditLog::write('pgp', 'tech', "Пометка технолога к записи ПГП #{$record->id}: " . implode(', ', array_map(fn ($k, $v) => "$k — $v", array_keys($changes), $changes)),
+                ['subject_type' => 'record', 'subject_id' => $record->id, 'section_id' => null]);
+        }
+
+        return back()->with('ok', 'Пометка технолога сохранена');
     }
 
     public function destroy(string $sheet, int $id)

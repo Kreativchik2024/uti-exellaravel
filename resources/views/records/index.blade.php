@@ -90,6 +90,13 @@
             </nav>
         @endif
 
+        @if($techOpen ?? false)
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm rounded-lg px-3 py-2" style="background: var(--ui-surface-2); color: var(--ui-text-2)">
+                <span>Показаны необработанные рекламации ПГП</span>
+                <a href="{{ route('records.index', $sheet) }}" class="font-semibold underline" style="color: var(--ui-accent-text)">Показать все</a>
+            </div>
+        @endif
+
         {{-- Карточки записей: мобильные (< 768px) --}}
         <div class="records-cards">
             @forelse($records as $record)

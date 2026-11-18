@@ -149,6 +149,39 @@
 
             {{-- Боковая колонка --}}
             <aside class="space-y-5 lg:sticky" style="top: calc(var(--ui-nav-h) + 16px)">
+                @if($sheet === 'pgp')
+                    <section class="ui-card overflow-hidden">
+                        <div class="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
+                            <h3 class="rec-section__title !p-0">Пометка технолога</h3>
+                            @if($record->tech_processed)
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background: var(--ui-surface-2); color: var(--ui-good)">Обработан</span>
+                            @else
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background: var(--ui-surface-2); color: var(--ui-bad)">Не обработан</span>
+                            @endif
+                        </div>
+                        <div class="px-4 pb-4 space-y-3">
+                            @if(auth()->user()->isOtk())
+                                <form method="POST" action="{{ route('records.tech', [$sheet, $record->id]) }}" class="space-y-3">
+                                    @csrf @method('PATCH')
+                                    <textarea name="tech_note" rows="3" maxlength="2000" placeholder="Что сделано или что нужно учесть"
+                                              class="w-full rounded-lg text-sm" style="background: var(--ui-surface-2); color: var(--ui-text); border: 1px solid var(--ui-border)">{{ old('tech_note', $record->tech_note) }}</textarea>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button type="submit" class="ui-btn ui-btn--ghost">Сохранить пометку</button>
+                                        <button type="submit" name="tech_processed" value="{{ $record->tech_processed ? 0 : 1 }}" class="ui-btn">
+                                            Обработан: {{ $record->tech_processed ? 'Да' : 'Нет' }} — {{ $record->tech_processed ? 'снять отметку' : 'отметить' }}
+                                        </button>
+                                    </div>
+                                </form>
+                            @else
+                                <p class="text-sm whitespace-pre-line" style="color: var(--ui-text-2)">{{ $record->tech_note ?: 'Пометки нет' }}</p>
+                            @endif
+                            @if($record->tech_updated_at)
+                                <p class="text-xs" style="color: var(--ui-muted)">Изменено {{ $record->tech_updated_at->format('d.m.Y H:i') }}</p>
+                            @endif
+                        </div>
+                    </section>
+                @endif
+
                 @if(!empty($healthFields))
                     <div class="ui-card p-4 flex items-center gap-3.5">
                         <span class="rec-health {{ $isGood ? 'rec-health--good' : 'rec-health--bad' }}" aria-hidden="true">

@@ -182,6 +182,8 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/records/{sheet}/{id}',      [RecordController::class, 'show'])->name('records.show');
     Route::get('/records/{sheet}/{id}/edit', [RecordController::class, 'edit'])->name('records.edit');
     Route::put('/records/{sheet}/{id}',      [RecordController::class, 'update'])->name('records.update');
+    // Пометка технолога ПГП — только группа ОТК
+    Route::patch('/records/{sheet}/{id}/tech', [RecordController::class, 'tech'])->middleware('role:otk')->name('records.tech');
     Route::delete('/records/{sheet}/{id}',   [RecordController::class, 'destroy'])->name('records.destroy');
 });
 

@@ -32,6 +32,8 @@ class PgpRecord extends Model
             'cross3_record_date'   => 'date',
             'bracket_record_date'  => 'date',
             'manet_record_date'    => 'date',
+            'tech_processed'       => 'boolean',
+            'tech_updated_at'      => 'datetime',
         ];
     }
 

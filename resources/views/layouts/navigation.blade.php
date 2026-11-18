@@ -160,6 +160,16 @@
                             <div class="text-xs truncate" style="color: var(--ui-muted)">{{ $user->email }}</div>
                         </div>
 
+                        @php $pgpComplaints = app(\App\Services\PgpComplaints::class); @endphp
+                        @if($pgpComplaints->cfg())
+                            @php $pgpOpen = $pgpComplaints->openCount(); @endphp
+                            <div class="ui-menu__sep"></div>
+                            <a href="{{ route('records.index', ['pgp', 'tech' => 'open']) }}" class="ui-menu__item justify-between">
+                                <span style="color: var(--ui-text-2)">Необработанные рекламации ПГП</span>
+                                <span class="font-semibold tabular-nums" style="color: {{ $pgpOpen ? 'var(--ui-bad)' : 'var(--ui-muted)' }}">{{ $pgpOpen }}</span>
+                            </a>
+                        @endif
+
                         {{-- Участок: выбор (если их несколько) или просто название --}}
                         @if($currentSection)
                             <div class="ui-menu__sep"></div>

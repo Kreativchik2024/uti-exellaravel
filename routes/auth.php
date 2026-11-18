@@ -17,11 +17,12 @@ Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
 
-    // Rate limiting: 5 попыток в минуту на email+IP
-    Route::post('login', [AuthenticatedSessionController::class, 'store'])
-        ->middleware('throttle:login');
-
 });
+
+// Вход вынесен из guest: при открытой старой сессии введённый логин всё равно проверяется
+// (контроллер сам завершает прежнюю сессию). Rate limiting: 5 попыток в минуту на email+IP
+Route::post('login', [AuthenticatedSessionController::class, 'store'])
+    ->middleware('throttle:login');
 
 // Восстановление пароля по почте. Выключено по умолчанию: в изолированной сети почты нет,
 // ссылки сброса писались бы в лог, а форма подсказывала бы, какие email зарегистрированы.

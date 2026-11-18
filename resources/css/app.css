@@ -932,10 +932,12 @@ html.dark .ui-ms-cell.n1 { color: #60a5fa; } html.dark .ui-ms-cell.n2 { color: #
 .ui-fc-group { flex-shrink: 0; font-size: .7rem; padding: .05rem .45rem; border-radius: 999px; background: var(--ui-surface-2); color: var(--ui-muted); }
 .ui-fc-note { color: var(--ui-text-2); }
 /* Подсказка по наведению: расшифровка кода неисправности в таблице записей */
-.ui-tip { position: relative; cursor: help; }
-.ui-tip[data-tip]:hover::after, .ui-tip[data-tip]:focus::after { content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 40;
-    width: max-content; max-width: 18rem; padding: .45rem .6rem; border-radius: 8px; background: var(--ui-surface); color: var(--ui-text);
-    border: 1px solid var(--ui-border); box-shadow: 0 8px 24px rgba(0,0,0,.18); font: 400 .8rem/1.35 system-ui, sans-serif; white-space: normal; text-align: left; pointer-events: none; }
+.ui-tip { cursor: help; }
+/* Общее окошко подсказки (наполняет resources/js/app.js): поверх всего, в пределах экрана, длинный текст переносится */
+.ui-tip-bubble { position: fixed; z-index: 1000; display: none; box-sizing: border-box; width: max-content; max-width: min(24rem, calc(100vw - 16px));
+    padding: .5rem .7rem; border-radius: 10px; background: var(--ui-surface); color: var(--ui-text); border: 1px solid var(--ui-border);
+    box-shadow: 0 10px 30px rgba(0,0,0,.2); font: 400 .8rem/1.4 system-ui, sans-serif; white-space: normal; overflow-wrap: anywhere; word-break: break-word;
+    text-align: left; pointer-events: none; }
 .ui-fc-note b { font-family: ui-monospace, monospace; }
 .ui-fc-group-row { padding: .7rem 1rem; border-top: 1px solid var(--ui-border); }
 .ui-fc-group-row.is-child { padding-left: 2.4rem; background: var(--ui-surface-2); }

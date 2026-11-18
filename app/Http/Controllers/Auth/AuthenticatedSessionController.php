@@ -18,6 +18,11 @@ class AuthenticatedSessionController extends Controller
 
     public function store(LoginRequest $request): RedirectResponse
     {
+        // В этом браузере уже открыта чья-то сессия: завершаем её, иначе вход пойдёт под старым логином
+        if (Auth::check()) {
+            $this->endCurrentSession($request);
+        }
+
         $request->authenticate();
 
         if (! auth()->user()->is_active) {
@@ -60,6 +65,14 @@ class AuthenticatedSessionController extends Controller
 
     public function destroy(Request $request): RedirectResponse
     {
+        $this->endCurrentSession($request);
+
+        return redirect('/');
+    }
+
+    /** Завершить текущую сессию: освободить сотрудника и выйти из аккаунта. */
+    private function endCurrentSession(Request $request): void
+    {
         $user = $request->user();
         if ($user && $user->isWorker()) {
             $user->forceFill(['session_id' => null])->saveQuietly();
@@ -71,7 +84,5 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-
-        return redirect('/');
     }
 }
