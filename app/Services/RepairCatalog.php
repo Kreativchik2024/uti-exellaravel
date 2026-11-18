@@ -17,15 +17,23 @@ use Illuminate\Validation\ValidationException;
  */
 class RepairCatalog
 {
+    /**
+     * Блоки справочника кодов, которых нет в выборе «Ремонт / Замена» (вместе со всем, что в них вложено).
+     * В справочнике кодов неисправностей они остаются. Сравнение без учёта регистра.
+     */
+    public const EXCLUDED_BLOCKS = ['ВМГ', 'ВМР', 'КОММУТАЦИЯ'];
+
     public function __construct(private SectionContext $sections) {}
 
-    /** Блоки справочника кодов (общие и текущего участка), ключи — id, с цепочкой родителей. */
+    /** Блоки справочника кодов (общие и текущего участка) без исключённых, ключи — id, с цепочкой родителей. */
     public function groups(): Collection
     {
         $section = $this->sections->current();
+        $excluded = array_map('mb_strtoupper', self::EXCLUDED_BLOCKS);
 
         return FaultCodeGroup::tree()
             ->filter(fn ($g) => $g->section_id === null || ($section && (int) $g->section_id === (int) $section->id))
+            ->reject(fn ($g) => array_intersect(array_map(fn ($p) => mb_strtoupper(trim($p->name)), $g->path()), $excluded))
             ->sortBy(fn ($g) => $g->sortKey());
     }
 

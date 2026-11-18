@@ -82,6 +82,49 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
         }
     }
 
+    public function test_vmg_vmr_and_kommutaciya_blocks_are_not_offered_for_repair(): void
+    {
+        [, , $leaf] = $this->blocks();
+        $vmg  = \App\Models\FaultCodeGroup::create(['name' => 'ВМГ', 'prefix' => 'VMG', 'sort' => 5]);
+        $vmr  = \App\Models\FaultCodeGroup::create(['name' => 'ВМР', 'prefix' => 'VMR', 'sort' => 6]);
+        $komm = \App\Models\FaultCodeGroup::create(['name' => 'Коммутация', 'prefix' => 'K', 'sort' => 7]);
+        $kommChild = \App\Models\FaultCodeGroup::create(['name' => 'Жгут', 'prefix' => 'K.1', 'sort' => 1, 'parent_id' => $komm->id]);
+        $research = $this->research();
+
+        $names = array_column(app(\App\Services\RepairCatalog::class)->pickerData($research)['groups'], 'name');
+        $this->assertContains('МИНИ ПК', $names);
+        foreach (['ВМГ', 'ВМР', 'Коммутация', 'Жгут'] as $hidden) $this->assertNotContains($hidden, $names);
+
+        // и выбрать их нельзя
+        $repair = $this->worker('repair');
+        foreach ([$vmg, $vmr, $komm, $kommChild] as $g) {
+            $this->repairPatch($repair, $research, ['repair_action' => 'repair', 'repair_node' => 'g' . $g->id])->assertSessionHasErrors('repair_node');
+        }
+        $this->repairPatch($repair, $research, ['repair_action' => 'repair', 'repair_node' => 'g' . $leaf->id])->assertSessionHasNoErrors();
+
+        // в справочнике кодов неисправностей блоки остаются
+        $this->assertSame(3, \App\Models\FaultCodeGroup::whereIn('id', [$vmg->id, $vmr->id, $komm->id])->count());
+    }
+
+    public function test_tail_block_with_motor_parts_is_offered_for_repair(): void
+    {
+        $research = $this->research();
+        $groups = collect(app(\App\Services\RepairCatalog::class)->pickerData($research)['groups']);
+
+        $tail = $groups->firstWhere('name', 'ХВОСТ');
+        $this->assertNotNull($tail, 'блок «ХВОСТ» есть в выборе');
+        $this->assertNull($tail['parent']);
+        $this->assertSame(['Регулятор мотора', 'Мотор', 'Лопасти мотора'], $groups->where('parent', $tail['id'])->pluck('name')->values()->all());
+
+        $motor = $groups->firstWhere('name', 'Мотор');
+        $this->repairPatch($this->worker('repair'), $research, ['repair_action' => 'replacement', 'repair_node' => 'g' . $motor['id']])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('ХВОСТ · Мотор', $research->fresh()->repair_item);
+
+        // В выпадающих кодах форм (вкладки не отмечены) хвоста нет
+        $this->assertFalse(\App\Models\FaultCodeGroup::find($tail['id'])->coversSheet('pgp'));
+    }
+
     public function test_replacement_puts_pgp_into_otk_act_list_until_act_done(): void
     {
         [, , $leaf] = $this->blocks();
