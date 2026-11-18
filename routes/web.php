@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\ChatGroupController;
 use App\Http\Controllers\ConsentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
@@ -10,8 +11,10 @@ use App\Http\Controllers\MediaController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecordController;
+use App\Http\Controllers\RecordReviewController;
 use App\Http\Controllers\SectionController;
 use App\Http\Controllers\StatsController;
+use App\Http\Controllers\StatsZoneController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkerSessionController;
 use App\Http\Controllers\WorkstationController;
@@ -189,13 +192,13 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/records/{sheet}/{id}/edit', [RecordController::class, 'edit'])->name('records.edit');
     Route::put('/records/{sheet}/{id}',      [RecordController::class, 'update'])->name('records.update');
     // Пометка технолога ПГП — только группа ОТК
-    Route::patch('/records/{sheet}/{id}/tech', [RecordController::class, 'tech'])->middleware('role:otk')->name('records.tech');
+    Route::patch('/records/{sheet}/{id}/tech', [RecordReviewController::class, 'tech'])->middleware('role:otk')->name('records.tech');
     // Исследования: статус кнопками — ремонтник (и мастер, админ); комментарии — все
-    Route::patch('/records/{sheet}/{id}/research-status', [RecordController::class, 'researchStatus'])->middleware('role:repair,master,admin')->name('records.researchStatus');
+    Route::patch('/records/{sheet}/{id}/research-status', [RecordReviewController::class, 'researchStatus'])->middleware('role:repair,master,admin')->name('records.researchStatus');
     // Ремонт / замена и узел — ремонтник (мастер, админ); акт на замену — технолог ОТК (мастер, админ)
-    Route::patch('/records/{sheet}/{id}/research-repair', [RecordController::class, 'researchRepair'])->middleware('role:repair,master,admin')->name('records.researchRepair');
-    Route::patch('/records/{sheet}/{id}/research-act', [RecordController::class, 'researchAct'])->middleware('role:otk,master,admin')->name('records.researchAct');
-    Route::post('/records/{sheet}/{id}/comments', [RecordController::class, 'comment'])->middleware('throttle:30,1')->name('records.comment');
+    Route::patch('/records/{sheet}/{id}/research-repair', [RecordReviewController::class, 'researchRepair'])->middleware('role:repair,master,admin')->name('records.researchRepair');
+    Route::patch('/records/{sheet}/{id}/research-act', [RecordReviewController::class, 'researchAct'])->middleware('role:otk,master,admin')->name('records.researchAct');
+    Route::post('/records/{sheet}/{id}/comments', [RecordReviewController::class, 'comment'])->middleware('throttle:30,1')->name('records.comment');
     Route::delete('/records/{sheet}/{id}',   [RecordController::class, 'destroy'])->name('records.destroy');
 });
 
@@ -204,19 +207,19 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/stats/export',         [StatsController::class, 'export'])->name('stats.export');
     Route::get('/stats/records',        [StatsController::class, 'records'])->name('stats.records');
     Route::post('/stats/filters',       [StatsController::class, 'saveFilters'])->middleware('throttle:120,1')->name('stats.saveFilters');
-    Route::get('/stats/zone1',          [StatsController::class, 'zone1'])->name('stats.zone1');
-    Route::get('/stats/zone2',          [StatsController::class, 'zone2'])->name('stats.zone2');
-    Route::get('/stats/zone2-chart',    [StatsController::class, 'zone2Chart'])->name('stats.zone2Chart');
-    Route::get('/stats/zone2-worker',   [StatsController::class, 'zone2Worker'])->name('stats.zone2Worker');
-    Route::get('/stats/zone3',          [StatsController::class, 'zone3'])->name('stats.zone3');
-    Route::get('/stats/zone4',          [StatsController::class, 'zone4'])->name('stats.zone4');
-    Route::get('/stats/zone4-records',  [StatsController::class, 'zone4Records'])->name('stats.zone4Records');
-    Route::get('/stats/zone5',          [StatsController::class, 'zone5'])->name('stats.zone5');
-    Route::get('/stats/zone5-chart',    [StatsController::class, 'zone5Chart'])->name('stats.zone5Chart');
-    Route::get('/stats/zone6',          [StatsController::class, 'zone6'])->name('stats.zone6');
-    Route::get('/stats/zone7',          [StatsController::class, 'zone7'])->name('stats.zone7');
+    Route::get('/stats/zone1',          [StatsZoneController::class, 'zone1'])->name('stats.zone1');
+    Route::get('/stats/zone2',          [StatsZoneController::class, 'zone2'])->name('stats.zone2');
+    Route::get('/stats/zone2-chart',    [StatsZoneController::class, 'zone2Chart'])->name('stats.zone2Chart');
+    Route::get('/stats/zone2-worker',   [StatsZoneController::class, 'zone2Worker'])->name('stats.zone2Worker');
+    Route::get('/stats/zone3',          [StatsZoneController::class, 'zone3'])->name('stats.zone3');
+    Route::get('/stats/zone4',          [StatsZoneController::class, 'zone4'])->name('stats.zone4');
+    Route::get('/stats/zone4-records',  [StatsZoneController::class, 'zone4Records'])->name('stats.zone4Records');
+    Route::get('/stats/zone5',          [StatsZoneController::class, 'zone5'])->name('stats.zone5');
+    Route::get('/stats/zone5-chart',    [StatsZoneController::class, 'zone5Chart'])->name('stats.zone5Chart');
+    Route::get('/stats/zone6',          [StatsZoneController::class, 'zone6'])->name('stats.zone6');
+    Route::get('/stats/zone7',          [StatsZoneController::class, 'zone7'])->name('stats.zone7');
     // Технологи: только мастер, технолог (ОТК) и администратор
-    Route::get('/stats/zone8',          [StatsController::class, 'zone8'])->middleware('role:admin,master,otk')->name('stats.zone8');
+    Route::get('/stats/zone8',          [StatsZoneController::class, 'zone8'])->middleware('role:admin,master,otk')->name('stats.zone8');
 });
 
 // Игры (меню профиля) — отдельно от рабочей статистики; админ включает и выключает
@@ -258,11 +261,11 @@ Route::middleware('auth')->prefix('chat')->name('chat.')->group(function () {
     Route::post('/messages/{message}/pin',   [ChatController::class, 'pin'])->middleware('throttle:30,1')->name('pin');
     Route::post('/typing',       [ChatController::class, 'typing'])->middleware('throttle:40,1')->name('typing');
     // Групповые беседы: создать с несколькими участниками, добавить ещё, исключить / выйти, переименовать
-    Route::post('/groups',                 [ChatController::class, 'createGroup'])->middleware('throttle:20,1')->name('groups.create');
-    Route::get('/groups/{group}',          [ChatController::class, 'showGroup'])->name('groups.show');
-    Route::post('/groups/{group}/members', [ChatController::class, 'addGroupMembers'])->middleware('throttle:30,1')->name('groups.members.add');
-    Route::post('/groups/{group}/remove',  [ChatController::class, 'removeGroupMember'])->middleware('throttle:30,1')->name('groups.members.remove');
-    Route::post('/groups/{group}/rename',  [ChatController::class, 'renameGroup'])->middleware('throttle:20,1')->name('groups.rename');
+    Route::post('/groups',                 [ChatGroupController::class, 'create'])->middleware('throttle:20,1')->name('groups.create');
+    Route::get('/groups/{group}',          [ChatGroupController::class, 'show'])->name('groups.show');
+    Route::post('/groups/{group}/members', [ChatGroupController::class, 'addMembers'])->middleware('throttle:30,1')->name('groups.members.add');
+    Route::post('/groups/{group}/remove',  [ChatGroupController::class, 'removeMember'])->middleware('throttle:30,1')->name('groups.members.remove');
+    Route::post('/groups/{group}/rename',  [ChatGroupController::class, 'rename'])->middleware('throttle:20,1')->name('groups.rename');
     Route::get('/attachments/{attachment}/{variant?}', [ChatController::class, 'attachment'])
         ->whereIn('variant', ['thumb'])->name('attachment');
 });

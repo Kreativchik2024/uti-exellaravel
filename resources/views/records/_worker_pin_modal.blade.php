@@ -321,7 +321,7 @@
                 var badge = cell ? cell.querySelector('.worker-pin-badge') : null;
                 if (badge) {
                     var info = occupiedMap[value];
-                    var text = '✗ Занят (' + info.sheet + (info.record_id ? '#' + info.record_id : '') + ')';
+                    var text = '✗ Занят (' + esc(info.sheet) + (info.record_id ? '#' + esc(info.record_id) : '') + ')';
                     badge.innerHTML = '<span class="text-[11px] text-red-600 font-medium">' + text + '</span>';
                     setTimeout(function(){ renderBadge(select); }, 3500);
                 }

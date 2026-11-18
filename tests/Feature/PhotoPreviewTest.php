@@ -44,7 +44,8 @@ class PhotoPreviewTest extends TestCase
         // текст переписки можно выделить и скопировать, ссылки в нём кликабельные
         $this->assertStringNotContainsString('ui-chat__messages ui-nocopy', $html);
         $this->assertStringNotContainsString('@copy.prevent', $html);
-        $this->assertStringContainsString('ui-chat__url', $html);
+        $this->assertStringContainsString('js/chat-widget.js', $html);
+        $this->assertStringContainsString('ui-chat__url', file_get_contents(public_path('js/chat-widget.js')));
         $this->assertStringContainsString('Печать страниц системы запрещена', $html);
         $this->assertStringContainsString("ui-print-blocked", file_get_contents(resource_path('css/app.css')));
     }
