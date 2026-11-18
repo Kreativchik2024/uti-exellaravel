@@ -105,21 +105,40 @@ document.addEventListener('alpine:init', () => {
                 reason.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => this.hintFrom(reason.value), 500); });
                 if (reason.value && !this.value) this.hintFrom(reason.value);
             }
-            // Меню-лесенка не уходит за правый край экрана: при открытии и каждом шаге — подвинуть влево
+            // Меню-лесенка привязано к окну браузера (fixed), а не к форме: карточка формы обрезает края
+            // (overflow: hidden), из-за этого колонки и описание уходили за её границу. Пересчёт — при каждом шаге и прокрутке.
             const refit = () => this.$nextTick(() => this.fit());
             this.$watch('open', refit);
             this.$watch('trail', refit);
             this.$watch('active', refit);
+            this.$watch('value', refit);
             window.addEventListener('resize', refit);
+            window.addEventListener('scroll', () => { if (this.open) this.fit(); }, true);
         },
         fit() {
             const pop = this.$refs.pop;
-            if (!pop) return;
-            pop.style.transform = '';
-            if (!this.open || pop.offsetParent === null) return;
-            const r = pop.getBoundingClientRect();
-            const over = r.right - (window.innerWidth - 8);
-            if (over > 0) pop.style.transform = 'translateX(-' + Math.min(over, Math.max(0, r.left - 8)) + 'px)';
+            const input = this.$el.querySelector('input[name="fault_code"]');
+            if (!pop || !input || !this.open || !pop.getClientRects().length) return;
+            const r = input.getBoundingClientRect();
+            const vw = document.documentElement.clientWidth, vh = window.innerHeight;
+            const narrow = vw <= 900;   // узкий экран — ступеньки вниз: ширина поля, но не уже 360px и в пределах окна
+            const w = Math.min(vw - 16, Math.max(r.width, 360));
+            Object.assign(pop.style, { position: 'fixed', right: 'auto', transform: '', maxHeight: 'none', overflowY: '',
+                left: (narrow ? Math.max(8, Math.min(r.left, vw - 8 - w)) : r.left) + 'px', top: (r.bottom + 4) + 'px',
+                width: narrow ? w + 'px' : '' });
+
+            const p = pop.getBoundingClientRect();
+            // по горизонтали — в пределах окна
+            if (!narrow && p.right > vw - 8) pop.style.left = Math.max(8, r.left - (p.right - (vw - 8))) + 'px';
+            // по вертикали: не влезает вниз, а сверху места больше — открыть вверх; иначе — прокрутка внутри
+            const below = vh - r.bottom - 12, above = r.top - 12;
+            if (p.height > below && above > below) {
+                const h = Math.min(p.height, above);
+                pop.style.top = (r.top - 4 - h) + 'px';
+                if (p.height > above) Object.assign(pop.style, { maxHeight: above + 'px', overflowY: 'auto' });
+            } else if (p.height > below) {
+                Object.assign(pop.style, { maxHeight: Math.max(160, below) + 'px', overflowY: 'auto' });
+            }
         },
         esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); },
         known() { return this.local.find(x => x.code.toLowerCase() === String(this.value).trim().toLowerCase()); },
