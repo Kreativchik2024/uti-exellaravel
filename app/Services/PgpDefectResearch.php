@@ -91,6 +91,25 @@ class PgpDefectResearch
         return $this->actsNeeded()?->count() ?? 0;
     }
 
+    /**
+     * Борта, вернувшиеся на ПГП после ремонта: запись ПГП ещё не «Сдан», исследование отправлено в конвейер.
+     * Их перепроверяет любой исполнитель и ставит «Сдан» в этой же записи (PgpRecord::returnedFromRepair).
+     */
+    public function returnedFromRepair(): ?Builder
+    {
+        $cfg = $this->sections->sheets()['pgp'] ?? null;
+        if (! $cfg) return null;
+
+        return $cfg['model']::query()
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'Сдан'))
+            ->whereHas('researches', fn ($r) => $r->where('repair_status', 'conveyor'));
+    }
+
+    public function returnedFromRepairCount(): int
+    {
+        return $this->returnedFromRepair()?->count() ?? 0;
+    }
+
     /** Какие из записей ПГП уже отремонтированы. @return array<int, true> id => true */
     public function repairedPgpIds(array $pgpIds): array
     {

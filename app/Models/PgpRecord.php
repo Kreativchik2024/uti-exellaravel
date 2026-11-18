@@ -63,6 +63,18 @@ class PgpRecord extends Model
         return $this->hasMany(ResearchRecord::class, 'pgp_record_id');
     }
 
+    /**
+     * Борт вернулся на ПГП после ремонта: запись ещё «не сдан», а исследование по ней отправлено в конвейер.
+     * Такую запись перепроверяет и правит любой исполнитель (не только тот, кто её создал, и без ограничения 24 ч):
+     * после проверки ставит «Сдан» в этой же записи — борт в статистике считается один раз, как сданный.
+     */
+    public function returnedFromRepair(): bool
+    {
+        if ($this->status === 'Сдан' || ! $this->exists) return false;
+
+        return $this->researches()->where('repair_status', 'conveyor')->exists();
+    }
+
     public function updater()
     {
         return $this->belongsTo(User::class, 'updated_by');

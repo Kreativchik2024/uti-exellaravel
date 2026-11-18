@@ -92,6 +92,25 @@ class TechnologistTest extends TestCase
         $this->assertNull($rec->wait_minutes);
     }
 
+    public function test_technologist_is_optional_when_board_not_delivered(): void
+    {
+        $this->tech('Петрова А.А.');
+        $exec = $this->worker();
+        $base = array_merge($this->validRecord('pgp', $this->nameOf($exec)), ['technologist' => '']);
+
+        // «Сдан» — без технолога нельзя
+        $this->asUser($exec)->post('/records/pgp', array_merge($base, ['status' => 'Сдан']))->assertSessionHasErrors('technologist');
+        // «Не сдан» — можно без технолога
+        $this->asUser($exec)->post('/records/pgp', array_merge($base, ['status' => 'Не сдан', 'board_number' => '', 'ip_address' => '']))
+            ->assertSessionHasNoErrors();
+        $this->assertNull(PgpRecord::firstOrFail()->technologist);
+
+        // В форме поле помечено «обязательно, кроме „Не сдан“»
+        $form = $this->asUser($exec)->get('/records/pgp/create')->getContent();
+        $start = mb_strpos($form, 'data-required-when-field="status"', mb_strpos($form, 'Приёмка технологом'));
+        $this->assertNotFalse($start);
+    }
+
     public function test_old_record_with_departed_technologist_can_be_saved(): void
     {
         $tech = $this->tech('Петрова А.А.');

@@ -146,8 +146,9 @@ class PgpRepairFlowTest extends TestCase
         $this->assertStringContainsString('Отремонтировано', $show);
         $this->assertStringContainsString('ui-pill--good', $show);
 
+        // В списке — не красный «Не сдан», а «После ремонта: проверить» (борт вернулся на ПГП)
         $list = $this->asUser($master)->get('/records/pgp')->assertOk()->getContent();
-        $this->assertStringContainsString('Отремонтировано', $list);
+        $this->assertStringContainsString('После ремонта: проверить', $list);
     }
 
     public function test_research_keeps_many_comments_and_shows_part_history(): void

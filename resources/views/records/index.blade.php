@@ -90,9 +90,34 @@
             </nav>
         @endif
 
-        @if(($techOpen ?? false) || ($repairOpen ?? false) || ($actNeeded ?? false))
+        {{-- ПГП: борта после ремонта — отдельные вкладки, чтобы не терялись в общем списке --}}
+        @if($repairTabs)
+            @php
+                $rTabs = [
+                    ['key' => null,       'label' => 'Все борта',                  'count' => null, 'active' => !($returnedOpen ?? false) && !($repairedOpen ?? false)],
+                    ['key' => 'returned', 'label' => 'Вернулись после ремонта',    'count' => $repairTabs['returned'], 'active' => $returnedOpen ?? false],
+                    ['key' => 'repaired', 'label' => 'Были в ремонте',             'count' => $repairTabs['repaired'], 'active' => $repairedOpen ?? false],
+                ];
+            @endphp
+            <nav class="flex flex-wrap items-center gap-2" aria-label="Ремонт">
+                <span class="text-sm font-medium mr-1" style="color: var(--ui-muted)">Ремонт:</span>
+                @foreach($rTabs as $tab)
+                    <a href="{{ route('records.index', array_filter([$sheet, $tab['key'] => $tab['key'] ? 1 : null, 'q' => $q ?: null])) }}"
+                       class="ui-btn ui-btn--sm {{ $tab['active'] ? 'ui-btn--primary' : 'ui-btn--ghost' }}"
+                       @if($tab['active']) aria-current="page" @endif>
+                        {{ $tab['label'] }}
+                        @if($tab['count'] !== null)
+                            <span class="tabular-nums text-xs font-semibold px-1.5 rounded-full"
+                                  style="background: {{ $tab['active'] ? 'rgba(255,255,255,.22)' : ($tab['key'] === 'returned' && $tab['count'] ? 'var(--ui-accent-soft)' : 'var(--ui-surface-hover)') }}">{{ number_format($tab['count'], 0, ',', ' ') }}</span>
+                        @endif
+                    </a>
+                @endforeach
+            </nav>
+        @endif
+
+        @if(($techOpen ?? false) || ($repairOpen ?? false) || ($actNeeded ?? false) || ($returnedOpen ?? false) || ($repairedOpen ?? false))
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm rounded-lg px-3 py-2" style="background: var(--ui-surface-2); color: var(--ui-text-2)">
-                <span>{{ ($actNeeded ?? false) ? 'Ждут технолога: замена — нужен акт, ремонт в конвейере — приёмка. Откройте исследование и отметьте «Акт оформлен» или «Принято технологом»' : (($repairOpen ?? false) ? 'Показан брак ПГП, ещё не отремонтированный' : 'Показаны необработанные рекламации ПГП') }}</span>
+                <span>{{ ($repairedOpen ?? false) ? 'Все борта, которые были в ремонте: «после ремонта» — уже сданы, «в ремонте» — ещё нет' : (($returnedOpen ?? false) ? 'Борта вернулись на ПГП после ремонта. Перепроверьте, откройте запись, нажмите «Изменить» и поставьте статус «Сдан»' : (($actNeeded ?? false) ? 'Ждут технолога: замена — нужен акт, ремонт в конвейере — приёмка. Откройте исследование и отметьте «Акт оформлен» или «Принято технологом»' : (($repairOpen ?? false) ? 'Показан брак ПГП, ещё не отремонтированный' : 'Показаны необработанные рекламации ПГП'))) }}</span>
                 <a href="{{ route('records.index', $sheet) }}" class="font-semibold underline" style="color: var(--ui-accent-text)">Показать все</a>
             </div>
         @endif
@@ -117,10 +142,8 @@
                                 @endif
                             </div>
                             <div class="flex flex-col items-end gap-1 flex-shrink-0">
-                                @if(isset($repairedIds[$record->id]))
-                                    <x-status-pill value="Отремонтировано" tone="good" />
-                                @elseif($record->status ?? null)
-                                    <x-status-pill :value="$record->status" />
+                                @if(($record->status ?? null) || isset($repairMarks[$record->id]))
+                                    @include('records._pgp_status', ['mark' => $repairMarks[$record->id] ?? null])
                                 @endif
                                 @if(($record->health ?? null) === 'green')
                                     <x-status-pill value="Работает" />
@@ -213,11 +236,7 @@
                                     @elseif($col === 'repair_status')
                                         <x-research-status :value="$record->repair_status" />
                                     @elseif($col === 'status')
-                                        @if(isset($repairedIds[$record->id]))
-                                            <x-status-pill value="Отремонтировано" tone="good" title="Было: {{ $record->status }}" />
-                                        @else
-                                            <x-status-pill :value="$record->status ?? null" />
-                                        @endif
+                                        @include('records._pgp_status', ['mark' => $repairMarks[$record->id] ?? null])
                                     @elseif($col === 'post_number')
                                         <span class="ui-table__strong whitespace-nowrap">{{ $record->post_number ? '№' . $record->post_number : '—' }}</span>
                                     @elseif($col === 'peripheral_number')

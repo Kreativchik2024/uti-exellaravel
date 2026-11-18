@@ -176,6 +176,15 @@
                             </a>
                         @endif
 
+                        {{-- Исполнители: борта вернулись на ПГП после ремонта — перепроверить и поставить «Сдан» --}}
+                        @php $retSvc = app(\App\Services\PgpDefectResearch::class); $retCount = $retSvc->returnedFromRepair() ? $retSvc->returnedFromRepairCount() : null; @endphp
+                        @if($retCount !== null)
+                            <a href="{{ route('records.index', ['pgp', 'returned' => 1]) }}" class="ui-menu__item justify-between">
+                                <span style="color: var(--ui-text-2)">ПГП: вернулись после ремонта</span>
+                                <span class="font-semibold tabular-nums" style="color: {{ $retCount ? 'var(--ui-accent-text)' : 'var(--ui-muted)' }}">{{ $retCount }}</span>
+                            </a>
+                        @endif
+
                         {{-- Технолог (ОТК): замена — нужен акт; ремонт в конвейере — нужна приёмка --}}
                         @if($user->isOtk() || $user->canManageContent())
                             @php $actSvc = app(\App\Services\PgpDefectResearch::class); $actCount = $actSvc->actsNeeded() ? $actSvc->actsNeededCount() : null; @endphp

@@ -258,6 +258,15 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
         $this->repairPatch($repair, $other, ['repair_action' => 'repair', 'repair_node' => 'i' . $item->id])->assertSessionHasNoErrors();
     }
 
+    public function test_comment_field_keeps_draft_between_page_reloads(): void
+    {
+        // «Акт оформлен», смена статуса и т.п. обновляют страницу — поле комментария хранит черновик в браузере
+        $research = $this->research();
+        $html = $this->asUser($this->worker('otk'))->get("/records/research/{$research->id}")->assertOk()->getContent();
+
+        $this->assertStringContainsString('data-draft-key="research-comment-' . $research->id . '"', $html);
+    }
+
     public function test_rejected_variant_is_removed_but_text_stays(): void
     {
         $research = $this->research();

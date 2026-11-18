@@ -198,7 +198,9 @@
 
                             <form method="POST" action="{{ route('records.comment', [$sheet, $record->id]) }}" class="space-y-2">
                                 @csrf
+                                {{-- Черновик хранится в браузере: «Акт оформлен», смена статуса и т.п. обновляют страницу — текст не пропадёт --}}
                                 <textarea name="body" rows="3" maxlength="2000" required placeholder="Новый комментарий к этому исследованию"
+                                          data-draft-key="research-comment-{{ $record->id }}"
                                           class="w-full rounded-lg text-sm" style="background: var(--ui-surface-2); color: var(--ui-text); border: 1px solid var(--ui-border)">{{ old('body') }}</textarea>
                                 @error('body')<p class="text-xs" style="color: var(--ui-bad)">{{ $message }}</p>@enderror
                                 <button type="submit" class="ui-btn">Добавить комментарий</button>
@@ -210,6 +212,18 @@
 
             {{-- Боковая колонка --}}
             <aside class="space-y-5 lg:sticky" style="top: calc(var(--ui-nav-h) + 16px)">
+                {{-- Борт вернулся на ПГП после ремонта: перепроверить и поставить «Сдан» в этой же записи --}}
+                @if($sheet === 'pgp' && $record->returnedFromRepair())
+                    <section class="ui-card p-4 space-y-2" style="border-color: var(--ui-accent)">
+                        <h3 class="text-sm font-semibold" style="color: var(--ui-accent-text)">Вернулся после ремонта</h3>
+                        <p class="text-sm" style="color: var(--ui-text-2)">
+                            Перепроверьте борт на ПГП и поставьте статус «Сдан» в этой записи — так борт посчитается в статистике один раз, как сданный.
+                        </p>
+                        @can('update', $record)
+                            <a href="{{ route('records.edit', [$sheet, $record->id]) }}" class="ui-btn w-full">Перепроверить и поставить «Сдан»</a>
+                        @endcan
+                    </section>
+                @endif
                 {{-- Исследование: статус цветными кнопками (ремонтник, мастер, админ), остальным — только метка --}}
                 @if($sheet === 'research')
                     @php

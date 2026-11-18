@@ -19,8 +19,10 @@
            class="{{ $baseInput }} @error('fault_code') !border-red-400 !ring-red-500/15 @enderror">
 
     {{-- Выпадающий список кодов + окошко с описанием выделенного --}}
-    <div x-show="open && list().length" x-cloak class="ui-fc-pop" :class="ancestors().length && 'has-stairs'">
-        {{-- Лесенка: пройденные уровни — колонками, каждая ниже предыдущей; клик — перейти в другой блок этого уровня --}}
+    <div x-show="open && list().length" x-cloak x-ref="pop" class="ui-fc-pop" :class="ancestors().length && 'has-stairs'">
+        {{-- Лесенка: пройденные уровни — колонками, каждая ниже предыдущей; клик — перейти в другой блок этого уровня.
+             Окошко с описанием кода — справа, а при лесенке — под колонками (сбоку ему не хватает места) --}}
+        <div class="ui-fc-cols">
         <template x-for="(col, n) in ancestors()" :key="'col' + n + col.open">
             <div class="ui-fc-menu ui-stairs-col" :style="'--i:' + n">
                 <template x-for="g in col.groups" :key="g.key">
@@ -52,6 +54,7 @@
                     <template x-if="it.isNew"><span class="font-semibold">+ Новая неисправность</span></template>
                 </button>
             </template>
+        </div>
         </div>
         <div class="ui-fc-detail" x-show="current() && !current().isGroup && !current().isBack && (current().description || current().isNew)" x-transition.opacity.duration.100ms>
             <template x-if="current() && !current().isNew && !current().isGroup && !current().isBack">
@@ -102,6 +105,21 @@ document.addEventListener('alpine:init', () => {
                 reason.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => this.hintFrom(reason.value), 500); });
                 if (reason.value && !this.value) this.hintFrom(reason.value);
             }
+            // Меню-лесенка не уходит за правый край экрана: при открытии и каждом шаге — подвинуть влево
+            const refit = () => this.$nextTick(() => this.fit());
+            this.$watch('open', refit);
+            this.$watch('trail', refit);
+            this.$watch('active', refit);
+            window.addEventListener('resize', refit);
+        },
+        fit() {
+            const pop = this.$refs.pop;
+            if (!pop) return;
+            pop.style.transform = '';
+            if (!this.open || pop.offsetParent === null) return;
+            const r = pop.getBoundingClientRect();
+            const over = r.right - (window.innerWidth - 8);
+            if (over > 0) pop.style.transform = 'translateX(-' + Math.min(over, Math.max(0, r.left - 8)) + 'px)';
         },
         esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); },
         known() { return this.local.find(x => x.code.toLowerCase() === String(this.value).trim().toLowerCase()); },

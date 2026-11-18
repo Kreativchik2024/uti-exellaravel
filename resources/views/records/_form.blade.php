@@ -443,6 +443,14 @@
         </div>
     @endforeach
 
+    {{-- Борт вернулся после ремонта: при «Сдан» дата записи станет днём фактической сдачи --}}
+    @if($sheet === 'pgp' && isset($record) && $record->returnedFromRepair())
+        <div class="mt-6 rounded-lg px-4 py-3 text-sm" style="background: var(--ui-accent-soft); color: var(--ui-accent-text)">
+            <b>Борт вернулся после ремонта.</b> Перепроверьте его и поставьте статус «Сдан» —
+            дата записи станет сегодняшней ({{ now()->format('d.m.Y') }}), борт посчитается днём фактической сдачи.
+        </div>
+    @endif
+
     {{-- ПГП: что известно об этом борте — по введённым номерам моторамы, фюзеляжа, Кросс 3 и кронштейна (журнал по этапам) --}}
     @if($sheet === 'pgp')
         <div class="mt-6" data-board-journal data-url="{{ route('records.boardJournal', $sheet) }}" aria-live="polite"></div>

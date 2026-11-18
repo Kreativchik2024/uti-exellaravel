@@ -49,6 +49,8 @@ class RecordController extends Controller
         if (!$record || !$record->created_at) return false;
         $user = auth()->user();
         if ($user && $user->canManageContent()) return false;
+        // Борт вернулся после ремонта — ремонт идёт дольше суток, запись перепроверяют на ПГП позже
+        if ($record instanceof \App\Models\PgpRecord && $record->returnedFromRepair()) return false;
         return $record->created_at->copy()->addHours(24)->isPast();
     }
 
@@ -551,6 +553,23 @@ class RecordController extends Controller
         if ($repairOpen) {
             $query->whereNotNull('pgp_record_id')->where('is_repaired', false);
         }
+        // ПГП: борта после ремонта, чтобы не терялись в общем списке —
+        // returned=1 — вернулись и ждут перепроверки; repaired=1 — все, кто был в ремонте (в т.ч. уже сданные)
+        $returnedOpen = $sheet === 'pgp' && $request->query('returned') === '1';
+        if ($returnedOpen) {
+            $query->whereIn('id', app(\App\Services\PgpDefectResearch::class)->returnedFromRepair()?->select('id') ?? [0]);
+        }
+        $repairedOpen = $sheet === 'pgp' && $request->query('repaired') === '1';
+        if ($repairedOpen) {
+            $query->whereHas('researches');
+        }
+        $repairTabs = null;
+        if ($sheet === 'pgp') {
+            $repairTabs = [
+                'returned' => app(\App\Services\PgpDefectResearch::class)->returnedFromRepairCount(),
+                'repaired' => $cfg['model']::query()->whereHas('researches')->count(),
+            ];
+        }
         // Ссылка из меню технолога (ОТК): исследования, где была замена и нужен акт
         $actNeeded = $sheet === 'research' && $request->query('act') === 'needed';
         if ($actNeeded) {
@@ -581,12 +600,21 @@ class RecordController extends Controller
             }
         }
 
-        // Отремонтированные борта ПГП — зелёным «Отремонтировано» вместо красного брака
-        $repairedIds = $sheet === 'pgp'
-            ? app(\App\Services\PgpDefectResearch::class)->repairedPgpIds($records->pluck('id')->all())
-            : [];
+        // Метки бортов ПГП после ремонта: 'returned' — вернулся, ждёт перепроверки; 'after' — сдан после ремонта
+        $repairMarks = [];
+        if ($sheet === 'pgp' && $records->count()) {
+            $byPgp = \App\Models\ResearchRecord::whereIn('pgp_record_id', $records->pluck('id'))
+                ->get(['pgp_record_id', 'repair_status'])->groupBy('pgp_record_id');
+            foreach ($records as $rec) {
+                $rs = $byPgp[$rec->id] ?? null;
+                if (! $rs) continue;
+                if ($rec->status === 'Сдан') $repairMarks[$rec->id] = 'after';
+                elseif ($rs->contains('repair_status', 'conveyor')) $repairMarks[$rec->id] = 'returned';
+                else $repairMarks[$rec->id] = 'in_repair';
+            }
+        }
 
-        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter', 'techOpen', 'repairOpen', 'actNeeded', 'repairedIds'));
+        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter', 'techOpen', 'repairOpen', 'actNeeded', 'returnedOpen', 'repairedOpen', 'repairTabs', 'repairMarks'));
     }
 
     public function show(string $sheet, int $id)
@@ -796,6 +824,14 @@ class RecordController extends Controller
             $data['fault_code'] = app(\App\Services\FaultCodes::class)->resolve($sheet, $data['fault_code'], auth()->id());
         }
 
+        // Борт вернулся после ремонта и сдан — в статистике он считается днём фактической сдачи,
+        // а не днём, когда уходил в ремонт (прежняя дата остаётся в журнале изменений)
+        $deliveredAfterRepair = $record instanceof \App\Models\PgpRecord && $record->returnedFromRepair()
+            && ($data['status'] ?? null) === 'Сдан';
+        if ($deliveredAfterRepair && array_key_exists('record_date', $data)) {
+            $data['record_date'] = now()->toDateString();
+        }
+
         try {
             $record->update($data);
         } catch (QueryException $e) {
@@ -807,8 +843,11 @@ class RecordController extends Controller
 
         $research = $this->researchForPgpDefect($sheet, $record);
 
-        return redirect()->route('records.index', $sheet)
-            ->with('ok', 'Запись обновлена' . ($research ? ". Брак — заведено исследование №{$research->id}" : ''));
+        $msg = $deliveredAfterRepair
+            ? 'Борт после ремонта сдан — дата записи: ' . now()->format('d.m.Y') . ' (день фактической сдачи)'
+            : 'Запись обновлена' . ($research ? ". Брак — заведено исследование №{$research->id}" : '');
+
+        return redirect()->route('records.index', $sheet)->with('ok', $msg);
     }
 
     /**
