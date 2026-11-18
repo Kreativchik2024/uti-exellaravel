@@ -19,6 +19,7 @@ class DefectAnalysis
     {
         $reasons = $parts = $workers = $weeks = [];
         $codeRows = [];   // сырые коды брака «код × вкладка» — потом привязываются к справочнику
+        $uncoded = 0;     // брак во вкладках с полем кода, но без кода
         $total = $defects = 0;
         $bySheet = [];
         $names = new \App\Support\WorkerNames();   // разные написания одного ФИО — один исполнитель
@@ -66,6 +67,7 @@ class DefectAnalysis
                 }
                 if (isset($fields['fault_code'])) {
                     $raw = trim((string) $row->fault_code);
+                    if ($raw === '' || $raw === '-' || $raw === '—') $uncoded++;
                     $k = $slug . '|' . $raw;
                     $codeRows[$k] ??= ['code' => $raw, 'sheet' => $slug, 'sheet_title' => $cfg['title'], 'count' => 0];
                     $codeRows[$k]['count']++;
@@ -90,6 +92,7 @@ class DefectAnalysis
             'defect'  => $defects,
             'reasons' => $this->top($reasons),
             'codes'   => $this->codesRating($codeRows),
+            'uncoded' => $uncoded,
             'parts'   => $this->top($parts),
             'workers' => $workers,
             'weeks'   => $weeks,
@@ -139,10 +142,37 @@ class DefectAnalysis
 
         return array_map(fn ($r) => [
             'text'        => $r['text'],
+            'code'        => $r['code'],
             'description' => $r['description'],
+            'known'       => $r['known'],
             'count'       => $r['count'],
             'sheets'      => array_values($r['sheets']),
         ], $rated);
+    }
+
+    /**
+     * Только итоги (записей и брака) — для сравнения с прошлым периодом. Тем же правилом брака, что build(),
+     * но одним запросом на вкладку, без разбора записей.
+     * @return array{total: int, defect: int}
+     */
+    public function totals(Carbon $from, Carbon $to, ?string $only = null): array
+    {
+        $total = $defects = 0;
+        foreach ($this->sections->sheets() as $slug => $cfg) {
+            if (empty($cfg['model']) || ($only && $only !== $slug)) continue;
+            $rule = $this->stats->defectSql($cfg)['defect'];
+            if (! $rule) continue;
+
+            $dateField = isset($cfg['fields']['record_date']) ? 'record_date' : 'created_at';
+            $row = $cfg['model']::query()
+                ->whereBetween($dateField, [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
+                ->selectRaw("COUNT(*) AS t, SUM(CASE WHEN {$rule['sql']} THEN 1 ELSE 0 END) AS d", $rule['bindings'])
+                ->first();
+            $total   += (int) ($row->t ?? 0);
+            $defects += (int) ($row->d ?? 0);
+        }
+
+        return ['total' => $total, 'defect' => $defects];
     }
 
     private function top(array $bucket): array

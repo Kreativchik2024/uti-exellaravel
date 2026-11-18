@@ -112,12 +112,19 @@ class ReportController extends Controller
         $sheet = $r->input('sheet');
         if ($sheet && ! isset($sections->sheets()[$sheet])) $sheet = null;
 
+        // Прошлый период той же длины — для сравнения («было → стало»)
+        $days = $from->copy()->startOfDay()->diffInDays($to->copy()->startOfDay()) + 1;
+        $prevTo = $from->copy()->subDay();
+        $prevFrom = $prevTo->copy()->subDays($days - 1);
+
         return view('reports.defects', [
-            'data'   => $analysis->build($from, $to, $sheet),
-            'from'   => $from,
-            'to'     => $to,
-            'sheet'  => $sheet,
-            'sheets' => $sections->sheets(),
+            'data'     => $analysis->build($from, $to, $sheet),
+            'prev'     => $analysis->totals($prevFrom, $prevTo, $sheet) + ['from' => $prevFrom, 'to' => $prevTo],
+            'from'     => $from,
+            'to'       => $to,
+            'days'     => (int) $days,
+            'sheet'    => $sheet,
+            'sheets'   => $sections->sheets(),
         ]);
     }
 

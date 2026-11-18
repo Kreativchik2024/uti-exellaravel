@@ -155,6 +155,31 @@ class TechnologistTest extends TestCase
         $this->asUser($exec)->get('/stats/records?' . $period . '&sheet=pgp&tech=' . urlencode('Сидоров С.С.'))->assertForbidden();
     }
 
+    public function test_zone8_numbers_link_to_boards_of_technologist(): void
+    {
+        $ok   = $this->pgp(['technologist' => 'Сидоров С.С.']);
+        $bad  = $this->pgp(['technologist' => 'Сидоров С.С.', 'status' => 'Не сдан']);
+        $other = $this->pgp(['technologist' => 'Петрова А.А.']);
+        $otk = $this->worker('otk');
+
+        $html = $this->asUser($otk)->get('/stats')->assertOk()->getContent();
+        $this->assertStringContainsString('zone8Url(row.name, \'all\')', $html);
+        $this->assertStringContainsString('zone8Url(row.name, \'defect\')', $html);
+
+        // Та же ссылка, что строит zone8Url: ОТК видит борта технолога целиком, не только свои записи
+        $url = fn ($kind) => '/stats/records?' . http_build_query(['sheet' => 'pgp', 'board' => '_all', 'tech' => 'Сидоров С.С.',
+            'kind' => $kind, 'mode' => 'all', 'from' => '2026-11-01', 'to' => '2026-11-30']);
+
+        $all = $this->asUser($otk)->get($url('all'))->assertOk()->getContent();
+        $this->assertStringContainsString("/records/pgp/{$ok->id}\"", $all);
+        $this->assertStringContainsString("/records/pgp/{$bad->id}\"", $all);
+        $this->assertStringNotContainsString("/records/pgp/{$other->id}\"", $all);
+
+        $defect = $this->asUser($otk)->get($url('defect'))->assertOk()->getContent();
+        $this->assertStringContainsString("/records/pgp/{$bad->id}\"", $defect);
+        $this->assertStringNotContainsString("/records/pgp/{$ok->id}\"", $defect);
+    }
+
     public function test_technologist_stats_visible_only_to_master_otk_admin(): void
     {
         foreach (['executor', 'repair'] as $role) {

@@ -696,9 +696,18 @@
                                     <tr class="border-t hover:bg-gray-50">
                                         <td class="p-3 text-gray-400" x-text="idx + 1"></td>
                                         <td class="p-3 font-semibold text-gray-900" x-text="row.name"></td>
-                                        <td class="p-3 text-right font-bold text-gray-800" x-text="row.boards"></td>
-                                        <td class="p-3 text-right text-green-700" x-text="row.delivered"></td>
-                                        <td class="p-3 text-right text-red-700" x-text="row.boards - row.delivered"></td>
+                                        {{-- Цифры — ссылки на список бортов технолога за период блока --}}
+                                        <td class="p-3 text-right font-bold text-gray-800">
+                                            <a :href="zone8Url(row.name, 'all')" class="underline decoration-dotted underline-offset-4 hover:opacity-75" title="Открыть список бортов" x-text="row.boards"></a>
+                                        </td>
+                                        <td class="p-3 text-right text-green-700">
+                                            <a x-show="row.delivered > 0" :href="zone8Url(row.name, 'good')" class="underline decoration-dotted underline-offset-4 hover:opacity-75" title="Открыть сданные" x-text="row.delivered"></a>
+                                            <span x-show="row.delivered === 0">0</span>
+                                        </td>
+                                        <td class="p-3 text-right text-red-700">
+                                            <a x-show="row.boards - row.delivered > 0" :href="zone8Url(row.name, 'defect')" class="underline decoration-dotted underline-offset-4 hover:opacity-75" title="Открыть несданные" x-text="row.boards - row.delivered"></a>
+                                            <span x-show="row.boards - row.delivered === 0">0</span>
+                                        </td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -911,6 +920,14 @@
                     },
                     resetDates8() { this.dateFrom8 = ''; this.dateTo8 = ''; this.loadZone8(true); },
                     zone8Boards() { return this.zone8Rows.reduce((s, r) => s + Number(r.boards), 0); },
+                    // Список бортов технолога: kind = all | good (сдано) | defect (не сдано); период — как у блока 8,
+                    // mode=all — все записи (цифры блока считаются по всем, не только по своим)
+                    zone8Url(tech, kind) {
+                        const p = new URLSearchParams({ sheet: 'pgp', board: '_all', tech, kind, mode: 'all' });
+                        if (this.dateFrom8) p.set('from', this.dateFrom8);
+                        if (this.dateTo8)   p.set('to',   this.dateTo8);
+                        return '{{ route("stats.records") }}?' + p.toString();
+                    },
                     zone7Total() { return this.zone7Rows.reduce((s, r) => s + Number(r.count), 0); },
 
                     toggleZone1() { this.expanded1 = !this.expanded1; },
