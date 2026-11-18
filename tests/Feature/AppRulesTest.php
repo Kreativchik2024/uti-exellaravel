@@ -28,6 +28,16 @@ class AppRulesTest extends TestCase
         return $user;
     }
 
+    /** Технолог (группа ОТК) для обязательного поля записи ПГП. */
+    private function technologistName(): string
+    {
+        if (! User::where('role', 'otk')->where('name', 'Технологов Т.Т.')->exists()) {
+            User::factory()->create(['role' => 'otk', 'is_active' => true, 'name' => 'Технологов Т.Т.']);
+        }
+
+        return 'Технологов Т.Т.';
+    }
+
     /** Базовые поля записи ПГП (статус и прочее — в самих тестах). */
     private function pgpBase(string $worker): array
     {
@@ -37,6 +47,7 @@ class AppRulesTest extends TestCase
             'worker1'      => $worker,
             'board_number' => 'B-1',
             'board_type'   => 'МН',
+            'technologist' => $this->technologistName(),   // обязательное поле: кто из технологов принял борт
         ];
     }
 

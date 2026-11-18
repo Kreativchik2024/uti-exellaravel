@@ -90,9 +90,9 @@
             </nav>
         @endif
 
-        @if($techOpen ?? false)
+        @if(($techOpen ?? false) || ($repairOpen ?? false))
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm rounded-lg px-3 py-2" style="background: var(--ui-surface-2); color: var(--ui-text-2)">
-                <span>Показаны необработанные рекламации ПГП</span>
+                <span>{{ ($repairOpen ?? false) ? 'Показан брак ПГП, ещё не отремонтированный' : 'Показаны необработанные рекламации ПГП' }}</span>
                 <a href="{{ route('records.index', $sheet) }}" class="font-semibold underline" style="color: var(--ui-accent-text)">Показать все</a>
             </div>
         @endif
@@ -117,7 +117,9 @@
                                 @endif
                             </div>
                             <div class="flex flex-col items-end gap-1 flex-shrink-0">
-                                @if($record->status ?? null)
+                                @if(isset($repairedIds[$record->id]))
+                                    <x-status-pill value="Отремонтировано" tone="good" />
+                                @elseif($record->status ?? null)
                                     <x-status-pill :value="$record->status" />
                                 @endif
                                 @if(($record->health ?? null) === 'green')
@@ -134,6 +136,7 @@
                                     @php
                                         $colValue = $record->$col ?? null;
                                         if ($col === 'is_repaired' || ($cfg['fields'][$col]['type'] ?? '') === 'checkbox' || !empty($cfg['fields'][$col]['bool'])) $colValue = $colValue ? 'Да' : 'Нет';
+                                        if ($col === 'repair_status') $colValue = \App\Models\ResearchRecord::STATUSES[$colValue ?: 'new']['label'] ?? $colValue;
                                     @endphp
                                     <div class="min-w-0">
                                         <dt>{{ $cfg['fields'][$col]['label'] ?? $col }}</dt>
@@ -207,8 +210,14 @@
                                         @else
                                             <span class="ui-table__muted">—</span>
                                         @endif
+                                    @elseif($col === 'repair_status')
+                                        <x-research-status :value="$record->repair_status" />
                                     @elseif($col === 'status')
-                                        <x-status-pill :value="$record->status ?? null" />
+                                        @if(isset($repairedIds[$record->id]))
+                                            <x-status-pill value="Отремонтировано" tone="good" title="Было: {{ $record->status }}" />
+                                        @else
+                                            <x-status-pill :value="$record->status ?? null" />
+                                        @endif
                                     @elseif($col === 'post_number')
                                         <span class="ui-table__strong whitespace-nowrap">{{ $record->post_number ? '№' . $record->post_number : '—' }}</span>
                                     @elseif($col === 'peripheral_number')

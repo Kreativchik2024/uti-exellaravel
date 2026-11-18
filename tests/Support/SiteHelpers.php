@@ -13,6 +13,17 @@ trait SiteHelpers
 {
     private int $employeeSeq = 0;
 
+    /** Технолог для записи ПГП (поле обязательное): первый из группы ОТК, а если их нет — создаётся. */
+    protected function technologistName(): string
+    {
+        $names = app(\App\Services\Technologists::class)->allNames();
+        if ($names) return $names[0];
+
+        User::factory()->create(['role' => 'otk', 'is_active' => true, 'name' => 'Технологов Т.Т.']);
+
+        return 'Технологов Т.Т.';
+    }
+
     /**
      * Пользователь с карточкой сотрудника (нужна, чтобы выбирать его исполнителем),
      * ПИН 1234 и доступом к участку испытаний.
@@ -63,12 +74,14 @@ trait SiteHelpers
 
             $data[$name] = match (true) {
                 $name === 'worker1'                => $worker1,
+                $name === 'technologist'           => $this->technologistName(),
                 $name === 'post_number'            => 3,
                 $name === 'peripheral_number'      => 2,
                 ($f['type'] ?? '') === 'date'      => now()->toDateString(),
                 ($f['type'] ?? '') === 'time'      => '08:30',
                 ($f['type'] ?? '') === 'number'    => 1,
-                ($f['type'] ?? '') === 'select'    => $f['options'][0],
+                // у списков с ключами (статус исследования: new, in_work…) — первый ключ
+                ($f['type'] ?? '') === 'select'    => $f['options'][0] ?? array_key_first($f['options']),
                 ($f['type'] ?? '') === 'ip_suffix' => '15',
                 default                            => 'Тест ' . $name,
             };

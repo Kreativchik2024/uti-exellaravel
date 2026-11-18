@@ -30,6 +30,9 @@
         $healthFields = $cfg['health_fields'] ?? [];
         $goodValues   = $cfg['health_good_values'] ?? ['Работает'];
         $isGood = collect($healthFields)->every(fn ($f) => in_array($record->{$f} ?? null, $goodValues, true));
+        // Брак уже отремонтирован (ПГП → исследование «Отремонтировано: Да») — зелёным, а не красным
+        $isRepaired = $isRepaired ?? false;
+        if ($isRepaired) $isGood = true;
 
         $workers = array_values(array_filter(array_map(fn ($wf) => $record->{$wf} ?? null, $workerFields)));
         $recordDate = $record->record_date ? \Carbon\Carbon::parse($record->record_date)->format('d.m.Y') : ($record->created_at?->format('d.m.Y') ?? '—');
@@ -113,6 +116,11 @@
                                     <dd>
                                         @if($empty)
                                             <span style="color: var(--ui-faint)">—</span>
+                                        @elseif($name === 'repair_status')
+                                            <x-research-status :value="$value" />
+                                        @elseif($name === 'status' && $isRepaired)
+                                            <x-status-pill value="Отремонтировано" tone="good" />
+                                            <span class="ml-1.5 text-xs" style="color: var(--ui-muted)">было: {{ $display }}</span>
                                         @elseif(in_array($name, $pillFields, true) || $name === 'is_repaired' || ($type === 'checkbox' || !empty($f['bool'])))
                                             <x-status-pill :value="$display" />
                                         @elseif($type === 'textarea')
@@ -145,10 +153,119 @@
                         </dl>
                     </section>
                 @endforeach
+
+                {{-- ПГП: история борта по этапам --}}
+                @if($sheet === 'pgp' && $boardHistory)
+                    <section id="board-history" class="ui-card overflow-hidden">
+                        <div class="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 pb-2">
+                            <h3 class="rec-section__title !p-0">История борта{{ $boardHistory['board'] ? ' ' . $boardHistory['board'] : '' }}</h3>
+                            <span class="flex items-center gap-1.5 text-xs" style="color: var(--ui-muted)">
+                                Сейчас: <x-status-pill :value="$boardHistory['stage']['label']" :tone="$boardHistory['stage']['tone']" />
+                            </span>
+                        </div>
+                        <ol class="px-4 pb-4 space-y-2.5">
+                            @foreach($boardHistory['events'] as $ev)
+                                <li class="flex gap-3">
+                                    <span class="ui-pill--{{ $ev['tone'] }} w-2.5 h-2.5 mt-1.5 shrink-0 rounded-full" aria-hidden="true" style="background: var(--pill-fg)"></span>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
+                                            @if($ev['url'])
+                                                <a href="{{ $ev['url'] }}" class="font-medium hover:underline" style="color: var(--ui-text)">{{ $ev['title'] }}</a>
+                                            @else
+                                                <span class="font-medium" style="color: var(--ui-text)">{{ $ev['title'] }}</span>
+                                            @endif
+                                            <span class="text-xs tabular-nums" style="color: var(--ui-muted)">{{ $ev['at']?->format('d.m.Y H:i') }}{{ $ev['who'] ? ' · ' . $ev['who'] : '' }}</span>
+                                        </div>
+                                        @if($ev['text'])
+                                            <div class="text-sm whitespace-pre-line" style="color: var(--ui-text-2)">{{ $ev['text'] }}</div>
+                                        @endif
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ol>
+                    </section>
+                @endif
+
+                {{-- Исследование: комментарии и вся история по детали (деталь может возвращаться несколько раз) --}}
+                @if($sheet === 'research')
+                    <section id="comments" class="ui-card overflow-hidden">
+                        <h3 class="rec-section__title">Комментарии и история детали</h3>
+                        <div class="px-4 pb-4 space-y-4">
+                            @foreach($partHistory as $item)
+                                @php $isCurrent = $item->id === $record->id; @endphp
+                                <div class="rounded-lg p-3" style="background: var(--ui-surface-2); {{ $isCurrent ? 'border: 1px solid var(--ui-accent-text)' : 'border: 1px solid var(--ui-border)' }}">
+                                    <div class="flex flex-wrap items-center justify-between gap-2 text-xs" style="color: var(--ui-muted)">
+                                        <span>
+                                            @if($isCurrent)
+                                                <b style="color: var(--ui-text)">Это исследование</b>
+                                            @else
+                                                <a href="{{ route('records.show', ['research', $item->id]) }}" class="underline">Исследование №{{ $item->id }}</a>
+                                            @endif
+                                            · {{ $item->record_date?->format('d.m.Y') }}
+                                        </span>
+                                        <span class="flex items-center gap-1.5">
+                                            @if($item->category)<span>{{ $item->category }}</span>@endif
+                                            <x-research-status :value="$item->repair_status" />
+                                        </span>
+                                    </div>
+                                    @if($item->reported_defect)
+                                        <div class="mt-1.5 text-sm" style="color: var(--ui-text-2)">{{ $item->reported_defect }}</div>
+                                    @endif
+                                    @forelse($item->comments as $c)
+                                        <div class="mt-2 pl-3 text-sm" style="border-left: 2px solid var(--ui-border)">
+                                            <div class="text-xs" style="color: var(--ui-muted)">{{ $c->user?->name ?? 'Удалённый пользователь' }} · {{ $c->created_at?->format('d.m.Y H:i') }}</div>
+                                            <div class="whitespace-pre-line" style="color: var(--ui-text)">{{ $c->body }}</div>
+                                        </div>
+                                    @empty
+                                        <div class="mt-2 text-xs" style="color: var(--ui-faint)">Комментариев нет</div>
+                                    @endforelse
+                                </div>
+                            @endforeach
+
+                            <form method="POST" action="{{ route('records.comment', [$sheet, $record->id]) }}" class="space-y-2">
+                                @csrf
+                                <textarea name="body" rows="3" maxlength="2000" required placeholder="Новый комментарий к этому исследованию"
+                                          class="w-full rounded-lg text-sm" style="background: var(--ui-surface-2); color: var(--ui-text); border: 1px solid var(--ui-border)">{{ old('body') }}</textarea>
+                                @error('body')<p class="text-xs" style="color: var(--ui-bad)">{{ $message }}</p>@enderror
+                                <button type="submit" class="ui-btn">Добавить комментарий</button>
+                            </form>
+                        </div>
+                    </section>
+                @endif
             </div>
 
             {{-- Боковая колонка --}}
             <aside class="space-y-5 lg:sticky" style="top: calc(var(--ui-nav-h) + 16px)">
+                {{-- Исследование: статус цветными кнопками (ремонтник, мастер, админ), остальным — только метка --}}
+                @if($sheet === 'research')
+                    @php
+                        $currentStatus = $record->repair_status ?: 'new';
+                        $canSetStatus = auth()->user()->isRepair() || auth()->user()->canManageContent();
+                    @endphp
+                    <section class="ui-card p-4 space-y-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="text-sm font-semibold" style="color: var(--ui-text)">Статус</h3>
+                            <x-research-status :value="$currentStatus" />
+                        </div>
+                        @if($canSetStatus)
+                            <form method="POST" action="{{ route('records.researchStatus', [$sheet, $record->id]) }}" class="grid grid-cols-1 gap-2">
+                                @csrf @method('PATCH')
+                                @foreach(\App\Models\ResearchRecord::STATUSES as $key => $s)
+                                    <button type="submit" name="repair_status" value="{{ $key }}"
+                                            class="ui-pill ui-pill--{{ $s['tone'] }} rs-btn {{ $key === $currentStatus ? 'rs-btn--current' : '' }}"
+                                            @if($key === $currentStatus) aria-pressed="true" @endif>
+                                        <span class="ui-pill__dot" aria-hidden="true"></span>{{ $s['label'] }}
+                                    </button>
+                                @endforeach
+                            </form>
+                        @endif
+                        @if($record->pgp_record_id)
+                            <a href="{{ route('records.show', ['pgp', $record->pgp_record_id]) }}" class="block text-sm underline" style="color: var(--ui-accent-text)">Брак ПГП: открыть запись №{{ $record->pgp_record_id }}</a>
+                            <a href="{{ route('records.show', ['pgp', $record->pgp_record_id]) }}#board-history" class="block text-sm underline" style="color: var(--ui-accent-text)">История борта по этапам</a>
+                        @endif
+                    </section>
+                @endif
+
                 @if($sheet === 'pgp')
                     <section class="ui-card overflow-hidden">
                         <div class="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
@@ -165,11 +282,17 @@
                                     @csrf @method('PATCH')
                                     <textarea name="tech_note" rows="3" maxlength="2000" placeholder="Что сделано или что нужно учесть"
                                               class="w-full rounded-lg text-sm" style="background: var(--ui-surface-2); color: var(--ui-text); border: 1px solid var(--ui-border)">{{ old('tech_note', $record->tech_note) }}</textarea>
+                                    <label class="flex items-center justify-between gap-2 text-sm" style="color: var(--ui-text-2)">
+                                        <span>Решён вопрос</span>
+                                        <select name="tech_processed" class="rounded-lg text-sm" style="background: var(--ui-surface-2); color: var(--ui-text); border: 1px solid var(--ui-border)">
+                                            <option value="0" @selected(! old('tech_processed', $record->tech_processed))>Нет</option>
+                                            <option value="1" @selected(old('tech_processed', $record->tech_processed))>Да</option>
+                                        </select>
+                                    </label>
                                     <div class="flex flex-wrap gap-2">
-                                        <button type="submit" class="ui-btn ui-btn--ghost">Сохранить пометку</button>
-                                        <button type="submit" name="tech_processed" value="{{ $record->tech_processed ? 0 : 1 }}" class="ui-btn">
-                                            Обработан: {{ $record->tech_processed ? 'Да' : 'Нет' }} — {{ $record->tech_processed ? 'снять отметку' : 'отметить' }}
-                                        </button>
+                                        <button type="submit" class="ui-btn">Сохранить пометку</button>
+                                        {{-- Отмена: возвращает значения, сохранённые в записи (без запроса к серверу) --}}
+                                        <button type="reset" class="ui-btn ui-btn--ghost">Отмена</button>
                                     </div>
                                 </form>
                             @else
@@ -192,8 +315,8 @@
                             @endif
                         </span>
                         <div>
-                            <div class="font-semibold" style="color: {{ $isGood ? 'var(--ui-good)' : 'var(--ui-bad)' }}">{{ $isGood ? 'Работает' : 'Требует внимания' }}</div>
-                            <div class="text-xs" style="color: var(--ui-muted)">{{ $isGood ? 'Все проверки пройдены' : 'Есть замечания — см. поля проверки' }}</div>
+                            <div class="font-semibold" style="color: {{ $isGood ? 'var(--ui-good)' : 'var(--ui-bad)' }}">{{ $isRepaired ? 'Отремонтировано' : ($isGood ? 'Работает' : 'Требует внимания') }}</div>
+                            <div class="text-xs" style="color: var(--ui-muted)">{{ $isRepaired ? 'Брак устранён — см. исследование' : ($isGood ? 'Все проверки пройдены' : 'Есть замечания — см. поля проверки') }}</div>
                         </div>
                     </div>
                 @endif

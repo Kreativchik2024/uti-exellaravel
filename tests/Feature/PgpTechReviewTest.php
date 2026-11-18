@@ -52,6 +52,20 @@ class PgpTechReviewTest extends TestCase
         $this->assertFalse($rec->fresh()->tech_processed);
     }
 
+    public function test_otk_sees_note_form_with_resolved_select_and_cancel(): void
+    {
+        $rec = $this->defect();
+
+        $otkHtml = $this->asUser($this->worker('otk'))->get("/records/pgp/{$rec->id}")->assertOk()->getContent();
+        $this->assertStringContainsString('name="tech_note"', $otkHtml);
+        $this->assertStringContainsString('name="tech_processed"', $otkHtml);
+        $this->assertStringContainsString('type="reset"', $otkHtml);
+
+        $masterHtml = $this->asUser($this->worker('master'))->get("/records/pgp/{$rec->id}")->assertOk()->getContent();
+        $this->assertStringNotContainsString('name="tech_note"', $masterHtml);
+        $this->assertStringNotContainsString('type="reset"', $masterHtml);
+    }
+
     public function test_open_complaints_count_only_unprocessed_defects(): void
     {
         $master = $this->worker('master');

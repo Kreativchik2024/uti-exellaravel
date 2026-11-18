@@ -13,7 +13,7 @@
 
         $initials = collect(preg_split('/\s+/u', trim($user->name)))
             ->filter()->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode('');
-        $roleLabel = ['admin' => 'Администратор', 'master' => 'Мастер', 'executor' => 'Исполнитель', 'otk' => 'ОТК'][$user->role] ?? '';
+        $roleLabel = ['admin' => 'Администратор', 'master' => 'Мастер', 'executor' => 'Исполнитель', 'otk' => 'ОТК', 'repair' => 'Ремонтник'][$user->role] ?? '';
         $isAdminArea = request()->routeIs('users.*') || request()->routeIs('employees.*') || request()->routeIs('firmware.categories.*') || request()->routeIs('sections.*') || request()->routeIs('audit.*') || request()->routeIs('system.*') || request()->routeIs('fault-codes.*');
     @endphp
 
@@ -168,6 +168,17 @@
                                 <span style="color: var(--ui-text-2)">Необработанные рекламации ПГП</span>
                                 <span class="font-semibold tabular-nums" style="color: {{ $pgpOpen ? 'var(--ui-bad)' : 'var(--ui-muted)' }}">{{ $pgpOpen }}</span>
                             </a>
+                        @endif
+
+                        {{-- Ремонтник: брак ПГП, пока исследование не отмечено «исправлено» --}}
+                        @if($user->isRepair() || $user->canManageContent())
+                            @php $repairSvc = app(\App\Services\PgpDefectResearch::class); $repairCount = $repairSvc->openForRepair() ? $repairSvc->openForRepairCount() : null; @endphp
+                            @if($repairCount !== null)
+                                <a href="{{ route('records.index', ['research', 'repair' => 'open']) }}" class="ui-menu__item justify-between">
+                                    <span style="color: var(--ui-text-2)">Брак ПГП на ремонт</span>
+                                    <span class="font-semibold tabular-nums" style="color: {{ $repairCount ? 'var(--ui-bad)' : 'var(--ui-muted)' }}">{{ $repairCount }}</span>
+                                </a>
+                            @endif
                         @endif
 
                         {{-- Участок: выбор (если их несколько) или просто название --}}

@@ -46,8 +46,9 @@ class User extends Authenticatable
     public function isAdmin(): bool    { return $this->role === 'admin'; }
     public function isMaster(): bool   { return $this->role === 'master'; }
     public function isOtk(): bool      { return $this->role === 'otk'; }
-    /** Исполнитель и ОТК — рабочие сотрудники участка (пока с одинаковыми правами). */
-    public function isWorker(): bool   { return in_array($this->role, ['executor', 'otk'], true); }
+    public function isRepair(): bool   { return $this->role === 'repair'; }
+    /** Исполнитель, ОТК и ремонтник — рабочие сотрудники участка (пока с одинаковыми правами). */
+    public function isWorker(): bool   { return in_array($this->role, ['executor', 'otk', 'repair'], true); }
 
     public function canManageContent(): bool { return $this->isAdmin() || $this->isMaster(); }
     public function canManageUsers(): bool   { return $this->isAdmin(); }

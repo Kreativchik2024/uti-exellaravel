@@ -29,6 +29,7 @@
                             $type = $cfg['fields'][$col]['type'] ?? '';
                             if ($type === 'checkbox' || !empty($cfg['fields'][$col]['bool']) || $col === 'is_repaired') $v = $v ? 'Да' : 'Нет';
                             elseif ($col === 'record_date' && $v) $v = \Carbon\Carbon::parse($v)->format('d.m.Y');
+                            elseif ($col === 'repair_status') $v = \App\Models\ResearchRecord::STATUSES[$v ?: 'new']['label'] ?? $v;
                         @endphp
                         <td><div class="break-words">{{ $v !== null && $v !== '' ? $v : '—' }}</div></td>
                     @endforeach

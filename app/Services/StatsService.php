@@ -251,7 +251,7 @@ class StatsService
      * Борта за цифрой карточки «Борта по типам»: $type — код типа, '_none' (не указан) или null (все);
      * $kind = all | good (сдано) | defect (не сдано). null — на участке нет ПГП с типами.
      */
-    public function boardRecords(?string $type, ?Carbon $from, ?Carbon $to, ?User $user, ?string $worker, string $kind = 'all')
+    public function boardRecords(?string $type, ?Carbon $from, ?Carbon $to, ?User $user, ?string $worker, string $kind = 'all', ?string $tech = null)
     {
         $cfg = $this->sheets()['pgp'] ?? null;
         if (!$cfg || empty($cfg['model']) || !isset($cfg['fields']['board_type'])) return null;
@@ -260,10 +260,46 @@ class StatsService
         if ($type === '_none') $q->where(fn ($w) => $w->whereNull('board_type')->orWhere('board_type', ''));
         elseif ($type !== null && $type !== '') $q->where('board_type', $type);
 
+        // Карточки «Борта по технологам»: имя технолога или '_none' (не указан)
+        if ($tech !== null && isset($cfg['fields']['technologist'])) {
+            if ($tech === '_none') $q->where(fn ($w) => $w->whereNull('technologist')->orWhere('technologist', ''));
+            else $q->where('technologist', $tech);
+        }
+
         if ($kind === 'good') $q->where('status', 'Сдан');
         elseif ($kind === 'defect') $q->where(fn ($w) => $w->whereNull('status')->orWhere('status', '<>', 'Сдан'));
 
         return $q->orderByDesc($this->metaFor($cfg)['dateField'])->orderByDesc('id');
+    }
+
+    /**
+     * Борта ПГП за период по технологам (кто принял): всего и сдано, по убыванию числа бортов.
+     * Фильтры те же, что у «Бортов по типам». null — на участке нет ПГП с полем технолога.
+     *
+     * @return array{techs: array<string, array{label:string,total:int,delivered:int}>, none: array{total:int,delivered:int}}|null
+     */
+    public function boardTechnologists(?Carbon $from, ?Carbon $to, ?User $user, ?string $worker = null): ?array
+    {
+        $cfg = $this->sheets()['pgp'] ?? null;
+        if (!$cfg || empty($cfg['model']) || !isset($cfg['fields']['technologist'])) return null;
+
+        $rows = $this->boardQuery($cfg, $from, $to, $user, $worker)
+            ->selectRaw("COALESCE(NULLIF(technologist, ''), '_none') as t")
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw("SUM(CASE WHEN status = 'Сдан' THEN 1 ELSE 0 END) as delivered")
+            ->groupBy('t')
+            ->get();
+
+        $techs = [];
+        $none = ['total' => 0, 'delivered' => 0];
+        foreach ($rows as $row) {
+            $item = ['total' => (int) $row->total, 'delivered' => (int) $row->delivered];
+            if ($row->t === '_none') $none = $item;
+            else $techs[(string) $row->t] = ['label' => (string) $row->t] + $item;
+        }
+        uasort($techs, fn ($a, $b) => [$b['total'], $a['label']] <=> [$a['total'], $b['label']]);
+
+        return ['techs' => $techs, 'none' => $none];
     }
 
     public function boardTypes(?Carbon $from, ?Carbon $to, ?User $user, ?string $worker = null): ?array

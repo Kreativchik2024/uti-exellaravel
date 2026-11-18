@@ -113,7 +113,7 @@ class StatsController extends Controller
     private const MAIN_FILTER_KEYS = ['from', 'to', 'worker', 'mode'];
 
     /** Зоны с собственными фильтрами по дате (сохраняются через saveFilters). */
-    private const ZONE_FILTER_KEYS = ['zone2', 'zone4', 'zone5', 'zone6'];
+    private const ZONE_FILTER_KEYS = ['zone2', 'zone4', 'zone5', 'zone6', 'zone7', 'zone8'];
 
     private function sessionKey(string $suffix): string
     {
@@ -181,18 +181,21 @@ class StatsController extends Controller
         $workersList = $canSeeWorkersStats ? $s->listWorkers() : [];
 
         // Кеш на минуту: расчёт по 19 таблицам — самая дорогая часть страницы
-        $cacheKey = 'stats.index.v3.' . $this->sectionKey() . '.' . md5(json_encode([
+        $cacheKey = 'stats.index.v4.' . $this->sectionKey() . '.' . md5(json_encode([
             $from?->toDateString(), $to?->toDateString(), $targetUser?->id, $worker,
         ]));
 
-        [$perSheet, $byPosts, $boardTypes] = Cache::remember($cacheKey, 60, function () use ($s, $from, $to, $targetUser, $worker) {
+        [$perSheet, $byPosts, $boardTypes, $boardTechs] = Cache::remember($cacheKey, 60, function () use ($s, $from, $to, $targetUser, $worker) {
             $perSheet = $s->forPeriod($from, $to, $targetUser, $worker !== '' ? $worker : null);
             return [
                 $perSheet,
                 $s->byPosts($from, $to, $targetUser),
                 $s->boardTypes($from, $to, $targetUser, $worker !== '' ? $worker : null),
+                $s->boardTechnologists($from, $to, $targetUser, $worker !== '' ? $worker : null),
             ];
         });
+        // «Борта по технологам» — только мастеру, технологу (ОТК) и администратору
+        if (! self::canSeeTechnologistStats($r->user())) $boardTechs = null;
 
         $totals = $s->totals($perSheet);
 
@@ -200,7 +203,7 @@ class StatsController extends Controller
 
         return view('stats.index', compact(
             'from', 'to', 'periodLabel',
-            'perSheet', 'totals', 'byPosts', 'boardTypes',
+            'perSheet', 'totals', 'byPosts', 'boardTypes', 'boardTechs',
             'targetUser', 'worker', 'workersList', 'canSeeWorkersStats', 'zoneFilters'
         ));
     }
@@ -213,7 +216,8 @@ class StatsController extends Controller
     {
         $r->validate(['sheet' => ['required', 'string', 'max:60'], 'kind' => ['nullable', 'in:all,good,defect'],
                       'from' => ['nullable', 'date'], 'to' => ['nullable', 'date'], 'worker' => ['nullable', 'string', 'max:200'],
-                      'board' => ['nullable', 'string', 'max:20'], 'post' => ['nullable', 'integer', 'min:0']]);
+                      'board' => ['nullable', 'string', 'max:20'], 'post' => ['nullable', 'integer', 'min:0'],
+                      'tech' => ['nullable', 'string', 'max:120']]);
         $slug = (string) $r->input('sheet');
         $cfg  = $this->sheetCfg($slug);
         abort_unless($cfg && ! empty($cfg['model']), 404);
@@ -226,8 +230,14 @@ class StatsController extends Controller
 
         // board — карточки «Борта по типам» (ПГП): код типа, '_none' или '_all'; там ✓/✕ — «сдан / не сдан»
         $board = $slug === 'pgp' && $r->filled('board') ? (string) $r->input('board') : null;
+        // tech — карточки «Борта по технологам» (ПГП): имя технолога или '_none'; видят мастер, ОТК, админ
+        $tech = $slug === 'pgp' && $r->filled('tech') ? (string) $r->input('tech') : null;
+        if ($tech !== null) {
+            abort_unless(self::canSeeTechnologistStats($r->user()), 403);
+            $board ??= '_all';
+        }
         $query = $board !== null
-            ? $s->boardRecords($board === '_all' ? null : $board, $from, $to, $targetUser, $worker ?: null, $kind)
+            ? $s->boardRecords($board === '_all' ? null : $board, $from, $to, $targetUser, $worker ?: null, $kind, $tech)
             : $s->periodRecords($slug, $from, $to, $targetUser, $worker ?: null, $kind);
         abort_if($board !== null && ! $query, 404);
         // post — клик по цифре в «Детализации по постам»: только записи этого поста
@@ -255,9 +265,11 @@ class StatsController extends Controller
             'defectIds' => $defectIds,
             'kind'    => $kind,
             'board'   => $board,
+            'tech'    => $tech,
             'boardLabel' => implode(' · ', array_filter([
                 $post !== null ? 'пост ' . $post : null,
-                $board === null || ($board === '_all' && $post !== null) ? null
+                $tech !== null ? ($tech === '_none' ? 'технолог не указан' : 'технолог ' . $tech) : null,
+                $board === null || ($board === '_all' && ($post !== null || $tech !== null)) ? null
                     : ($board === '_all' ? 'все борта' : ($board === '_none' ? 'тип не указан' : 'тип ' . $board)),
             ])) ?: null,
             'post'    => $post,
@@ -671,6 +683,117 @@ class StatsController extends Controller
                 }
             }
             return app(\App\Services\FaultCodeRating::class)->rate($rows);
+        });
+
+        return response()->json($data);
+    }
+
+    /** Статистику по технологам видят только мастер, технолог (ОТК) и администратор. */
+    public static function canSeeTechnologistStats(?User $u): bool
+    {
+        return $u && ($u->isAdmin() || $u->isMaster() || $u->isOtk());
+    }
+
+    /** Технологи: сколько бортов принял каждый за период и сколько из них сдано. */
+    public function zone8(Request $r)
+    {
+        abort_unless(self::canSeeTechnologistStats($r->user()), 403);
+
+        $from = $r->input('from');
+        $to   = $r->input('to');
+        $cacheKey = "stats.zone8.{$this->sectionKey()}.{$from}_{$to}";
+
+        $data = Cache::remember($cacheKey, 120, function () use ($from, $to) {
+            $cfg = $this->sheets()['pgp'] ?? null;
+            if (!$cfg || !isset($cfg['fields']['technologist'])) return [];
+
+            $table = (new $cfg['model'])->getTable();
+            [$dateSql, $dateBindings] = $this->sqlDateRange($from, $to);
+
+            $res = DB::select(
+                "SELECT `technologist` AS name, COUNT(*) AS boards,
+                        SUM(CASE WHEN `status` = 'Сдан' THEN 1 ELSE 0 END) AS delivered
+                 FROM `$table`
+                 WHERE (`technologist` IS NOT NULL AND `technologist` != '')" . $dateSql . "
+                 GROUP BY `technologist`",
+                $dateBindings
+            );
+
+            $rows = array_map(fn ($row) => [
+                'name'      => $row->name,
+                'boards'    => (int) $row->boards,
+                'delivered' => (int) $row->delivered,
+            ], $res);
+            usort($rows, fn ($a, $b) => [$b['boards'], $a['name']] <=> [$a['boards'], $b['name']]);
+
+            return $rows;
+        });
+
+        return response()->json($data);
+    }
+
+    /**
+     * Замены в исследованиях: что и сколько раз меняли за период, по каким узлам.
+     * Одно и то же написание в разном регистре и с лишними пробелами — одна строка; «Без замены» не считается.
+     */
+    public function zone7(Request $r, StatsService $s)
+    {
+        $from = $r->input('from');
+        $to   = $r->input('to');
+        $targetUser = $this->resolveTargetUser($r);
+        $cacheKey = "stats.zone7.{$this->sectionKey()}.{$from}_{$to}." . ($targetUser?->id ?? 'all');
+
+        $data = Cache::remember($cacheKey, 120, function () use ($from, $to, $targetUser, $s) {
+            $cfg = $this->sheets()['research'] ?? null;
+            if (!$cfg || !isset($cfg['fields']['replacement'])) return [];
+
+            $table = (new $cfg['model'])->getTable();
+            $scope = $s->workerScopeSql($cfg, $targetUser);
+            [$dateSql, $dateBindings] = $this->sqlDateRange($from, $to);
+
+            $res = DB::select(
+                "SELECT `replacement` AS name, `category` AS category, COUNT(*) AS cnt,
+                        MIN(record_date) AS first_date, MAX(record_date) AS last_date
+                 FROM `$table`
+                 WHERE (`replacement` IS NOT NULL AND `replacement` != '')" . $scope['sql'] . $dateSql . "
+                 GROUP BY `replacement`, `category`",
+                array_merge($scope['bindings'], $dateBindings)
+            );
+
+            $agg = [];
+            foreach ($res as $row) {
+                $name = trim(preg_replace('/\s+/u', ' ', (string) $row->name));
+                $key  = mb_strtolower($name);
+                if ($name === '' || $key === 'без замены') continue;
+
+                $agg[$key] ??= ['name' => $name, 'count' => 0, 'categories' => [], 'first_date' => null, 'last_date' => null, 'spelled' => []];
+                $e = &$agg[$key];
+                $e['count'] += (int) $row->cnt;
+                $e['spelled'][$name] = ($e['spelled'][$name] ?? 0) + (int) $row->cnt;
+                $cat = trim((string) $row->category) ?: 'Без категории';
+                $e['categories'][$cat] = ($e['categories'][$cat] ?? 0) + (int) $row->cnt;
+                $first = substr((string) $row->first_date, 0, 10);
+                $last  = substr((string) $row->last_date, 0, 10);
+                if ($first && (!$e['first_date'] || $first < $e['first_date'])) $e['first_date'] = $first;
+                if ($last && (!$e['last_date'] || $last > $e['last_date'])) $e['last_date'] = $last;
+                unset($e);
+            }
+
+            $rows = [];
+            foreach ($agg as $e) {
+                arsort($e['spelled']);
+                arsort($e['categories']);
+                $rows[] = [
+                    'name'       => array_key_first($e['spelled']),   // самое частое написание
+                    'count'      => $e['count'],
+                    'categories' => $e['categories'],
+                    'first_date' => $e['first_date'],
+                    'last_date'  => $e['last_date'],
+                ];
+            }
+            usort($rows, fn ($a, $b) => $b['count'] <=> $a['count']);
+
+            return $rows;
         });
 
         return response()->json($data);

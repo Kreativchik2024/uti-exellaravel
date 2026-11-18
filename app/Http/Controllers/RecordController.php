@@ -20,7 +20,28 @@ class RecordController extends Controller
     /** Конфиг вкладки с проверкой доступа к её участку (см. SectionContext::sheet). */
     private function cfg(string $sheet): array
     {
-        return app(SectionContext::class)->sheet($sheet);
+        $cfg = app(SectionContext::class)->sheet($sheet);
+
+        // 'options_from' => 'technologists': список — активные технологи (ОТК), проверка — любой технолог,
+        // в т.ч. отключённый, или уже записанное значение (чтобы старую запись можно было пересохранить)
+        foreach ($cfg['fields'] ?? [] as $name => $f) {
+            if (($f['options_from'] ?? null) !== 'technologists') continue;
+            $tech = app(\App\Services\Technologists::class);
+            $options = $tech->names();
+            $allowed = $tech->allNames();
+            if ($id = (int) request()->route('id')) {
+                $current = $cfg['model']::query()->whereKey($id)->value($name);
+                if (filled($current)) {
+                    $allowed[] = $current;
+                    if (! in_array($current, $options, true)) $options[] = $current;
+                }
+            }
+            $cfg['fields'][$name]['options'] = $options;
+            $rules = is_array($f['rules']) ? $f['rules'] : explode('|', (string) $f['rules']);
+            $cfg['fields'][$name]['rules'] = [...$rules, \Illuminate\Validation\Rule::in($allowed)];
+        }
+
+        return $cfg;
     }
 
     private function isRecordLocked($record): bool
@@ -525,6 +546,11 @@ class RecordController extends Controller
         if ($techOpen) {
             $query->whereIn('id', app(\App\Services\PgpComplaints::class)->openQuery()->select('id'));
         }
+        // Ссылка из меню ремонтника: брак ПГП, ещё не отремонтированный (см. App\Services\PgpDefectResearch)
+        $repairOpen = $sheet === 'research' && $request->query('repair') === 'open';
+        if ($repairOpen) {
+            $query->whereNotNull('pgp_record_id')->where('is_repaired', false);
+        }
 
         if (array_key_exists('record_date', $cfg['fields'])) {
             $query->orderByDesc('record_date')->orderByDesc('id');
@@ -550,7 +576,12 @@ class RecordController extends Controller
             }
         }
 
-        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter', 'techOpen'));
+        // Отремонтированные борта ПГП — зелёным «Отремонтировано» вместо красного брака
+        $repairedIds = $sheet === 'pgp'
+            ? app(\App\Services\PgpDefectResearch::class)->repairedPgpIds($records->pluck('id')->all())
+            : [];
+
+        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter', 'techOpen', 'repairOpen', 'repairedIds'));
     }
 
     public function show(string $sheet, int $id)
@@ -573,7 +604,15 @@ class RecordController extends Controller
             : collect();
         $historyLabels = \App\Http\Controllers\AuditController::fieldLabels();
 
-        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups', 'isTimeLocked', 'history', 'historyLabels'));
+        // ПГП: брак уже отремонтирован (исследование с «Отремонтировано: Да») — показываем зелёным
+        $isRepaired = $sheet === 'pgp'
+            && isset(app(\App\Services\PgpDefectResearch::class)->repairedPgpIds([$record->id])[$record->id]);
+        // Исследование: все исследования той же детали с их комментариями (деталь может возвращаться)
+        $partHistory = $sheet === 'research' ? $record->samePartHistory() : collect();
+        // ПГП: история борта по этапам (проверки, исследования, статусы, комментарии, пометки ОТК)
+        $boardHistory = $sheet === 'pgp' ? app(\App\Services\BoardHistory::class)->for($record) : null;
+
+        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups', 'isTimeLocked', 'history', 'historyLabels', 'isRepaired', 'partHistory', 'boardHistory'));
     }
 
     public function create(Request $r, string $sheet)
@@ -679,7 +718,10 @@ class RecordController extends Controller
         }
         if ($tokenKey) Cache::put($tokenKey, $record->id, now()->addHours(12));
 
-        return redirect()->route('records.index', $sheet)->with('ok', 'Запись добавлена');
+        $research = $this->researchForPgpDefect($sheet, $record);
+
+        return redirect()->route('records.index', $sheet)
+            ->with('ok', 'Запись добавлена' . ($research ? ". Брак — заведено исследование №{$research->id}" : ''));
     }
 
     public function edit(Request $r, string $sheet, int $id)
@@ -756,7 +798,58 @@ class RecordController extends Controller
             throw $e;
         }
 
-        return redirect()->route('records.index', $sheet)->with('ok', 'Запись обновлена');
+        $research = $this->researchForPgpDefect($sheet, $record);
+
+        return redirect()->route('records.index', $sheet)
+            ->with('ok', 'Запись обновлена' . ($research ? ". Брак — заведено исследование №{$research->id}" : ''));
+    }
+
+    /**
+     * Брак в ПГП сразу заносится в «Исследования». Только для записей, введённых через форму:
+     * загрузка старых данных из таблицы исследования не плодит.
+     */
+    private function researchForPgpDefect(string $sheet, $record): ?\App\Models\ResearchRecord
+    {
+        if ($sheet !== 'pgp') return null;
+
+        return app(\App\Services\PgpDefectResearch::class)->syncFor($record);
+    }
+
+    /**
+     * Статус исследования кнопками на карточке: не обработан / в работе / отправлен в разбор / отправлен в конвейер.
+     * Ставят ремонтник, мастер и админ. «В конвейер» = отремонтировано: брак ПГП уходит из списка ремонтника.
+     */
+    public function researchStatus(Request $r, string $sheet, int $id)
+    {
+        abort_unless($sheet === 'research', 404);
+        $record = $this->cfg($sheet)['model']::findOrFail($id);
+        $statuses = \App\Models\ResearchRecord::STATUSES;
+
+        $data = $r->validate(['repair_status' => ['required', \Illuminate\Validation\Rule::in(array_keys($statuses))]]);
+        $old = $record->repair_status ?: 'new';
+
+        if ($old !== $data['repair_status']) {
+            $record->forceFill(['repair_status' => $data['repair_status'], 'updated_by' => auth()->id()])->save();
+            \App\Models\AuditLog::write('research', 'status', "Исследование #{$record->id}: {$statuses[$old]['label']} → {$statuses[$data['repair_status']]['label']}",
+                ['subject_type' => 'record', 'subject_id' => $record->id, 'section_id' => null]);
+        }
+
+        return back()->with('ok', 'Статус: ' . $statuses[$data['repair_status']]['label']);
+    }
+
+    /** Комментарий к исследованию. Комментарии копятся — видна вся история по детали. */
+    public function comment(Request $r, string $sheet, int $id)
+    {
+        abort_unless($sheet === 'research', 404);
+        $record = $this->cfg($sheet)['model']::findOrFail($id);
+
+        $data = $r->validate(['body' => ['required', 'string', 'max:2000']], [], ['body' => 'Комментарий']);
+
+        $comment = $record->comments()->make(['body' => trim($data['body'])]);
+        $comment->user_id = auth()->id();
+        $comment->save();
+
+        return redirect()->to(route('records.show', [$sheet, $record->id]) . '#comments')->with('ok', 'Комментарий добавлен');
     }
 
     /** Пометка технолога к записи ПГП: текст и отметка «обработан». Пишет только группа ОТК (маршрут role:otk). */

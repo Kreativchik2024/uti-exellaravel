@@ -184,6 +184,46 @@
                     </div>
                 @endif
 
+                {{-- Борта ПГП по технологам (кто принял), по убыванию — только мастеру, ОТК и админу --}}
+                @if(!empty($boardTechs) && ($boardTechs['techs'] || $boardTechs['none']['total']))
+                    @php
+                        $techUrl = fn ($kind, $tech) => route('stats.records', $statFilters + array_filter(['sheet' => 'pgp', 'kind' => $kind, 'board' => '_all', 'tech' => $tech]));
+                        $techCards = [];
+                        foreach ($boardTechs['techs'] as $name => $t) $techCards[] = $t + ['code' => $name];
+                        if ($boardTechs['none']['total'] > 0) $techCards[] = ['label' => 'Технолог не указан', 'code' => '_none'] + $boardTechs['none'];
+                        $techTotal = array_sum(array_column($techCards, 'total'));
+                    @endphp
+                    <div class="board-types">
+                        <div class="board-types__head">
+                            <span class="board-types__title">Борта по технологам</span>
+                            <span class="board-types__hint">{{ $periodLabel }} · кто принял, по количеству · ✓ сдано / ✕ не сдано</span>
+                        </div>
+                        <div class="sheet-grid">
+                            @foreach($techCards as $card)
+                                @php
+                                    $bt = $card['total']; $btOk = $card['delivered']; $btBad = $bt - $btOk;
+                                    $btPct = $bt > 0 ? round($btBad / $bt * 100, 1) : 0;
+                                    $btShare = $techTotal > 0 ? round($bt / $techTotal * 100) : 0;
+                                @endphp
+                                <div class="sheet-card">
+                                    <div class="sheet-card__title" title="{{ $card['label'] }}">
+                                        {{ $card['label'] }} <span class="sheet-card__muted">· {{ $btShare }}%</span>
+                                    </div>
+                                    <div class="sheet-card__total"><a href="{{ $techUrl('all', $card['code']) }}" class="sheet-card__link" title="Открыть список бортов">{{ number_format($bt, 0, ',', ' ') }}</a><span class="sheet-card__unit">шт.</span></div>
+                                    <div class="sheet-card__bar" role="img" aria-label="Сдано {{ $btOk }}, не сдано {{ $btBad }}">
+                                        <span class="sheet-card__bar-good" style="width: {{ 100 - $btPct }}%"></span>
+                                        <span class="sheet-card__bar-bad"  style="width: {{ $btPct }}%"></span>
+                                    </div>
+                                    <div class="sheet-card__split">
+                                        @if($btOk)<a href="{{ $techUrl('good', $card['code']) }}" class="sheet-card__good sheet-card__link" title="Открыть сданные">✓ {{ number_format($btOk, 0, ',', ' ') }}</a>@else<span class="sheet-card__good">✓ 0</span>@endif
+                                        @if($btBad)<a href="{{ $techUrl('defect', $card['code']) }}" class="sheet-card__bad sheet-card__link" title="Открыть несданные">✕ {{ number_format($btBad, 0, ',', ' ') }}</a>@else<span class="sheet-card__bad">✕ 0</span>@endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 {{-- По вкладкам: выпуск / исправные / брак (общего итога нет — устройства разные) --}}
                 <div class="sheet-grid">
                     @foreach($perSheet as $slug => $data)
@@ -565,6 +605,111 @@
             </div>
         </div>
 
+        {{-- ЗОНА 7: замены в исследованиях --}}
+        @if(isset(app(\App\Services\SectionContext::class)->sheets()['research']))
+        <div class="ui-card p-5">
+            <div class="stat-card-head mb-3">
+                <h3 class="font-semibold text-lg text-gray-800">7. Замены в исследованиях</h3>
+                <div class="flex gap-2">
+                    <button x-show="!expanded7" @click="toggleZone7()" class="ui-btn ui-btn--ghost ui-btn--sm">Показать</button>
+                    <button x-show="expanded7" @click="toggleZone7()" class="ui-btn ui-btn--ghost ui-btn--sm">Скрыть</button>
+                </div>
+            </div>
+            <div x-show="expanded7" x-cloak>
+                <div x-show="loading7" class="text-gray-500 text-sm">Загрузка…</div>
+                <div x-show="loaded7 && !loading7">
+                    <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
+                        <label class="text-sm text-gray-600">С: <input type="date" x-model="dateFrom7" @change="loadZone7(true)" class="border rounded px-2 py-1 ml-1"></label>
+                        <label class="text-sm text-gray-600">По: <input type="date" x-model="dateTo7" @change="loadZone7(true)" class="border rounded px-2 py-1 ml-1"></label>
+                        <button @click="resetDates7()" class="text-sm text-gray-500 hover:text-gray-800 underline">Сбросить даты</button>
+                    </div>
+                    <div class="mb-4 flex flex-wrap gap-4 items-baseline text-sm">
+                        <span class="text-gray-600">Видов замен: <strong class="text-lg text-gray-800" x-text="zone7Rows.length"></strong></span>
+                        <span class="text-gray-600">Всего замен: <strong class="text-lg text-blue-700" x-text="zone7Total()"></strong></span>
+                    </div>
+                    <div class="overflow-x-auto table-scroll">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50 text-gray-600">
+                                <tr>
+                                    <th class="p-3 text-left w-12">#</th>
+                                    <th class="p-3 text-left">Замена</th>
+                                    <th class="p-3 text-left">Узлы</th>
+                                    <th class="p-3 text-right">Кол-во</th>
+                                    <th class="p-3 text-left">Первая</th>
+                                    <th class="p-3 text-left">Последняя</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(row, idx) in zone7Rows" :key="row.name">
+                                    <tr class="border-t hover:bg-gray-50">
+                                        <td class="p-3 text-gray-400" x-text="idx + 1"></td>
+                                        <td class="p-3 font-semibold text-gray-900" x-text="row.name"></td>
+                                        <td class="p-3 text-gray-600" x-text="Object.entries(row.categories).map(([c, n]) => c + ' (' + n + ')').join(', ')"></td>
+                                        <td class="p-3 text-right font-bold text-blue-700" x-text="row.count"></td>
+                                        <td class="p-3 text-gray-500" x-text="formatDate(row.first_date)"></td>
+                                        <td class="p-3 text-gray-500" x-text="formatDate(row.last_date)"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                        <div x-show="zone7Rows.length === 0" class="p-3 text-gray-500 text-sm">Нет замен за период</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
+
+        {{-- ЗОНА 8: технологи — только мастер, технолог (ОТК) и администратор --}}
+        @if(\App\Http\Controllers\StatsController::canSeeTechnologistStats(auth()->user()) && isset(app(\App\Services\SectionContext::class)->sheets()['pgp']))
+        <div class="ui-card p-5">
+            <div class="stat-card-head mb-3">
+                <h3 class="font-semibold text-lg text-gray-800">8. Технологи: принятые борта</h3>
+                <div class="flex gap-2">
+                    <button x-show="!expanded8" @click="toggleZone8()" class="ui-btn ui-btn--ghost ui-btn--sm">Показать</button>
+                    <button x-show="expanded8" @click="toggleZone8()" class="ui-btn ui-btn--ghost ui-btn--sm">Скрыть</button>
+                </div>
+            </div>
+            <div x-show="expanded8" x-cloak>
+                <div x-show="loading8" class="text-gray-500 text-sm">Загрузка…</div>
+                <div x-show="loaded8 && !loading8">
+                    <div class="flex flex-wrap gap-3 mb-4 items-end bg-gray-50 p-3 rounded border border-gray-100">
+                        <label class="text-sm text-gray-600">С: <input type="date" x-model="dateFrom8" @change="loadZone8(true)" class="border rounded px-2 py-1 ml-1"></label>
+                        <label class="text-sm text-gray-600">По: <input type="date" x-model="dateTo8" @change="loadZone8(true)" class="border rounded px-2 py-1 ml-1"></label>
+                        <button @click="resetDates8()" class="text-sm text-gray-500 hover:text-gray-800 underline">Сбросить даты</button>
+                    </div>
+                    <div class="mb-4 flex flex-wrap gap-4 items-baseline text-sm">
+                        <span class="text-gray-600">Принято бортов: <strong class="text-lg text-gray-800" x-text="zone8Boards()"></strong></span>
+                    </div>
+                    <div class="overflow-x-auto table-scroll">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50 text-gray-600">
+                                <tr>
+                                    <th class="p-3 text-left w-12">#</th>
+                                    <th class="p-3 text-left">Технолог</th>
+                                    <th class="p-3 text-right">Принято бортов</th>
+                                    <th class="p-3 text-right">Сдано</th>
+                                    <th class="p-3 text-right">Не сдано</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(row, idx) in zone8Rows" :key="row.name">
+                                    <tr class="border-t hover:bg-gray-50">
+                                        <td class="p-3 text-gray-400" x-text="idx + 1"></td>
+                                        <td class="p-3 font-semibold text-gray-900" x-text="row.name"></td>
+                                        <td class="p-3 text-right font-bold text-gray-800" x-text="row.boards"></td>
+                                        <td class="p-3 text-right text-green-700" x-text="row.delivered"></td>
+                                        <td class="p-3 text-right text-red-700" x-text="row.boards - row.delivered"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                        <div x-show="zone8Rows.length === 0" class="p-3 text-gray-500 text-sm">Нет принятых бортов за период</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
+
         {{-- МОДАЛКА: записи поста за день --}}
         <div x-show="recordsModalOpen" x-cloak
              class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
@@ -667,7 +812,7 @@
                     init() {
                         // Запоминаем даты зон в сессии, чтобы они не сбрасывались при обновлении/уходе со страницы
                         [['zone2', 'dateFrom2', 'dateTo2'], ['zone4', 'dateFrom', 'dateTo'],
-                         ['zone5', 'dateFrom5', 'dateTo5'], ['zone6', 'dateFrom6', 'dateTo6']]
+                         ['zone5', 'dateFrom5', 'dateTo5'], ['zone6', 'dateFrom6', 'dateTo6'], ['zone7', 'dateFrom7', 'dateTo7'], ['zone8', 'dateFrom8', 'dateTo8']]
                             .forEach(([zone, f, t]) => {
                                 const save = () => saveZoneFilter(zone, this[f], this[t]);
                                 this.$watch(f, save);
@@ -722,6 +867,51 @@
                     zone6Rows: [], selectedCategory6: '',
                     dateFrom6: zoneDate(opts, 'zone6', 'from'),
                     dateTo6: zoneDate(opts, 'zone6', 'to'),
+
+                    expanded7: false, loaded7: false, loading7: false,
+                    zone7Rows: [],
+                    dateFrom7: zoneDate(opts, 'zone7', 'from'),
+                    dateTo7: zoneDate(opts, 'zone7', 'to'),
+                    toggleZone7() { this.expanded7 = !this.expanded7; if (this.expanded7 && !this.loaded7 && !this.loading7) this.loadZone7(); },
+                    async loadZone7(force = false) {
+                        if (!force) this.loaded7 = true;
+                        this.loading7 = true;
+                        try {
+                            const params = new URLSearchParams();
+                            if (this.dateFrom7) params.set('from', this.dateFrom7);
+                            if (this.dateTo7)   params.set('to',   this.dateTo7);
+                            params.set('mode', this.statsMode);
+                            const res = await fetch('{{ route("stats.zone7") }}?' + params.toString());
+                            if (!res.ok) throw new Error('zone7 HTTP ' + res.status);
+                            this.zone7Rows = await res.json();
+                            this.loaded7 = true;
+                        } catch (e) { console.error('[zone7]', e); }
+                        this.loading7 = false;
+                    },
+                    resetDates7() { this.dateFrom7 = ''; this.dateTo7 = ''; this.loadZone7(true); },
+
+                    expanded8: false, loaded8: false, loading8: false,
+                    zone8Rows: [],
+                    dateFrom8: zoneDate(opts, 'zone8', 'from'),
+                    dateTo8: zoneDate(opts, 'zone8', 'to'),
+                    toggleZone8() { this.expanded8 = !this.expanded8; if (this.expanded8 && !this.loaded8 && !this.loading8) this.loadZone8(); },
+                    async loadZone8(force = false) {
+                        if (!force) this.loaded8 = true;
+                        this.loading8 = true;
+                        try {
+                            const params = new URLSearchParams();
+                            if (this.dateFrom8) params.set('from', this.dateFrom8);
+                            if (this.dateTo8)   params.set('to',   this.dateTo8);
+                            const res = await fetch('{{ route("stats.zone8") }}?' + params.toString());
+                            if (!res.ok) throw new Error('zone8 HTTP ' + res.status);
+                            this.zone8Rows = await res.json();
+                            this.loaded8 = true;
+                        } catch (e) { console.error('[zone8]', e); }
+                        this.loading8 = false;
+                    },
+                    resetDates8() { this.dateFrom8 = ''; this.dateTo8 = ''; this.loadZone8(true); },
+                    zone8Boards() { return this.zone8Rows.reduce((s, r) => s + Number(r.boards), 0); },
+                    zone7Total() { return this.zone7Rows.reduce((s, r) => s + Number(r.count), 0); },
 
                     toggleZone1() { this.expanded1 = !this.expanded1; },
                     toggleZone2() { this.expanded2 = !this.expanded2; if (this.expanded2 && !this.loaded2 && !this.loading2) this.loadZone2(); },

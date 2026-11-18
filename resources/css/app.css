@@ -932,6 +932,10 @@ html.dark .ui-ms-cell.n1 { color: #60a5fa; } html.dark .ui-ms-cell.n2 { color: #
 .ui-fc-group { flex-shrink: 0; font-size: .7rem; padding: .05rem .45rem; border-radius: 999px; background: var(--ui-surface-2); color: var(--ui-muted); }
 .ui-fc-note { color: var(--ui-text-2); }
 /* Подсказка по наведению: расшифровка кода неисправности в таблице записей */
+/* Кнопки статуса исследования: цвет — тон ui-pill, текущий статус выделен рамкой */
+.rs-btn { width: 100%; justify-content: center; padding: .55rem .75rem; font-size: .875rem; font-weight: 600; cursor: pointer; opacity: .75; transition: opacity .15s, box-shadow .15s; }
+.rs-btn:hover, .rs-btn:focus-visible { opacity: 1; }
+.rs-btn--current { opacity: 1; box-shadow: 0 0 0 2px var(--pill-fg); }
 .ui-tip { cursor: help; }
 /* Общее окошко подсказки (наполняет resources/js/app.js): поверх всего, в пределах экрана, длинный текст переносится */
 .ui-tip-bubble { position: fixed; z-index: 1000; display: none; box-sizing: border-box; width: max-content; max-width: min(24rem, calc(100vw - 16px));

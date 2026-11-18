@@ -17,7 +17,7 @@ class PgpRecord extends Model
         'bracket_serial', 'bracket_worker', 'bracket_record_date', 'bracket_health', 'bracket_status_text',
         'manet_number', 'manet_worker', 'manet_record_date', 'manet_health', 'manet_status_text',
 
-        'status', 'defect_reason', 'actions_taken',
+        'status', 'technologist', 'wait_minutes', 'defect_reason', 'actions_taken',
         'created_by', 'updated_by', 'fault_code',
     ];
 
@@ -33,6 +33,7 @@ class PgpRecord extends Model
             'bracket_record_date'  => 'date',
             'manet_record_date'    => 'date',
             'tech_processed'       => 'boolean',
+            'wait_minutes'         => 'integer',
             'tech_updated_at'      => 'datetime',
         ];
     }
@@ -54,6 +55,12 @@ class PgpRecord extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** Исследования, заведённые по браку этой записи. */
+    public function researches()
+    {
+        return $this->hasMany(ResearchRecord::class, 'pgp_record_id');
     }
 
     public function updater()

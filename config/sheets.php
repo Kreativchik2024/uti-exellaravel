@@ -62,6 +62,12 @@ $map = [
                 'status'          => ['label'=>'Статус','type'=>'select','rules'=>'required|in:Сдан,Не сдан',
                                        'options'=>['Сдан','Не сдан']],
 
+                // Приёмка технологом: список — активные пользователи группы ОТК (подставляет RecordController::cfg)
+                'technologist'    => ['label'=>'Технолог','type'=>'select','rules'=>'required|string|max:120',
+                                      'options'=>[], 'options_from'=>'technologists',
+                                      'messages'=>['required'=>'Выберите технолога, который принял борт.', 'in'=>'Выберите технолога из списка.']],
+                // «Время ожидания технолога» (колонка wait_minutes) пока не используется: поле убрано из формы, данные в БД сохранены
+
                 // --- Появляются после выбора статуса; все необязательные (заполняются по возможности) ---
                 'fuselage_number' => ['label'=>'№ фюзеляжа','type'=>'text',
                                       'rules'=>'nullable|string|max:64'],
@@ -102,6 +108,8 @@ $map = [
                  'fields'=>['ip_address','manet_number']],
                 ['title'=>'Статус', 'subtitle'=>'После выбора статуса откроются поля проверки', 'icon'=>'shield',
                  'fields'=>['status']],
+                ['title'=>'Приёмка технологом', 'subtitle'=>'Кто из технологов принял борт', 'icon'=>'shield',
+                 'fields'=>['technologist']],
                 ['title'=>'Проверка и неисправности',
                  'subtitle'=>'При «Не сдан» — все поля, кроме «Действия», обязательны; при «Сдан» — по желанию',
                  'icon'=>'note',
@@ -231,6 +239,9 @@ $map = [
             'fields' => array_merge([
                 'record_date' => ['label'=>'Дата','type'=>'date','rules'=>'required|date'],
                 'seq'         => ['label'=>'№','type'=>'number','rules'=>'nullable|integer'],
+                // Исследоваться может любой узел: список — все вкладки участка (заполняется ниже), можно вписать свой
+                'category'    => ['label'=>'Категория (узел)','type'=>'combo','rules'=>'nullable|string|max:120',
+                                  'placeholder'=>'Выберите узел или впишите свой', 'options'=>[]],
             ], $workers, [
                 'fuselage_no'     => ['label'=>'№ фюзеляжа','type'=>'text','rules'=>'nullable|string|max:64'],
                 'fuselage_serial' => ['label'=>'Фюзеляж с аппаратурой','type'=>'text','rules'=>'nullable|string|max:120'],
@@ -241,10 +252,15 @@ $map = [
                 'analysis_actions'=> ['label'=>'Действия для анализа','type'=>'textarea','rules'=>'nullable|string'],
                 'found_defect'    => ['label'=>'Дефект при анализе','type'=>'textarea','rules'=>'nullable|string'],
                 'result'          => ['label'=>'Результат','type'=>'textarea','rules'=>'nullable|string'],
-                'is_repaired'     => ['label'=>'Отремонтировано','type'=>'select','rules'=>'required|boolean',
-                                      'options'=>['1'=>'Да','0'=>'Нет']],
+                // Что заменено: список узлов участка (заполняется ниже) и ранее вписанные варианты; можно вписать свой
+                'replacement'     => ['label'=>'Замена','type'=>'combo','rules'=>'nullable|string|max:120',
+                                      'placeholder'=>'Выберите, что заменено, или впишите своё', 'options'=>[]],
+                // «Отремонтировано» следует из статуса: «Отправлен в конвейер» = да (App\Models\ResearchRecord)
+                'repair_status'   => ['label'=>'Статус','type'=>'select',
+                                      'rules'=>'nullable|in:' . implode(',', array_keys(\App\Models\ResearchRecord::STATUSES)),
+                                      'options'=>\App\Models\ResearchRecord::statusOptions()],
             ], $faultCode),
-            'list_columns' => ['record_date','fuselage_no','frame_serial','bracket_serial','is_repaired'],
+            'list_columns' => ['record_date','category','fuselage_no','frame_serial','bracket_serial','repair_status'],
         ],
 
         // =====================================================
@@ -499,6 +515,15 @@ $map = [
 foreach ($map as $slug => $cfg) {
     $map[$slug]['section'] ??= 'ispytaniya';
 }
+
+// Категории исследований: все узлы (вкладки) того же участка. Свой вариант можно вписать в поле.
+$researchNodes = array_values(array_map(
+    fn ($cfg) => $cfg['title'],
+    array_filter($map, fn ($cfg, $slug) => $slug !== 'research' && $cfg['section'] === $map['research']['section'], ARRAY_FILTER_USE_BOTH)
+));
+$map['research']['fields']['category']['options'] = $researchNodes;
+// Замена: те же узлы и «Без замены» (вписанные ранее варианты добавляются в список сами — RecordController::comboOptions)
+$map['research']['fields']['replacement']['options'] = array_merge(['Без замены'], $researchNodes);
 
 return [
     'map' => $map,

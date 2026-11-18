@@ -184,6 +184,9 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::put('/records/{sheet}/{id}',      [RecordController::class, 'update'])->name('records.update');
     // Пометка технолога ПГП — только группа ОТК
     Route::patch('/records/{sheet}/{id}/tech', [RecordController::class, 'tech'])->middleware('role:otk')->name('records.tech');
+    // Исследования: статус кнопками — ремонтник (и мастер, админ); комментарии — все
+    Route::patch('/records/{sheet}/{id}/research-status', [RecordController::class, 'researchStatus'])->middleware('role:repair,master,admin')->name('records.researchStatus');
+    Route::post('/records/{sheet}/{id}/comments', [RecordController::class, 'comment'])->middleware('throttle:30,1')->name('records.comment');
     Route::delete('/records/{sheet}/{id}',   [RecordController::class, 'destroy'])->name('records.destroy');
 });
 
@@ -202,6 +205,9 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/stats/zone5',          [StatsController::class, 'zone5'])->name('stats.zone5');
     Route::get('/stats/zone5-chart',    [StatsController::class, 'zone5Chart'])->name('stats.zone5Chart');
     Route::get('/stats/zone6',          [StatsController::class, 'zone6'])->name('stats.zone6');
+    Route::get('/stats/zone7',          [StatsController::class, 'zone7'])->name('stats.zone7');
+    // Технологи: только мастер, технолог (ОТК) и администратор
+    Route::get('/stats/zone8',          [StatsController::class, 'zone8'])->middleware('role:admin,master,otk')->name('stats.zone8');
 });
 
 // Игры (меню профиля) — отдельно от рабочей статистики; админ включает и выключает
