@@ -36,7 +36,7 @@ class StatsController extends Controller
     private function resolveTargetUser(Request $r): ?User
     {
         $user = auth()->user();
-        if (!$user->isExecutor()) return null;
+        if (!$user->isWorker()) return null;
         if ($r->input('mode') === 'all') return null;
         return $user;
     }
@@ -419,7 +419,7 @@ class StatsController extends Controller
             ->whereNotNull('post_number');
 
         $targetUser = $this->resolveTargetUser($r);
-        if ($targetUser && $targetUser->isExecutor()) {
+        if ($targetUser && $targetUser->isWorker()) {
             $s->applyUserScope($query, $cfg, $targetUser);
         }
         $this->applyDateRange($query, $from, $to);

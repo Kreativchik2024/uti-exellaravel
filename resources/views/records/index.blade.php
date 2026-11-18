@@ -210,7 +210,8 @@
                                         <x-status-pill :value="$record->$col ? 'Да' : 'Нет'" />
                                     @elseif($col === 'fault_code')
                                         @if($record->fault_code)
-                                            <span class="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md" style="background: var(--ui-surface-hover); color: var(--ui-text)">{{ $record->fault_code }}</span>
+                                            <span class="ui-tip font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md" style="background: var(--ui-surface-hover); color: var(--ui-text)"
+                                                  @if(!empty($faultDescriptions[$record->fault_code])) data-tip="{{ $faultDescriptions[$record->fault_code] }}" tabindex="0" @endif>{{ $record->fault_code }}</span>
                                         @else
                                             <span class="ui-table__muted">—</span>
                                         @endif

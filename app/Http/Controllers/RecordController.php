@@ -544,7 +544,12 @@ class RecordController extends Controller
             }
         }
 
-        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter'));
+        // Расшифровки кодов неисправности для подсказки в таблице (код → описание)
+        $faultDescriptions = in_array('fault_code', $listColumns, true)
+            ? \App\Models\FaultCode::mapFor(app(\App\Services\SectionContext::class)->current())
+            : [];
+
+        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter', 'faultDescriptions'));
     }
 
     public function show(string $sheet, int $id)

@@ -21,7 +21,7 @@
             <input name="q" value="{{ request('q') }}" placeholder="Имя или email" class="border rounded px-3 py-1">
             <select name="role" class="border rounded px-3 py-1">
                 <option value="">Все роли</option>
-                @foreach(['admin'=>'Админ','master'=>'Мастер','executor'=>'Исполнитель'] as $k=>$v)
+                @foreach(['admin'=>'Админ','master'=>'Мастер','executor'=>'Исполнитель','otk'=>'ОТК'] as $k=>$v)
                     <option value="{{ $k }}" @selected(request('role')===$k)>{{ $v }}</option>
                 @endforeach
             </select>
@@ -58,7 +58,7 @@
                             <form method="POST" action="{{ route('users.role', $u) }}">
                                 @csrf @method('PATCH')
                                 <select name="role" onchange="this.form.submit()" class="border rounded px-2 py-0.5">
-                                    @foreach(['admin'=>'Админ','master'=>'Мастер','executor'=>'Исполнитель'] as $k=>$v)
+                                    @foreach(['admin'=>'Админ','master'=>'Мастер','executor'=>'Исполнитель','otk'=>'ОТК'] as $k=>$v)
                                         <option value="{{ $k }}" @selected($u->role===$k)>{{ $v }}</option>
                                     @endforeach
                                 </select>

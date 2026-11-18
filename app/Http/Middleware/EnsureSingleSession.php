@@ -13,7 +13,7 @@ class EnsureSingleSession
     {
         $user = $request->user();
 
-        if ($user && $user->isExecutor()) {
+        if ($user && $user->isWorker()) {
             $currentSessionId = $request->session()->getId();
 
             // Первый вход: записываем текущую сессию

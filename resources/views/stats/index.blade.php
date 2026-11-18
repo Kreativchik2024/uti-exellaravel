@@ -72,7 +72,7 @@
         {{-- ФИЛЬТРЫ --}}
         <div class="ui-card p-4">
             <form method="GET" action="{{ route('stats.index') }}" class="flex flex-wrap items-end gap-4">
-                @if(auth()->user()->isExecutor() && request('mode'))
+                @if(auth()->user()->isWorker() && request('mode'))
                     <input type="hidden" name="mode" value="{{ request('mode') }}">
                 @endif
 
@@ -102,7 +102,7 @@
                 <a href="{{ route('stats.index', ['reset' => 1]) }}" class="text-sm text-gray-500 hover:text-gray-800 underline px-2 py-1">Сбросить</a>
             </form>
 
-            @if(auth()->user()->isExecutor())
+            @if(auth()->user()->isWorker())
                 <div class="mt-3 flex gap-1">
                     <a href="{{ route('stats.index', ['from' => $from ? $from->format('Y-m-d') : null, 'to' => $to ? $to->format('Y-m-d') : null, 'mode' => 'my']) }}"
                        class="px-3 py-1 text-sm rounded border {{ request('mode') !== 'all' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300' }}">
@@ -121,7 +121,7 @@
             @if($canSeeWorkersStats && $worker)
                 <span class="ml-2 text-amber-700">· исполнитель: {{ $worker }}</span>
             @endif
-            @if($targetUser && $targetUser->isExecutor())
+            @if($targetUser && $targetUser->isWorker())
                 <span class="ml-2 text-amber-700">· ваша статистика ({{ $targetUser->name }})</span>
             @endif
         </div>

@@ -74,6 +74,18 @@ class AdminTest extends TestCase
         $this->assertTrue($admin->fresh()->is_active);
     }
 
+    public function test_otk_role_is_assignable_and_has_worker_rights(): void
+    {
+        $user = User::factory()->create(['role' => 'executor']);
+        $this->asUser($this->admin())->patch("/users/{$user->id}/role", ['role' => 'otk'])->assertSessionHasNoErrors();
+
+        $user = $user->fresh();
+        $this->assertSame('otk', $user->role);
+        $this->assertTrue($user->isOtk());
+        $this->assertTrue($user->isWorker());
+        $this->assertFalse($user->canManageContent());
+    }
+
     public function test_invalid_role_is_rejected(): void
     {
         $user = User::factory()->create();

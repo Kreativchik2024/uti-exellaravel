@@ -35,7 +35,7 @@ class AuthenticatedSessionController extends Controller
         $user = auth()->user();
 
         // Single session: для executor запоминаем текущую сессию.
-        if ($user->isExecutor()) {
+        if ($user->isWorker()) {
             $user->forceFill(['session_id' => session()->getId()])->saveQuietly();
         }
 
@@ -61,7 +61,7 @@ class AuthenticatedSessionController extends Controller
     public function destroy(Request $request): RedirectResponse
     {
         $user = $request->user();
-        if ($user && $user->isExecutor()) {
+        if ($user && $user->isWorker()) {
             $user->forceFill(['session_id' => null])->saveQuietly();
         }
         // Сотрудник свободен — его можно сразу поставить на другое рабочее место

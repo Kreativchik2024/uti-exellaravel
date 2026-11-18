@@ -931,6 +931,11 @@ html.dark .ui-ms-cell.n1 { color: #60a5fa; } html.dark .ui-ms-cell.n2 { color: #
 .ui-fc-desc { color: var(--ui-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-fc-group { flex-shrink: 0; font-size: .7rem; padding: .05rem .45rem; border-radius: 999px; background: var(--ui-surface-2); color: var(--ui-muted); }
 .ui-fc-note { color: var(--ui-text-2); }
+/* Подсказка по наведению: расшифровка кода неисправности в таблице записей */
+.ui-tip { position: relative; cursor: help; }
+.ui-tip[data-tip]:hover::after, .ui-tip[data-tip]:focus::after { content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 40;
+    width: max-content; max-width: 18rem; padding: .45rem .6rem; border-radius: 8px; background: var(--ui-surface); color: var(--ui-text);
+    border: 1px solid var(--ui-border); box-shadow: 0 8px 24px rgba(0,0,0,.18); font: 400 .8rem/1.35 system-ui, sans-serif; white-space: normal; text-align: left; pointer-events: none; }
 .ui-fc-note b { font-family: ui-monospace, monospace; }
 .ui-fc-group-row { padding: .7rem 1rem; border-top: 1px solid var(--ui-border); }
 .ui-fc-group-row.is-child { padding-left: 2.4rem; background: var(--ui-surface-2); }

@@ -137,7 +137,7 @@ class StatsService
 
         $q = $cfg['model']::query();
         $this->applyRange($q, $meta['dateField'], $from, $to);
-        if ($user && $user->isExecutor()) $this->applyUserScope($q, $cfg, $user);
+        if ($user && $user->isWorker()) $this->applyUserScope($q, $cfg, $user);
         if ($workerVariants) {
             if (empty($meta['workerFields'])) return null;
             $this->applyWorkerFilter($q, $meta['workerFields'], $workerVariants);
@@ -313,7 +313,7 @@ class StatsService
 
         $q = $model::query();
         $this->applyRange($q, $meta['dateField'], $from, $to);
-        if ($user && $user->isExecutor()) $this->applyUserScope($q, $cfg, $user);
+        if ($user && $user->isWorker()) $this->applyUserScope($q, $cfg, $user);
 
         $rows = $q->select(
             'post_number',
@@ -547,7 +547,7 @@ class StatsService
      */
     public function workerScopeSql(array $cfg, ?User $user): array
     {
-        if (!$user || !$user->isExecutor()) {
+        if (!$user || !$user->isWorker()) {
             return ['sql' => '', 'bindings' => []];
         }
 
