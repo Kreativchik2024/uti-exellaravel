@@ -970,6 +970,23 @@ html.dark .ui-ms-cell.n1 { color: #60a5fa; } html.dark .ui-ms-cell.n2 { color: #
     .ui-fc-pop { flex-direction: column; right: 0; width: auto; }
     .ui-fc-menu, .ui-fc-detail { width: 100%; max-width: none; }
 }
+/* Лесенка: каждый уровень (блок → подблок → …) — своя колонка, правее и ниже предыдущей (--i — номер ступеньки) */
+.ui-stairs { display: flex; align-items: flex-start; gap: .4rem; }
+.ui-stairs-col { --i: 0; flex: 0 0 auto; width: 14rem; margin-top: calc(var(--i) * 1.75rem); }
+.ui-fc-pop.has-stairs { max-width: calc(100vw - 2rem); overflow-x: auto; pointer-events: auto; padding-bottom: .25rem; }
+.ui-fc-item.is-open { background: var(--ui-surface-2); font-weight: 600; box-shadow: inset 3px 0 0 var(--ui-accent); }
+/* «Ремонт / Замена»: окно лесенки раскрывается влево от боковой колонки */
+.rp-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; width: max-content; min-width: 100%; max-width: calc(100vw - 2rem);
+    padding: .5rem; border-radius: 14px; background: var(--ui-surface); border: 1px solid var(--ui-border);
+    box-shadow: 0 18px 40px -12px rgba(15, 23, 42, .35); overflow-x: auto; }
+.rp-pop .ui-fc-menu { box-shadow: none; background: var(--ui-surface-2); }
+.rp-pop .ui-fc-item.is-open { background: var(--ui-surface); }
+@media (max-width: 640px) {
+    /* на телефоне ступеньки идут вниз с отступом слева */
+    .ui-stairs, .ui-fc-pop.has-stairs { flex-direction: column; align-items: stretch; }
+    .ui-stairs-col { width: auto; margin-top: 0; margin-left: calc(var(--i) * .9rem); }
+    .rp-pop { left: 0; width: auto; }
+}
 .ui-fc-item { display: flex; align-items: center; justify-content: space-between; gap: .6rem; width: 100%; padding: .45rem .6rem; border-radius: 8px; text-align: left; font-size: .875rem; color: var(--ui-text); }
 .ui-fc-item.is-active { background: var(--ui-accent-soft); }
 .ui-fc-item.is-new { border-top: 1px dashed var(--ui-border); margin-top: .2rem; color: var(--ui-accent-text); }

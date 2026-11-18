@@ -41,19 +41,19 @@
                 </select>
             </label>
 
-            <div x-show="action" x-cloak>
+            <div x-show="action" x-cloak class="relative" @click.outside="open = false">
                 <span class="ui-label">Узел</span>
                 <button type="button" @click="open = !open" class="ui-input w-full text-left flex items-center justify-between gap-2">
                     <span class="min-w-0" :style="label ? '' : 'color: var(--ui-faint)'" x-text="label || 'Выберите узел…'"></span>
                     <span x-show="pending" class="ui-badge-warn shrink-0">на проверке</span>
                 </button>
 
-                {{-- Выбор: поиск или дерево блоков, как в кодах неисправностей --}}
-                <div x-show="open" x-cloak class="ui-fc-menu !w-full mt-1.5" style="max-height: 340px" @keydown.escape.stop="open = false">
-                    <input type="text" x-model="q" placeholder="Поиск по блокам и узлам" class="ui-input w-full !py-1.5 text-sm mb-1">
+                {{-- Выбор: поиск или лесенка блоков (блок → подблок → узел), как в кодах неисправностей --}}
+                <div x-show="open" x-cloak class="rp-pop" @keydown.escape.stop="open = false">
+                    <input type="text" x-model="q" placeholder="Поиск по блокам и узлам" class="ui-input w-full !py-1.5 text-sm">
 
                     <template x-if="results() !== null">
-                        <div>
+                        <div class="ui-fc-menu !w-full mt-1.5" style="max-height: 320px">
                             <template x-for="r in results()" :key="r.key">
                                 <button type="button" class="ui-fc-item" @click="pickResult(r)">
                                     <span class="text-left" x-text="r.label"></span>
@@ -64,32 +64,34 @@
                         </div>
                     </template>
 
+                    {{-- Лесенка: колонка на каждый открытый уровень, каждая ниже предыдущей --}}
                     <template x-if="results() === null">
-                        <div>
-                            <div class="ui-fc-trail flex flex-wrap gap-1 items-center">
-                                <button type="button" class="hover:underline" @click="trail = []">Все блоки</button>
-                                <template x-for="(id, n) in trail" :key="id">
-                                    <span>› <button type="button" class="hover:underline" @click="trail = trail.slice(0, n + 1)" x-text="groupById(id)?.name"></button></span>
-                                </template>
-                            </div>
-                            <button type="button" x-show="current()" class="ui-fc-item is-new" @click="pickGroup(current())">
-                                <span>✓ Выбрать «<span x-text="groupById(current())?.name"></span>» целиком</span>
-                            </button>
-                            <template x-for="g in childGroups(current())" :key="'g' + g.id">
-                                <button type="button" class="ui-fc-item" :class="hasChildren(g.id) && 'is-group'" @click="hasChildren(g.id) ? enter(g.id) : pickGroup(g.id)">
-                                    <span class="text-left" x-text="g.name"></span>
-                                    <span x-show="hasChildren(g.id)" class="ui-fc-count">›</span>
-                                </button>
+                        <div class="ui-stairs mt-1.5">
+                            <template x-for="(parent, n) in [null, ...trail]" :key="'col' + n + '-' + parent">
+                                <div class="ui-fc-menu ui-stairs-col" :style="'--i:' + n">
+                                    <div x-show="parent !== null" class="ui-fc-trail" x-text="groupById(parent)?.name"></div>
+                                    <button type="button" x-show="parent !== null" class="ui-fc-item is-new" @click="pickGroup(parent)">
+                                        <span>✓ Весь блок целиком</span>
+                                    </button>
+                                    <template x-for="g in childGroups(parent)" :key="'g' + g.id">
+                                        <button type="button" class="ui-fc-item"
+                                                :class="{ 'is-group': hasChildren(g.id), 'is-open': trail[n] === g.id, 'is-active': node === 'g' + g.id }"
+                                                @click="hasChildren(g.id) ? openAt(n, g.id) : pickGroup(g.id)">
+                                            <span class="text-left" x-text="g.name"></span>
+                                            <span x-show="hasChildren(g.id)" class="ui-fc-count">›</span>
+                                        </button>
+                                    </template>
+                                    <template x-for="i in childItems(parent)" :key="'i' + i.id">
+                                        <button type="button" class="ui-fc-item" :class="node === 'i' + i.id && 'is-active'" @click="pickItem(i)">
+                                            <span class="text-left" x-text="i.name"></span>
+                                            <span x-show="!i.approved" class="ui-badge-warn">на проверке</span>
+                                        </button>
+                                    </template>
+                                    <p x-show="parent === null && !childGroups(null).length && !childItems(null).length" class="px-2 py-1.5 text-xs" style="color: var(--ui-muted)">
+                                        Блоков нет — заполните справочник кодов неисправностей или добавьте свой вариант
+                                    </p>
+                                </div>
                             </template>
-                            <template x-for="i in childItems(current())" :key="'i' + i.id">
-                                <button type="button" class="ui-fc-item" @click="pickItem(i)">
-                                    <span class="text-left" x-text="i.name"></span>
-                                    <span x-show="!i.approved" class="ui-badge-warn">на проверке</span>
-                                </button>
-                            </template>
-                            <p x-show="!childGroups(current()).length && !childItems(current()).length && !current()" class="px-2 py-1.5 text-xs" style="color: var(--ui-muted)">
-                                Блоков нет — заполните справочник кодов неисправностей или добавьте свой вариант
-                            </p>
                         </div>
                     </template>
 
@@ -178,6 +180,8 @@ document.addEventListener('alpine:init', () => {
             return r.slice(0, 40);
         },
         enter(id) { this.trail.push(id); },
+        // Лесенка: в колонке n открыт блок id — колонки правее него заменяются его содержимым
+        openAt(n, id) { this.trail = this.trail.slice(0, n).concat([id]); },
         choose(node, label, pending) { this.node = node; this.label = label; this.pending = pending; this.custom = ''; this.customOpen = false; this.open = false; this.q = ''; },
         pickGroup(id) { this.choose('g' + id, this.pathOf(id).join(' · '), false); },
         pickItem(i) { this.choose('i' + i.id, this.itemLabel(i), !i.approved); },

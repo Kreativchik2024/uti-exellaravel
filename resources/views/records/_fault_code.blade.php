@@ -19,9 +19,25 @@
            class="{{ $baseInput }} @error('fault_code') !border-red-400 !ring-red-500/15 @enderror">
 
     {{-- Выпадающий список кодов + окошко с описанием выделенного --}}
-    <div x-show="open && list().length" x-cloak class="ui-fc-pop">
-        <div class="ui-fc-menu" role="listbox">
-            <div x-show="browsing() && trail.length" class="ui-fc-trail" x-text="trail.join(' › ')"></div>
+    <div x-show="open && list().length" x-cloak class="ui-fc-pop" :class="ancestors().length && 'has-stairs'">
+        {{-- Лесенка: пройденные уровни — колонками, каждая ниже предыдущей; клик — перейти в другой блок этого уровня --}}
+        <template x-for="(col, n) in ancestors()" :key="'col' + n + col.open">
+            <div class="ui-fc-menu ui-stairs-col" :style="'--i:' + n">
+                <template x-for="g in col.groups" :key="g.key">
+                    <button type="button" class="ui-fc-item is-group" :class="g.name === col.open && 'is-open'" @mousedown.prevent="jump(col.depth, g.name)">
+                        <span class="flex items-center justify-between gap-2 w-full min-w-0">
+                            <span class="truncate font-medium" x-text="g.name"></span>
+                            <span class="ui-fc-count"><span x-text="g.count"></span> ›</span>
+                        </span>
+                    </button>
+                </template>
+                <template x-for="c in col.here" :key="'h' + c.code">
+                    <button type="button" class="ui-fc-item" @mousedown.prevent="pick(c)"><span class="ui-fc-code" x-text="c.code"></span></button>
+                </template>
+            </div>
+        </template>
+        <div class="ui-fc-menu ui-stairs-col" role="listbox" :style="'--i:' + ancestors().length">
+            <div x-show="browsing() && trail.length && !ancestors().length" class="ui-fc-trail" x-text="trail.join(' › ')"></div>
             <template x-for="(it, i) in list()" :key="it.key">
                 <button type="button" class="ui-fc-item" :class="{ 'is-active': i === active, 'is-new': it.isNew, 'is-back': it.isBack, 'is-group': it.isGroup }"
                         @mousedown.prevent="pick(it)" @mousemove="active !== i && (active = i)">
@@ -121,12 +137,28 @@ document.addEventListener('alpine:init', () => {
             }
             this.active = 0;
         },
+        // Пройденные уровни для лесенки (без пройденных автоматически): [{depth, open, groups, here}]
+        ancestors() {
+            if (!this.browsing() || this.remote !== null) return [];
+            const cols = [];
+            for (let d = this.autoDepth(); d < this.trail.length; d++) {
+                const l = this.level(this.trail.slice(0, d));
+                cols.push({ depth: d, open: this.trail[d], groups: l.groups, here: l.here });
+            }
+            return cols;
+        },
+        // Клик по блоку в колонке-ступеньке: открыть его вместо прежнего на этом уровне
+        jump(depth, name) {
+            this.trail = this.trail.slice(0, depth).concat([name]);
+            this.settle();
+            this.active = 0;
+        },
         list() {
             if (this.browsing() && this.remote === null) {
                 if (!this.trail.length) this.settle();
                 const l = this.level(this.trail);
-                const back = this.trail.length && (this.trail.length > this.autoDepth()) ? [{ key: 'back', isBack: true }] : [];
-                return [...back, ...l.groups, ...l.here];
+                // «Назад» не нужен: пройденные уровни видны ступеньками слева (Backspace — на уровень выше)
+                return [...l.groups, ...l.here];
             }
             const q = String(this.value).trim().toLowerCase();
             let items = this.remote !== null ? this.remote
