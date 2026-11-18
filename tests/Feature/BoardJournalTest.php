@@ -50,6 +50,54 @@ class BoardJournalTest extends TestCase
         $this->assertStringContainsString('Проверка на ПГП: Сдан', $journal);
     }
 
+    public function test_form_shows_what_is_known_about_board_when_frame_number_entered(): void
+    {
+        $this->make('cross3', ['serial_number' => 'CR3-0005', 'worker1' => 'Прошивалов П.П.']);
+        $earlier = $this->make('pgp', ['board_number' => 'RA-OLD', 'frame_serial' => 'FR-5005', 'cross3_number' => 'CR3-0005',
+            'status' => 'Не сдан', 'defect_reason' => 'Нет связи с модулем']);
+        $exec = $this->worker();
+
+        // В форме ПГП есть блок, который подгружается по номерам
+        $form = $this->asUser($exec)->get('/records/pgp/create')->assertOk()->getContent();
+        $this->assertStringContainsString('data-board-journal', $form);
+        $this->assertStringContainsString(route('records.boardJournal', 'pgp'), $form);
+
+        // Ввели № моторамы — вся история борта: прежняя проверка ПГП (под старым номером) и прошивка Кросс 3
+        $html = $this->asUser($exec)->get('/records/pgp/board-journal?frame_serial=FR-5005')->assertOk()->getContent();
+        $this->assertStringContainsString('Что известно об этом борте', $html);
+        $this->assertStringContainsString("/records/pgp/{$earlier->id}\"", $html);
+        $this->assertStringContainsString('Нет связи с модулем', $html);
+        $this->assertStringContainsString('Кросс 3 · CR3-0005', $html);
+        $this->assertStringContainsString('Прошивалов П.П.', $html);
+
+        // Только номер периферии (моторамы ещё нет) — показывает, кто её шил
+        $html = $this->asUser($exec)->get('/records/pgp/board-journal?cross3_number=CR3-0005')->assertOk()->getContent();
+        $this->assertStringContainsString('Кросс 3 · CR3-0005', $html);
+        $this->assertStringNotContainsString("/records/pgp/{$earlier->id}\"", $html);
+
+        // Неизвестная моторама — «борт новый»; без номеров — пусто
+        $this->assertStringContainsString('ничего не найдено', $this->asUser($exec)->get('/records/pgp/board-journal?frame_serial=FR-0000')->getContent());
+        $this->assertSame('', $this->asUser($exec)->get('/records/pgp/board-journal')->assertOk()->getContent());
+        $this->asUser($exec)->get('/records/cross3/board-journal?frame_serial=FR-5005')->assertNotFound();
+    }
+
+    public function test_comm_module_is_not_tied_to_board(): void
+    {
+        // Модуль связи переходит с номером борта на другой борт — в журнал физического борта не попадает
+        $module = $this->make('comm_module', ['serial_number' => 'MAN-123', 'worker1' => 'Связист С.С.']);
+        $pgp = $this->make('pgp', ['frame_serial' => 'FR-6006', 'manet_number' => 'MAN-123', 'status' => 'Сдан']);
+        $master = $this->worker('master');
+
+        $card = $this->asUser($master)->get("/records/pgp/{$pgp->id}")->assertOk()->getContent();
+        $journal = mb_substr($card, mb_strpos($card, 'Журнал борта'));
+        $this->assertStringNotContainsString("/records/comm_module/{$module->id}\"", $journal);
+        $this->assertStringNotContainsString('Связист С.С.', $journal);
+
+        // Форма на номер модуля не реагирует
+        $this->assertSame('', $this->asUser($master)->get('/records/pgp/board-journal?manet_number=MAN-123')->assertOk()->getContent());
+        $this->assertStringNotContainsString("'manet_number'", $this->asUser($master)->get('/records/pgp/create')->getContent());
+    }
+
     public function test_board_is_recognised_by_frame_even_when_board_number_changed(): void
     {
         // Ушёл в ремонт под одним номером, вернулся на ПГП под другим — та же моторама

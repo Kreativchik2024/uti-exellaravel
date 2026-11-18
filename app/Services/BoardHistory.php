@@ -11,7 +11,7 @@ use Illuminate\Support\Collection;
 
 /**
  * Журнал борта по этапам производства:
- *   1. Прошивка и настройка периферии (Кросс 3, модуль связи, прошивка камеры…)
+ *   1. Прошивка и настройка периферии (Кросс 3, прошивка камеры…; модуль связи — нет, он переходит с номером борта)
  *   2. Сборка (кронштейн с камерой…)
  *   3. ПГП — проверка: борт сдан или ушёл в ремонт
  *   4. Ремонт — исследование, ремонт/замена узла, статусы, комментарии; после ремонта — снова ПГП
@@ -36,6 +36,12 @@ class BoardHistory
     private const ASSEMBLY_SHEETS = ['camera_bracket'];
 
     /**
+     * Номера в ПГП, по которым периферия к борту НЕ привязывается: модуль связи, как и номер борта,
+     * переходит с наклейкой на другой борт, если прежний неисправен — к физическому борту он не относится.
+     */
+    private const NOT_BOARD_LOOKUPS = ['manet_number'];
+
+    /**
      * @return array{board: ?string, keys: array<string,string>, stage: array{label: string, tone: string},
      *               stages: array<string, array{label: string, count: int}>,
      *               events: list<array{at: ?Carbon, stage: string, title: string, text: ?string, tone: string, who: ?string, by: ?string, url: ?string}>,
@@ -46,6 +52,35 @@ class BoardHistory
         $keys = $this->boardKeys($pgp);
         $pgps = $this->boardPgps($pgp, $keys);
 
+        return $this->build($pgp, $keys, $pgps, $pgps);
+    }
+
+    /**
+     * Что известно о борте по номерам из ещё не сохранённой формы ПГП (моторама, фюзеляж, номера периферии).
+     * Номер борта не учитывается: в форме это новая наклейка, по ней нашлись бы чужие борта.
+     * @param array<string, mixed> $numbers поля записи ПГП
+     */
+    public function forNumbers(array $numbers): array
+    {
+        $draft = new PgpRecord();
+        $draft->forceFill(array_intersect_key($numbers, array_flip(['frame_serial', 'fuselage_number', 'cross3_number', 'bracket_serial'])));
+
+        $keys = $this->boardKeys($draft);
+        unset($keys['board_number']);
+        $pgps = $keys ? $this->boardPgps($draft, $keys) : collect();
+
+        // периферия — и по записям борта, и по номерам, введённым в форме
+        return $this->build($draft, $keys, $pgps, $pgps->concat([$draft]));
+    }
+
+    /** Есть ли что показать: хоть одно событие. */
+    public static function isEmpty(array $journal): bool
+    {
+        return ! $journal['events'];
+    }
+
+    private function build(PgpRecord $pgp, array $keys, Collection $pgps, Collection $peripheralSources): array
+    {
         $researches = ResearchRecord::query()
             ->where(function ($q) use ($pgps, $keys) {
                 $q->whereIn('pgp_record_id', $pgps->pluck('id'));
@@ -54,7 +89,7 @@ class BoardHistory
             })
             ->with(['comments.user', 'creator'])->orderBy('id')->get();
 
-        $peripherals = $this->peripherals($pgps);   // [[slug, cfg, record], …]
+        $peripherals = $this->peripherals($peripheralSources);   // [[slug, cfg, record], …]
 
         $events = [];
         foreach ($peripherals as [$slug, $cfg, $rec]) $events[] = $this->peripheralEvent($slug, $cfg, $rec);
@@ -75,7 +110,7 @@ class BoardHistory
         return [
             'board'   => filled($pgp->board_number) ? (string) $pgp->board_number : null,
             'keys'    => $keys,
-            'stage'   => $this->current($pgps, $researches),
+            'stage'   => $pgps->isEmpty() ? ['label' => 'На ПГП ещё не был', 'tone' => 'neutral'] : $this->current($pgps, $researches),
             'stages'  => $stages,
             'events'  => $events,
             'changes' => $this->changes($pgps, $researches, $peripherals),
@@ -131,6 +166,7 @@ class BoardHistory
             if ($depth >= 2) continue;
             foreach ($cfg['fields'] ?? [] as $name => $f) {
                 if (empty($f['lookup'])) continue;
+                if ($rec instanceof PgpRecord && in_array($name, self::NOT_BOARD_LOOKUPS, true)) continue;
                 $value = trim((string) $rec->{$name});
                 $slug = $f['lookup']['sheet'];
                 $target = config("sheets.map.$slug");

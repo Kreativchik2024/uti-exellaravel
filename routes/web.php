@@ -182,6 +182,8 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/records/{sheet}/create',    [RecordController::class, 'create'])->name('records.create');
     Route::post('/records/{sheet}',          [RecordController::class, 'store'])->name('records.store');
     Route::get('/records/{sheet}/lookup',    [RecordController::class, 'lookup'])->name('records.lookup');
+    // Форма ПГП: что известно о борте по введённым номерам (моторама, фюзеляж, периферия)
+    Route::get('/records/{sheet}/board-journal', [RecordController::class, 'boardJournal'])->middleware('throttle:120,1')->name('records.boardJournal');
     Route::get('/records/{sheet}/fault-codes', [RecordController::class, 'faultCodes'])->middleware('throttle:120,1')->name('records.faultCodes');
     Route::get('/records/{sheet}/{id}',      [RecordController::class, 'show'])->name('records.show');
     Route::get('/records/{sheet}/{id}/edit', [RecordController::class, 'edit'])->name('records.edit');

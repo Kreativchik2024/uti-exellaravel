@@ -443,6 +443,11 @@
         </div>
     @endforeach
 
+    {{-- ПГП: что известно об этом борте — по введённым номерам моторамы, фюзеляжа, Кросс 3 и кронштейна (журнал по этапам) --}}
+    @if($sheet === 'pgp')
+        <div class="mt-6" data-board-journal data-url="{{ route('records.boardJournal', $sheet) }}" aria-live="polite"></div>
+    @endif
+
     {{-- Панель кнопок (на мобильных — в столбик, кнопки на всю ширину) --}}
     <div class="form-actions mt-8 pt-6 border-t border-gray-200">
         <a href="{{ route('records.index', $sheet) }}"
@@ -517,6 +522,41 @@ document.addEventListener('DOMContentLoaded', function () {
             timer = setTimeout(doLookup, 400);
         });
     });
+
+    // --- ПГП: «Что известно об этом борте» — при вводе моторамы, фюзеляжа или номеров периферии ---
+    // Модуль связи не учитывается: он переходит с номером борта на другой борт, к самому борту не относится
+    (function () {
+        var box = document.querySelector('[data-board-journal]');
+        if (!box) return;
+        var form = box.closest('form');
+        var names = ['frame_serial', 'fuselage_number', 'cross3_number', 'bracket_serial'];
+        var timer = null, last = null;
+
+        function load() {
+            var params = new URLSearchParams();
+            names.forEach(function (n) {
+                var el = form && form.querySelector('[name="' + n + '"]');
+                var v = el ? String(el.value || '').trim() : '';
+                if (v) params.set(n, v);
+            });
+            var query = params.toString();
+            if (query === last) return;
+            last = query;
+            if (!query) { box.innerHTML = ''; return; }
+            fetch(box.dataset.url + '?' + query, { headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.text() : ''; })
+                .then(function (html) { if (params.toString() === last) box.innerHTML = html; })
+                .catch(function () {});
+        }
+
+        names.forEach(function (n) {
+            var el = form && form.querySelector('[name="' + n + '"]');
+            if (!el) return;
+            el.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(load, 500); });
+            el.addEventListener('change', load);
+        });
+        load();   // при правке записи — сразу по уже введённым номерам
+    })();
 
     // --- МАСКА IP: в поле последнего октета — только цифры ---
     document.querySelectorAll('input[data-ip-suffix]').forEach(function (inp) {

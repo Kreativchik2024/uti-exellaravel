@@ -905,6 +905,35 @@ class RecordController extends Controller
         return back()->with('ok', $kind === 'act' ? 'Акт на замену отмечен как оформленный' : 'Ремонт принят технологом');
     }
 
+    /**
+     * Форма ПГП: «Что известно об этом борте» — журнал по этапам по введённым номерам
+     * (моторама, фюзеляж, Кросс 3, кронштейн). Модуль связи не учитывается — он переходит с номером борта на другой борт.
+     * Отдаёт готовый HTML блока или пусто.
+     */
+    public function boardJournal(Request $r, string $sheet)
+    {
+        abort_unless($sheet === 'pgp', 404);
+        $this->cfg($sheet);   // доступ к вкладке на участке
+
+        $numbers = $r->validate([
+            'frame_serial'    => ['nullable', 'string', 'max:120'],
+            'fuselage_number' => ['nullable', 'string', 'max:120'],
+            'cross3_number'   => ['nullable', 'string', 'max:120'],
+            'bracket_serial'  => ['nullable', 'string', 'max:120'],
+        ]);
+        $numbers = array_filter(array_map(fn ($v) => trim((string) $v), $numbers), fn ($v) => $v !== '');
+        if (! $numbers) return response('');
+
+        $journal = app(\App\Services\BoardHistory::class)->forNumbers($numbers);
+
+        return response()->view('records._board_journal', [
+            'boardHistory' => $journal,
+            'title'        => 'Что известно об этом борте',
+            'sectionId'    => 'board-journal-draft',
+            'draft'        => true,
+        ]);
+    }
+
     /** Комментарий к исследованию. Комментарии копятся — видна вся история по детали. */
     public function comment(Request $r, string $sheet, int $id)
     {
