@@ -89,11 +89,12 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
         $vmr  = \App\Models\FaultCodeGroup::create(['name' => 'ВМР', 'prefix' => 'VMR', 'sort' => 6]);
         $komm = \App\Models\FaultCodeGroup::create(['name' => 'Коммутация', 'prefix' => 'K', 'sort' => 7]);
         $kommChild = \App\Models\FaultCodeGroup::create(['name' => 'Жгут', 'prefix' => 'K.1', 'sort' => 1, 'parent_id' => $komm->id]);
+        \App\Models\FaultCodeGroup::create(['name' => 'Исследования', 'prefix' => 'ИС', 'sort' => 8]);   // есть в справочнике на сервере
         $research = $this->research();
 
         $names = array_column(app(\App\Services\RepairCatalog::class)->pickerData($research)['groups'], 'name');
         $this->assertContains('МИНИ ПК', $names);
-        foreach (['ВМГ', 'ВМР', 'Коммутация', 'Жгут'] as $hidden) $this->assertNotContains($hidden, $names);
+        foreach (['ВМГ', 'ВМР', 'Коммутация', 'Жгут', 'Исследования'] as $hidden) $this->assertNotContains($hidden, $names);
 
         // и выбрать их нельзя
         $repair = $this->worker('repair');

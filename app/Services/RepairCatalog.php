@@ -21,7 +21,7 @@ class RepairCatalog
      * Блоки справочника кодов, которых нет в выборе «Ремонт / Замена» (вместе со всем, что в них вложено).
      * В справочнике кодов неисправностей они остаются. Сравнение без учёта регистра.
      */
-    public const EXCLUDED_BLOCKS = ['ВМГ', 'ВМР', 'КОММУТАЦИЯ'];
+    public const EXCLUDED_BLOCKS = ['ВМГ', 'ВМР', 'КОММУТАЦИЯ', 'ИССЛЕДОВАНИЯ'];
 
     public function __construct(private SectionContext $sections) {}
 
