@@ -138,7 +138,7 @@
 
                         @if($record->fault_code)
                             <div class="mt-2 text-xs" style="color: var(--ui-muted)">
-                                Код неиспр.: <span class="font-mono font-semibold" style="color: var(--ui-text)">{{ $record->fault_code }}</span>
+                                Код неиспр.: <x-fault-code :code="$record->fault_code" class="!px-0 !py-0 !bg-transparent font-semibold" style="color: var(--ui-text)" />
                             </div>
                         @endif
                         @if($record->workers_list)
@@ -210,8 +210,7 @@
                                         <x-status-pill :value="$record->$col ? 'Да' : 'Нет'" />
                                     @elseif($col === 'fault_code')
                                         @if($record->fault_code)
-                                            <span class="ui-tip font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md" style="background: var(--ui-surface-hover); color: var(--ui-text)"
-                                                  @if(!empty($faultDescriptions[$record->fault_code])) data-tip="{{ $faultDescriptions[$record->fault_code] }}" tabindex="0" @endif>{{ $record->fault_code }}</span>
+                                            <x-fault-code :code="$record->fault_code" style="background: var(--ui-surface-hover); color: var(--ui-text)" />
                                         @else
                                             <span class="ui-table__muted">—</span>
                                         @endif

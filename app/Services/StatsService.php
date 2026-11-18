@@ -423,6 +423,7 @@ class StatsService
                 'status'       => $meta['hasStatus'] ? ($row->status ?? null)      : null,
                 'qty'          => $meta['hasQty']    ? ($row->qty ?? null)         : null,
                 'fault_code'   => $meta['hasFault']  ? ($row->fault_code ?? null)  : null,
+                'fault_desc'   => $meta['hasFault']  ? app(FaultCodeDescriptions::class)->describe($row->fault_code ?? null) : null,
                 'worker_field' => implode(',', $matchedFields),
             ];
         }

@@ -362,7 +362,7 @@
                                                                             <td class="p-2 text-gray-700" x-text="rec.post || '—'"></td>
                                                                             <td class="p-2 text-gray-700" x-text="rec.status || '—'"></td>
                                                                             <td class="p-2 text-right text-gray-700" x-text="rec.qty ?? '—'"></td>
-                                                                            <td class="p-2 font-mono text-xs text-gray-700" x-text="rec.fault_code || '—'"></td>
+                                                                            <td class="p-2 font-mono text-xs text-gray-700 ui-tip" :data-tip="rec.fault_desc || null" :tabindex="rec.fault_desc ? 0 : null" x-text="rec.fault_code || '—'"></td>
                                                                             <td class="p-2 text-xs text-gray-400" x-text="rec.worker_field || '—'"></td>
                                                                         </tr>
                                                                     </template>
@@ -535,6 +535,7 @@
                                 <tr>
                                     <th class="p-3 text-left w-12">#</th>
                                     <th class="p-3 text-left">Код неисправности</th>
+                                    <th class="p-3 text-left">Описание</th>
                                     <th class="p-3 text-left">Категория</th>
                                     <th class="p-3 text-right">Кол-во</th>
                                     <th class="p-3 text-left">Первое появление</th>
@@ -542,11 +543,15 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="(row, idx) in zone6Rows" :key="row.code + '|' + row.sheet">
-                                    <tr class="border-t hover:bg-gray-50">
+                                <template x-for="(row, idx) in zone6Rows" :key="row.key">
+                                    <tr class="border-t hover:bg-gray-50" :title="Object.keys(row.variants).length > 1 ? 'Записано по-разному: ' + Object.keys(row.variants).join(' | ') : null">
                                         <td class="p-3 text-gray-400" x-text="idx + 1"></td>
-                                        <td class="p-3 font-mono font-semibold text-gray-900" x-text="row.code"></td>
-                                        <td class="p-3 text-gray-600" x-text="row.sheet_title"></td>
+                                        <td class="p-3 font-mono font-semibold text-gray-900">
+                                            <span x-text="row.code || row.text"></span>
+                                            <span x-show="!row.known" x-cloak class="ml-1 text-xs font-normal text-amber-600">нет в справочнике</span>
+                                        </td>
+                                        <td class="p-3 text-gray-700" x-text="row.description || '—'"></td>
+                                        <td class="p-3 text-gray-600" x-text="Object.values(row.sheets).join(', ')"></td>
                                         <td class="p-3 text-right font-bold text-red-700" x-text="row.count"></td>
                                         <td class="p-3 text-gray-500" x-text="formatDate(row.first_date)"></td>
                                         <td class="p-3 text-gray-500" x-text="formatDate(row.last_date)"></td>

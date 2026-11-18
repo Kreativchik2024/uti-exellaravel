@@ -35,7 +35,11 @@
                     <td><div class="break-words max-w-[22rem]">{{ $workersList ?: '—' }}</div></td>
                     <td>
                         @if(isset($defectIds[$rec->id]))
-                            <span class="font-semibold" style="color: var(--ui-bad)">{{ $rec->fault_code ?: 'брак' }}</span>
+                            @if($rec->fault_code)
+                                <x-fault-code :code="$rec->fault_code" class="font-semibold" style="color: var(--ui-bad)" />
+                            @else
+                                <span class="font-semibold" style="color: var(--ui-bad)">брак</span>
+                            @endif
                         @else
                             <span class="ui-table__muted">—</span>
                         @endif

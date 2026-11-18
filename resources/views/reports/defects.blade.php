@@ -49,7 +49,7 @@
                     <section class="ui-card overflow-hidden">
                         <h3 class="px-4 pt-3 pb-2 text-xs font-semibold uppercase tracking-wide" style="color: var(--ui-muted)">{{ $title }}</h3>
                         @forelse($bars($items) as $i)
-                            <div class="ui-bar-row" title="{{ implode(', ', $i['sheets']) }}">
+                            <div class="ui-bar-row {{ !empty($i['description']) ? 'ui-tip' : '' }}" title="{{ implode(', ', $i['sheets']) }}" @if(!empty($i['description'])) data-tip="{{ $i['description'] }}" @endif>
                                 <span class="ui-bar-row__label">{{ $i['text'] }}</span>
                                 <span class="ui-bar-row__track"><span class="ui-bar-row__fill" style="width: {{ $i['w'] }}%"></span></span>
                                 <span class="ui-bar-row__value">{{ $i['count'] }}</span>

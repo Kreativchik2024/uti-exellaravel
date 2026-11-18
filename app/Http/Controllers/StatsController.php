@@ -644,7 +644,7 @@ class StatsController extends Controller
             if ($category && isset($sheets[$category])) $sheets = [$category => $sheets[$category]];
 
             foreach ($sheets as $slug => $cfg) {
-                if (!isset($cfg['model']) || !isset($cfg['fields']['fault_code'])) continue;
+                if (!isset($cfg['model']) || !isset($cfg['fields']['fault_code'])) continue;   // группировка по сырому коду — ниже, привязка к справочнику в FaultCodeRating
                 $model = $cfg['model'];
                 $table = (new $model)->getTable();
                 $scope = $s->workerScopeSql($cfg, $targetUser);
@@ -670,8 +670,7 @@ class StatsController extends Controller
                     ];
                 }
             }
-            usort($rows, fn($a, $b) => $b['count'] <=> $a['count']);
-            return $rows;
+            return app(\App\Services\FaultCodeRating::class)->rate($rows);
         });
 
         return response()->json($data);

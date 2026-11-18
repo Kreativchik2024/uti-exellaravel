@@ -13,11 +13,12 @@ class DefectAnalysis
     private const WORKERS = ['worker1', 'worker2', 'worker3', 'worker4', 'worker5'];
     private const TOP = 15;
 
-    public function __construct(private SectionContext $sections, private StatsService $stats) {}
+    public function __construct(private SectionContext $sections, private StatsService $stats, private FaultCodeRating $ratings) {}
 
     public function build(Carbon $from, Carbon $to, ?string $only = null): array
     {
-        $reasons = $codes = $parts = $workers = $weeks = [];
+        $reasons = $parts = $workers = $weeks = [];
+        $codeRows = [];   // сырые коды брака «код × вкладка» — потом привязываются к справочнику
         $total = $defects = 0;
         $bySheet = [];
         $names = new \App\Support\WorkerNames();   // разные написания одного ФИО — один исполнитель
@@ -64,7 +65,10 @@ class DefectAnalysis
                     $this->bump($reasons, (string) $row->{$f}, $cfg['title']);
                 }
                 if (isset($fields['fault_code'])) {
-                    $this->bump($codes, (string) $row->fault_code, $cfg['title']);
+                    $raw = trim((string) $row->fault_code);
+                    $k = $slug . '|' . $raw;
+                    $codeRows[$k] ??= ['code' => $raw, 'sheet' => $slug, 'sheet_title' => $cfg['title'], 'count' => 0];
+                    $codeRows[$k]['count']++;
                 }
                 foreach ($partFields as $f) {
                     $v = (string) $row->{$f};
@@ -85,7 +89,7 @@ class DefectAnalysis
             'total'   => $total,
             'defect'  => $defects,
             'reasons' => $this->top($reasons),
-            'codes'   => $this->top($codes),
+            'codes'   => $this->codesRating($codeRows),
             'parts'   => $this->top($parts),
             'workers' => $workers,
             'weeks'   => $weeks,
@@ -126,6 +130,19 @@ class DefectAnalysis
         $bucket[$key] ??= ['text' => $value, 'count' => 0, 'sheets' => []];
         $bucket[$key]['count']++;
         $bucket[$key]['sheets'][$sheet] = true;
+    }
+
+    /** Коды брака — по справочнику: похожие написания и неизвестные тексты группируются, см. FaultCodeRating. */
+    private function codesRating(array $codeRows): array
+    {
+        $rated = array_slice($this->ratings->rate(array_values($codeRows)), 0, self::TOP);
+
+        return array_map(fn ($r) => [
+            'text'        => $r['text'],
+            'description' => $r['description'],
+            'count'       => $r['count'],
+            'sheets'      => array_values($r['sheets']),
+        ], $rated);
     }
 
     private function top(array $bucket): array

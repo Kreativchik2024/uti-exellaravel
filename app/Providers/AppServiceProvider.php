@@ -24,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->scoped(EmployeeDirectory::class);
         $this->app->scoped(SectionContext::class);
+        $this->app->scoped(\App\Services\FaultCodeDescriptions::class);
     }
 
     public function boot(): void
