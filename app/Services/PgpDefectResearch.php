@@ -74,14 +74,16 @@ class PgpDefectResearch
     }
 
     /**
-     * Где нужен акт: в исследовании была замена, технолог (ОТК) ещё не отметил «Акт оформлен».
-     * Любое исследование — заведённое по браку ПГП и внесённое вручную.
+     * Ждут технолога (ОТК): замена — нужен акт; ремонт, отправленный в конвейер, — нужна приёмка.
+     * Любое исследование — заведённое по браку ПГП и внесённое вручную (см. ResearchRecord::techCheckKind).
      */
     public function actsNeeded(): ?Builder
     {
         if (! isset($this->sections->sheets()['research'])) return null;
 
-        return ResearchRecord::query()->where('repair_action', 'replacement')->whereNull('act_done_at');
+        return ResearchRecord::query()->whereNull('act_done_at')
+            ->where(fn ($q) => $q->where('repair_action', 'replacement')
+                ->orWhere(fn ($w) => $w->where('repair_action', 'repair')->where('repair_status', 'conveyor')));
     }
 
     public function actsNeededCount(): int

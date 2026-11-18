@@ -127,15 +127,21 @@
         </form>
     @endif
 
-    {{-- Акт на замену: нужен при любой замене --}}
-    @if($record->repair_action === 'replacement')
+    {{-- Технолог (ОТК): замена — акт; ремонт, отправленный в конвейер, — приёмка --}}
+    @if($techKind = $record->techCheckKind())
+        @php
+            $isAct = $techKind === 'act';
+            $t = $isAct
+                ? ['title' => 'Акт на замену', 'done' => 'Оформлен', 'todo' => 'Нужен акт', 'button' => 'Акт оформлен', 'who' => 'Оформляет технолог (ОТК)']
+                : ['title' => 'Приёмка после ремонта', 'done' => 'Принято', 'todo' => 'Ждёт технолога', 'button' => 'Принято технологом', 'who' => 'Принимает технолог (ОТК)'];
+        @endphp
         <div class="pt-3 space-y-2" style="border-top: 1px solid var(--ui-border)">
             <div class="flex items-center justify-between gap-2">
-                <span class="text-sm font-semibold" style="color: var(--ui-text)">Акт на замену</span>
+                <span class="text-sm font-semibold" style="color: var(--ui-text)">{{ $t['title'] }}</span>
                 @if($record->act_done_at)
-                    <x-status-pill value="Оформлен" tone="good" />
+                    <x-status-pill :value="$t['done']" tone="good" />
                 @else
-                    <x-status-pill value="Нужен акт" tone="bad" />
+                    <x-status-pill :value="$t['todo']" tone="bad" />
                 @endif
             </div>
             @if($record->act_done_at)
@@ -143,12 +149,16 @@
             @elseif($canAct)
                 <form method="POST" action="{{ route('records.researchAct', ['research', $record->id]) }}">
                     @csrf @method('PATCH')
-                    <button type="submit" class="ui-btn w-full">Акт оформлен</button>
+                    <button type="submit" class="ui-btn w-full">{{ $t['button'] }}</button>
                 </form>
             @else
-                <p class="text-xs" style="color: var(--ui-muted)">Оформляет технолог (ОТК)</p>
+                <p class="text-xs" style="color: var(--ui-muted)">{{ $t['who'] }}</p>
             @endif
         </div>
+    @elseif($record->repair_action === 'repair')
+        <p class="pt-3 text-xs" style="border-top: 1px solid var(--ui-border); color: var(--ui-muted)">
+            После статуса «Отправлен в конвейер» борт уйдёт технологу (ОТК) на приёмку
+        </p>
     @endif
 </section>
 

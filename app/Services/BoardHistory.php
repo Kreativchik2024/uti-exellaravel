@@ -5,77 +5,230 @@ namespace App\Services;
 use App\Models\AuditLog;
 use App\Models\PgpRecord;
 use App\Models\ResearchRecord;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
- * История борта по этапам: проверки на ПГП → исследование по браку → смены статуса (в работе, в разбор,
- * в конвейер) → комментарии → пометки ОТК. Борт — все записи ПГП с тем же номером борта.
- * Смены статуса берутся из журнала действий (там есть время и кто менял).
+ * Журнал борта по этапам производства:
+ *   1. Прошивка и настройка периферии (Кросс 3, модуль связи, прошивка камеры…)
+ *   2. Сборка (кронштейн с камерой…)
+ *   3. ПГП — проверка: борт сдан или ушёл в ремонт
+ *   4. Ремонт — исследование, ремонт/замена узла, статусы, комментарии; после ремонта — снова ПГП
+ *   5. ОТК — акт на замену, приёмка после ремонта, пометки технолога
+ *
+ * Борт — все записи ПГП с тем же № моторамы или № фюзеляжа (номер борта при ремонте не переходит дальше,
+ * поэтому он — только запасной вариант, см. boardKeys). Периферия подтягивается
+ * по номерам из записей ПГП (поля со ссылкой 'lookup' в config/sheets.php) и дальше по цепочке
+ * (кронштейн → прошивка камеры). У каждого события — кто делал и кто внёс; изменения полей — из журнала действий.
  */
 class BoardHistory
 {
+    public const STAGES = [
+        'setup'    => '1. Прошивка и настройка',
+        'assembly' => '2. Сборка',
+        'pgp'      => '3. ПГП',
+        'repair'   => '4. Ремонт',
+        'otk'      => '5. ОТК',
+    ];
+
+    /** Вкладки, которые относятся к сборке; остальная периферия — прошивка и настройка. */
+    private const ASSEMBLY_SHEETS = ['camera_bracket'];
+
     /**
-     * @return array{board: ?string, stage: array{label: string, tone: string},
-     *               events: list<array{at: ?Carbon, title: string, text: ?string, tone: string, who: ?string, url: ?string}>}
+     * @return array{board: ?string, keys: array<string,string>, stage: array{label: string, tone: string},
+     *               stages: array<string, array{label: string, count: int}>,
+     *               events: list<array{at: ?Carbon, stage: string, title: string, text: ?string, tone: string, who: ?string, by: ?string, url: ?string}>,
+     *               changes: list<array{at: ?Carbon, who: ?string, record: string, action: string, url: ?string, fields: list<array{label: string, old: ?string, new: ?string}>}>}
      */
     public function for(PgpRecord $pgp): array
     {
-        $board = trim((string) $pgp->board_number);
-        $pgps = $board !== ''
-            ? PgpRecord::query()->where('board_number', $board)->orderBy('created_at')->orderBy('id')->get()
-            : collect([$pgp]);
+        $keys = $this->boardKeys($pgp);
+        $pgps = $this->boardPgps($pgp, $keys);
 
-        $researches = ResearchRecord::query()->whereIn('pgp_record_id', $pgps->pluck('id'))
-            ->with('comments.user')->orderBy('id')->get();
-        $researchIds = $researches->pluck('id')->all();
+        $researches = ResearchRecord::query()
+            ->where(function ($q) use ($pgps, $keys) {
+                $q->whereIn('pgp_record_id', $pgps->pluck('id'));
+                if (isset($keys['frame_serial']))    $q->orWhere('frame_serial', $keys['frame_serial']);
+                if (isset($keys['fuselage_number'])) $q->orWhere('fuselage_no', $keys['fuselage_number']);
+            })
+            ->with(['comments.user', 'creator'])->orderBy('id')->get();
 
-        $statusLogs = $researchIds
-            ? AuditLog::query()->where('area', 'research')->whereIn('action', ['status', 'repair', 'act'])->where('subject_type', 'record')
-                ->whereIn('subject_id', $researchIds)->with('user')->orderBy('id')->get()
-            : collect();
-        $techLogs = AuditLog::query()->where('area', 'pgp')->where('action', 'tech')->where('subject_type', 'record')
-            ->whereIn('subject_id', $pgps->pluck('id'))->with('user')->orderBy('id')->get();
+        $peripherals = $this->peripherals($pgps);   // [[slug, cfg, record], …]
 
         $events = [];
+        foreach ($peripherals as [$slug, $cfg, $rec]) $events[] = $this->peripheralEvent($slug, $cfg, $rec);
+        foreach ($pgps as $p) $events[] = $this->pgpEvent($p);
+        foreach ($researches as $r) array_push($events, ...$this->researchEvents($r));
+        array_push($events, ...$this->logEvents($pgps, $researches));
 
-        foreach ($pgps as $p) {
-            $passed = $p->status === 'Сдан';
-            $events[] = [
-                'at'    => $p->created_at,
-                'title' => 'Проверка на ПГП: ' . ($p->status ?: 'без статуса') . ($p->record_date ? ' (' . $p->record_date->format('d.m.Y') . ')' : ''),
-                'text'  => $passed ? null : (trim((string) $p->defect_reason) ?: null),
-                'tone'  => $passed ? 'good' : 'bad',
-                'who'   => $p->worker1,
-                'url'   => route('records.show', ['pgp', $p->id]),
-            ];
+        // По времени; в одну секунду — по этапам (ПГП раньше заведения исследования и т.д.)
+        $order = array_flip(array_keys(self::STAGES));
+        usort($events, fn ($a, $b) => [$a['at']?->getTimestamp() ?? 0, $order[$a['stage']], $a['rank'] ?? 0]
+            <=> [$b['at']?->getTimestamp() ?? 0, $order[$b['stage']], $b['rank'] ?? 0]);
+
+        $stages = [];
+        foreach (self::STAGES as $k => $label) {
+            $stages[$k] = ['label' => $label, 'count' => count(array_filter($events, fn ($e) => $e['stage'] === $k))];
         }
 
-        foreach ($researches as $r) {
-            $details = array_filter([
-                $r->category ? 'Категория: ' . $r->category : null,
-            ]);
-            $events[] = [
-                'at'    => $r->created_at,
-                'title' => "Исследование №{$r->id} заведено",
-                'text'  => $details ? implode(' · ', $details) : null,
-                'tone'  => 'bad',
-                'who'   => null,
-                'url'   => route('records.show', ['research', $r->id]),
-            ];
-            foreach ($r->comments as $c) {
-                $events[] = [
-                    'at'    => $c->created_at,
-                    'title' => "Комментарий к исследованию №{$r->id}",
-                    'text'  => $c->body,
-                    'tone'  => 'neutral',
-                    'who'   => $c->user?->name,
-                    'url'   => route('records.show', ['research', $r->id]) . '#comments',
-                ];
+        return [
+            'board'   => filled($pgp->board_number) ? (string) $pgp->board_number : null,
+            'keys'    => $keys,
+            'stage'   => $this->current($pgps, $researches),
+            'stages'  => $stages,
+            'events'  => $events,
+            'changes' => $this->changes($pgps, $researches, $peripherals),
+        ];
+    }
+
+    // ================================================================ кто этот борт
+
+    /**
+     * Номера, по которым узнаётся физический борт: № моторамы и № фюзеляжа (только «настоящие» — есть цифра, от 4 знаков).
+     * Номер борта сюда не входит: при уходе в ремонт он дальше не переходит (наклейка уходит на другой борт),
+     * поэтому по нему склеились бы разные борта. Он берётся, только если ни моторамы, ни фюзеляжа в записи нет.
+     */
+    private function boardKeys(PgpRecord $pgp): array
+    {
+        $keys = [];
+        foreach (['frame_serial', 'fuselage_number'] as $f) {
+            $v = trim((string) $pgp->{$f});
+            if (mb_strlen($v) >= 4 && preg_match('/\d/u', $v)) $keys[$f] = $v;
+        }
+        if (! $keys && filled($b = trim((string) $pgp->board_number))) $keys['board_number'] = $b;
+
+        return $keys;
+    }
+
+    private function boardPgps(PgpRecord $pgp, array $keys): Collection
+    {
+        if (! $keys) return collect([$pgp]);
+
+        return PgpRecord::query()->with('creator')
+            ->where(function ($q) use ($keys) {
+                foreach ($keys as $f => $v) $q->orWhere($f, $v);
+            })
+            ->orderBy('created_at')->orderBy('id')->get();
+    }
+
+    // ================================================================ 1–2. периферия по номерам
+
+    /**
+     * Записи периферии по номерам из записей ПГП и дальше по цепочке (до 2 шагов): кронштейн → прошивка камеры.
+     * @return list<array{0: string, 1: array, 2: Model}>
+     */
+    private function peripherals(Collection $pgps): array
+    {
+        $found = [];
+        $seen = [];
+        $queue = [];
+        $pgpCfg = config('sheets.map.pgp');
+        foreach ($pgps as $p) $queue[] = [$pgpCfg, $p, 0];
+
+        while ($queue) {
+            [$cfg, $rec, $depth] = array_shift($queue);
+            if ($depth >= 2) continue;
+            foreach ($cfg['fields'] ?? [] as $name => $f) {
+                if (empty($f['lookup'])) continue;
+                $value = trim((string) $rec->{$name});
+                $slug = $f['lookup']['sheet'];
+                $target = config("sheets.map.$slug");
+                if ($value === '' || ! $target || empty($target['model'])) continue;
+
+                foreach ($target['model']::query()->with('creator')->where($f['lookup']['match_by'], $value)->get() as $t) {
+                    if (isset($seen[$slug][$t->id])) continue;
+                    $seen[$slug][$t->id] = true;
+                    $found[] = [$slug, $target, $t];
+                    $queue[] = [$target, $t, $depth + 1];
+                }
             }
         }
 
-        foreach ($statusLogs as $log) {
+        return $found;
+    }
+
+    private function peripheralEvent(string $slug, array $cfg, Model $rec): array
+    {
+        $serial = $rec->serial_number ?? $rec->camera_serial ?? null;
+        $ok = $this->isGood($cfg, $rec);
+        $details = array_filter([
+            filled($rec->assembled_by ?? null) ? 'Собрал: ' . $rec->assembled_by : null,
+            $ok ? null : $this->badText($cfg, $rec),
+            filled($rec->fault_code ?? null) ? 'Код неисправности: ' . $rec->fault_code : null,
+        ]);
+
+        return [
+            'at'    => $rec->created_at,
+            'stage' => in_array($slug, self::ASSEMBLY_SHEETS, true) ? 'assembly' : 'setup',
+            'title' => ($cfg['title'] ?? $slug) . ($serial ? ' · ' . $serial : '') . ($rec->record_date ? ' (' . Carbon::parse($rec->record_date)->format('d.m.Y') . ')' : ''),
+            'text'  => $details ? implode(' · ', $details) : null,
+            'tone'  => $ok ? 'good' : 'bad',
+            'who'   => $this->workers($rec),
+            'by'    => $rec->creator?->name,
+            'url'   => route('records.show', [$slug, $rec->id]),
+        ];
+    }
+
+    // ================================================================ 3. ПГП
+
+    private function pgpEvent(PgpRecord $p): array
+    {
+        $passed = $p->status === 'Сдан';
+        $text = array_filter([
+            $passed ? null : (trim((string) $p->defect_reason) ?: null),
+            filled($p->fault_code) ? 'Код неисправности: ' . $p->fault_code : null,
+            filled($p->technologist) ? 'Технолог: ' . $p->technologist : null,
+        ]);
+
+        return [
+            'at'    => $p->created_at,
+            'stage' => 'pgp',
+            'title' => 'Проверка на ПГП: ' . ($p->status ?: 'без статуса') . ($p->record_date ? ' (' . $p->record_date->format('d.m.Y') . ')' : ''),
+            'text'  => $text ? implode(' · ', $text) : null,
+            'tone'  => $passed ? 'good' : 'bad',
+            'who'   => $this->workers($p),
+            'by'    => $p->creator?->name,
+            'url'   => route('records.show', ['pgp', $p->id]),
+        ];
+    }
+
+    // ================================================================ 4. ремонт
+
+    private function researchEvents(ResearchRecord $r): array
+    {
+        $url = route('records.show', ['research', $r->id]);
+        $events = [[
+            'at'    => $r->created_at,
+            'stage' => 'repair',
+            'rank'  => 0,
+            'title' => "Исследование №{$r->id} заведено",
+            'text'  => trim(implode(' · ', array_filter([$r->category ? 'Категория: ' . $r->category : null, $r->reported_defect]))) ?: null,
+            'tone'  => 'bad',
+            'who'   => null,
+            'by'    => $r->creator?->name,
+            'url'   => $url,
+        ]];
+        foreach ($r->comments as $c) {
+            $events[] = ['at' => $c->created_at, 'stage' => 'repair', 'rank' => 2, 'title' => "Комментарий к исследованию №{$r->id}",
+                'text' => $c->body, 'tone' => 'neutral', 'who' => $c->user?->name, 'by' => null, 'url' => $url . '#comments'];
+        }
+
+        return $events;
+    }
+
+    /** Статусы, ремонт/замена, акт и приёмка, пометки ОТК — из журнала действий (там время и кто). */
+    private function logEvents(Collection $pgps, Collection $researches): array
+    {
+        $events = [];
+        $researchIds = $researches->pluck('id')->all();
+
+        $logs = $researchIds
+            ? AuditLog::query()->where('area', 'research')->whereIn('action', ['status', 'repair', 'act'])->where('subject_type', 'record')
+                ->whereIn('subject_id', $researchIds)->with('user')->orderBy('id')->get()
+            : collect();
+
+        foreach ($logs as $log) {
             $who = $log->user?->name ?? $log->user_name;
             $url = route('records.show', ['research', $log->subject_id]);
             // «Исследование #12: Замена — МОТОРАМА · Кросс 3» / «… акт на замену оформлен (…)»
@@ -83,48 +236,79 @@ class BoardHistory
 
             if ($log->action === 'repair') {
                 $isReplacement = str_starts_with($after, 'Замена');
-                $events[] = ['at' => $log->created_at, 'title' => "Исследование №{$log->subject_id}: " . ($isReplacement ? 'замена' : 'ремонт'),
-                    'text' => $after, 'tone' => $isReplacement ? 'warn' : 'neutral', 'who' => $who, 'url' => $url];
-                continue;
+                $events[] = ['at' => $log->created_at, 'stage' => 'repair', 'rank' => 1,
+                    'title' => "Исследование №{$log->subject_id}: " . ($isReplacement ? 'замена' : 'ремонт'),
+                    'text' => $after, 'tone' => $isReplacement ? 'warn' : 'neutral', 'who' => $who, 'by' => null, 'url' => $url];
+            } elseif ($log->action === 'act') {
+                $accepted = str_contains($after, 'ремонт принят');
+                $events[] = ['at' => $log->created_at, 'stage' => 'otk', 'rank' => 0,
+                    'title' => "Исследование №{$log->subject_id}: " . ($accepted ? 'ремонт принят технологом' : 'акт на замену оформлен'),
+                    'text' => null, 'tone' => 'good', 'who' => $who, 'by' => null, 'url' => $url];
+            } else {
+                // «Исследование #12: Не обработан → В работе» — новый этап после стрелки
+                $to = trim((string) (preg_split('/→/u', (string) $log->summary)[1] ?? ''));
+                $events[] = ['at' => $log->created_at, 'stage' => 'repair', 'rank' => 1,
+                    'title' => "Исследование №{$log->subject_id}: " . ($to ?: 'статус изменён'),
+                    'text' => null, 'tone' => $this->toneOfLabel($to), 'who' => $who, 'by' => null, 'url' => $url];
             }
-            if ($log->action === 'act') {
-                $events[] = ['at' => $log->created_at, 'title' => "Исследование №{$log->subject_id}: акт на замену оформлен",
-                    'text' => null, 'tone' => 'good', 'who' => $who, 'url' => $url];
-                continue;
-            }
-
-            // «Исследование #12: Не обработан → В работе» — новый этап после стрелки
-            $to = trim((string) (preg_split('/→/u', (string) $log->summary)[1] ?? ''));
-            $events[] = [
-                'at'    => $log->created_at,
-                'title' => "Исследование №{$log->subject_id}: " . ($to ?: 'статус изменён'),
-                'text'  => null,
-                'tone'  => $this->toneOfLabel($to),
-                'who'   => $who,
-                'url'   => $url,
-            ];
         }
 
+        $techLogs = AuditLog::query()->where('area', 'pgp')->where('action', 'tech')->where('subject_type', 'record')
+            ->whereIn('subject_id', $pgps->pluck('id'))->with('user')->orderBy('id')->get();
         foreach ($techLogs as $log) {
-            $events[] = [
-                'at'    => $log->created_at,
-                'title' => 'Пометка ОТК',
-                'text'  => trim((string) preg_replace('/^.*?:\s*/u', '', (string) $log->summary)) ?: null,
-                'tone'  => 'neutral',
-                'who'   => $log->user?->name ?? $log->user_name,
-                'url'   => route('records.show', ['pgp', $log->subject_id]),
-            ];
+            $events[] = ['at' => $log->created_at, 'stage' => 'otk', 'rank' => 1, 'title' => 'Пометка ОТК',
+                'text' => trim((string) preg_replace('/^.*?:\s*/u', '', (string) $log->summary)) ?: null,
+                'tone' => 'neutral', 'who' => $log->user?->name ?? $log->user_name, 'by' => null,
+                'url' => route('records.show', ['pgp', $log->subject_id])];
         }
 
-        // По времени; в одну и ту же секунду — проверка ПГП, затем заведение исследования, затем остальное
-        $rank = fn ($e) => str_starts_with($e['title'], 'Проверка на ПГП') ? 0 : (str_ends_with($e['title'], 'заведено') ? 1 : 2);
-        usort($events, fn ($a, $b) => [$a['at']?->getTimestamp() ?? 0, $rank($a)] <=> [$b['at']?->getTimestamp() ?? 0, $rank($b)]);
-
-        return ['board' => $board !== '' ? $board : null, 'stage' => $this->stage($pgps, $researches), 'events' => $events];
+        return $events;
     }
 
+    // ================================================================ журнал изменений
+
+    /** Кто, когда и что изменил во всех записях борта (ПГП, исследования, периферия) — «было → стало». */
+    private function changes(Collection $pgps, Collection $researches, array $peripherals): array
+    {
+        $bySlug = ['pgp' => $pgps->pluck('id')->all(), 'research' => $researches->pluck('id')->all()];
+        foreach ($peripherals as [$slug, , $rec]) $bySlug[$slug][] = $rec->id;
+        $bySlug = array_filter($bySlug);
+        if (! $bySlug) return [];
+
+        $logs = AuditLog::query()->where('area', 'records')
+            ->where(function ($q) use ($bySlug) {
+                foreach ($bySlug as $slug => $ids) $q->orWhere(fn ($w) => $w->where('subject_type', $slug)->whereIn('subject_id', $ids));
+            })
+            ->with('user')->orderByDesc('id')->limit(200)->get();
+
+        $labels = \App\Http\Controllers\AuditController::fieldLabels();
+        $actions = ['created' => 'создана', 'updated' => 'изменена', 'deleted' => 'удалена'];
+        $fmt = fn ($v) => $v === null || $v === '' ? null : (is_bool($v) ? ($v ? 'Да' : 'Нет') : (string) $v);
+
+        return $logs->map(function ($log) use ($labels, $actions, $fmt) {
+            $cfg = config("sheets.map.{$log->subject_type}", []);
+            $fields = [];
+            if ($log->action === 'updated') {
+                foreach ((array) $log->changes as $field => [$old, $new]) {
+                    $fields[] = ['label' => $cfg['fields'][$field]['label'] ?? $labels[$field] ?? $field, 'old' => $fmt($old), 'new' => $fmt($new)];
+                }
+            }
+
+            return [
+                'at'     => $log->created_at,
+                'who'    => $log->user?->name ?? $log->user_name,
+                'record' => ($cfg['title'] ?? $log->subject_type) . ' №' . $log->subject_id,
+                'action' => $actions[$log->action] ?? $log->action,
+                'url'    => $log->action === 'deleted' ? null : route('records.show', [$log->subject_type, $log->subject_id]),
+                'fields' => $fields,
+            ];
+        })->all();
+    }
+
+    // ================================================================ вспомогательное
+
     /** Где борт сейчас: по последней проверке на ПГП и исследованию по ней. */
-    private function stage(Collection $pgps, Collection $researches): array
+    private function current(Collection $pgps, Collection $researches): array
     {
         $last = $pgps->last();
         if (! $last) return ['label' => 'Нет данных', 'tone' => 'neutral'];
@@ -136,6 +320,41 @@ class BoardHistory
         $s = ResearchRecord::STATUSES[$research->repair_status ?: 'new'] ?? ResearchRecord::STATUSES['new'];
 
         return ['label' => "Исследование №{$research->id}: {$s['label']}", 'tone' => $s['tone']];
+    }
+
+    private function workers(Model $rec): ?string
+    {
+        $names = array_filter(array_map(fn ($f) => trim((string) ($rec->{$f} ?? '')), ['worker1', 'worker2', 'worker3', 'worker4', 'worker5']));
+
+        return $names ? implode(', ', array_unique($names)) : null;
+    }
+
+    private function isGood(array $cfg, Model $rec): bool
+    {
+        $fields = $cfg['health_fields'] ?? [];
+        if ($fields) {
+            $good = $cfg['health_good_values'] ?? ['Работает'];
+            foreach ($fields as $f) {
+                $v = $rec->{$f} ?? null;
+                if ($v !== null && $v !== '' && ! in_array($v, $good, true)) return false;
+            }
+
+            return true;
+        }
+
+        return blank($rec->fault_code ?? null);
+    }
+
+    private function badText(array $cfg, Model $rec): ?string
+    {
+        $good = $cfg['health_good_values'] ?? ['Работает'];
+        $bad = [];
+        foreach ($cfg['health_fields'] ?? [] as $f) {
+            $v = $rec->{$f} ?? null;
+            if ($v !== null && $v !== '' && ! in_array($v, $good, true)) $bad[] = ($cfg['fields'][$f]['label'] ?? $f) . ': ' . $v;
+        }
+
+        return $bad ? implode(', ', $bad) : null;
     }
 
     private function toneOfLabel(string $label): string

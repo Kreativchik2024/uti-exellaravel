@@ -879,24 +879,30 @@ class RecordController extends Controller
         $msg = "{$actions[$data['repair_action']]}: {$picked['label']}";
         if ($picked['pending']) $msg .= ' — свой вариант отправлен на проверку администратору';
         if ($record->needsAct()) $msg .= '. Технологу (ОТК) нужно оформить акт';
+        elseif ($record->repair_action === 'repair') $msg .= '. После «Отправлен в конвейер» борт уйдёт технологу на приёмку';
 
         return back()->with('ok', $msg);
     }
 
-    /** Технолог (ОТК), мастер или админ отмечает: акт на замену оформлен — ПГП уходит из списка «нужен акт». */
+    /**
+     * Технолог (ОТК), мастер или админ отмечает проверку: при замене — «Акт оформлен»,
+     * при ремонте, отправленном в конвейер, — «Принято технологом». Исследование уходит из списка технолога.
+     */
     public function researchAct(Request $r, string $sheet, int $id)
     {
         abort_unless($sheet === 'research', 404);
         $record = $this->cfg($sheet)['model']::findOrFail($id);
-        abort_unless($record->repair_action === 'replacement', 422, 'Акт нужен только при замене');
+        $kind = $record->techCheckKind();
+        abort_unless($kind !== null, 422, 'Технологу отмечать нечего: нет замены или ремонт ещё не отправлен в конвейер');
 
+        $what = $kind === 'act' ? 'акт на замену оформлен' : 'ремонт принят технологом';
         if (! $record->act_done_at) {
             $record->forceFill(['act_done_at' => now(), 'act_done_by' => auth()->id()])->save();
-            \App\Models\AuditLog::write('research', 'act', "Исследование #{$record->id}: акт на замену оформлен ({$record->repair_item})",
+            \App\Models\AuditLog::write('research', 'act', "Исследование #{$record->id}: {$what} ({$record->repair_item})",
                 ['subject_type' => 'record', 'subject_id' => $record->id, 'section_id' => null]);
         }
 
-        return back()->with('ok', 'Акт на замену отмечен как оформленный');
+        return back()->with('ok', $kind === 'act' ? 'Акт на замену отмечен как оформленный' : 'Ремонт принят технологом');
     }
 
     /** Комментарий к исследованию. Комментарии копятся — видна вся история по детали. */

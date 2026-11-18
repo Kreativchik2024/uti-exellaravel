@@ -29,6 +29,25 @@ class ResearchRecord extends Model
         return $this->repair_action === 'replacement' && ! $this->act_done_at;
     }
 
+    /**
+     * Ждёт технолога (ОТК): замена — нужен акт; ремонт, отправленный в конвейер, — нужна приёмка.
+     * Отметка технолога одна (act_done_at): «Акт оформлен» или «Принято технологом».
+     * Исследования без указанного ремонта/замены (старые) сюда не попадают.
+     */
+    public function needsTechnologist(): bool
+    {
+        return $this->techCheckKind() !== null && ! $this->act_done_at;
+    }
+
+    /** 'act' — замена (акт), 'accept' — ремонт отправлен в конвейер (приёмка), null — технологу не нужно. */
+    public function techCheckKind(): ?string
+    {
+        if ($this->repair_action === 'replacement') return 'act';
+        if ($this->repair_action === 'repair' && $this->repair_status === 'conveyor') return 'accept';
+
+        return null;
+    }
+
     public function repairItemModel()
     {
         return $this->belongsTo(RepairItem::class, 'repair_item_id');

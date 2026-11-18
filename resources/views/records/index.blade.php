@@ -92,7 +92,7 @@
 
         @if(($techOpen ?? false) || ($repairOpen ?? false) || ($actNeeded ?? false))
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm rounded-lg px-3 py-2" style="background: var(--ui-surface-2); color: var(--ui-text-2)">
-                <span>{{ ($actNeeded ?? false) ? 'Была замена — нужен акт. Откройте исследование и отметьте «Акт оформлен»' : (($repairOpen ?? false) ? 'Показан брак ПГП, ещё не отремонтированный' : 'Показаны необработанные рекламации ПГП') }}</span>
+                <span>{{ ($actNeeded ?? false) ? 'Ждут технолога: замена — нужен акт, ремонт в конвейере — приёмка. Откройте исследование и отметьте «Акт оформлен» или «Принято технологом»' : (($repairOpen ?? false) ? 'Показан брак ПГП, ещё не отремонтированный' : 'Показаны необработанные рекламации ПГП') }}</span>
                 <a href="{{ route('records.index', $sheet) }}" class="font-semibold underline" style="color: var(--ui-accent-text)">Показать все</a>
             </div>
         @endif

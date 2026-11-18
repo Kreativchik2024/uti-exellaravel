@@ -336,6 +336,10 @@
                             </datalist>
 
                         @elseif($hasLookup)
+                            {{-- ПГП: кто прошил / проверил / собрал по номеру — не подсказкой у поля, а в журнале борта на карточке.
+                                 Снимок (кто, когда, исправно ли) по-прежнему сохраняется при записи — RecordController::applyLookupSnapshots.
+                                 Остальные вкладки (журнала борта там нет) — подсказка у поля, как раньше. --}}
+                            @if($sheet !== 'pgp')
                             <div class="lookup-result mb-1.5">
                                 @if($lookupData)
                                     @php
@@ -359,6 +363,7 @@
                                     @endforeach
                                 @endif
                             </div>
+                            @endif
 
                             <input type="text" name="{{ $name }}"
                                    value="{{ $value }}"
