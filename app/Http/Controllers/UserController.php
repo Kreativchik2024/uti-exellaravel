@@ -15,7 +15,7 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $users = User::query()
-            ->with('sections:id,name')
+            ->with(['sections:id,name', 'employee:id,user_id,short_name'])
             ->when($request->filled('section'), fn($q) => $q->whereHas('sections', fn($s) => $s->whereKey((int) $request->section)))
             ->when($request->filled('q'), fn($q) => $q
                 ->where('name', 'like', "%{$request->q}%")
@@ -36,21 +36,7 @@ class UserController extends Controller
         return view('users.index', compact('users', 'sections'));
     }
 
-    public function updateRole(Request $request, User $user)
-    {
-        $data = $request->validate([
-            'role' => ['required', Rule::in(['admin', 'master', 'executor', 'otk', 'repair'])],
-        ]);
-
-        if ($user->id === auth()->id() && $data['role'] !== 'admin') {
-            return back()->withErrors(['role' => 'Нельзя снять роль админа с самого себя.']);
-        }
-
-        $oldRole = $user->role;
-        $user->forceFill(['role' => $data['role']])->save();
-        \App\Models\AuditLog::write('users', 'role', "Роль {$user->name} ({$user->email}): {$data['role']}", ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null, 'changes' => ['роль' => [$oldRole, $data['role']]]]);
-        return back()->with('ok', "Роль пользователя {$user->name} изменена на {$data['role']}");
-    }
+    // Роль меняется не здесь, а в карточке сотрудника (EmployeeController) — учётная запись получает её сама
 
     public function approve(User $user)
     {

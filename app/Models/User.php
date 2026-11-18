@@ -43,6 +43,15 @@ class User extends Authenticatable
         return $this->belongsToMany(Section::class);
     }
 
+    /** Роли и подписи. Роль назначается в карточке сотрудника (App\Models\Employee), у учётной записи — копия. */
+    public const ROLES = [
+        'admin'    => 'Администратор',
+        'master'   => 'Мастер',
+        'executor' => 'Исполнитель',
+        'otk'      => 'ОТК',
+        'repair'   => 'Ремонтник',
+    ];
+
     public function isAdmin(): bool    { return $this->role === 'admin'; }
     public function isMaster(): bool   { return $this->role === 'master'; }
     public function isOtk(): bool      { return $this->role === 'otk'; }

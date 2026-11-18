@@ -56,7 +56,7 @@ class EmployeeController extends Controller
                     $q->where('id', '!=', $current->id);
                 }
             })
-            ->get(['id', 'name', 'email']);
+            ->get(['id', 'name', 'email', 'role']);
     }
 
     public function index(Request $r)
@@ -99,7 +99,11 @@ class EmployeeController extends Controller
             'department'  => 'nullable|string|max:150',
             'is_active'   => 'boolean',
             'user_id'     => 'nullable|exists:users,id|unique:employees,user_id',
+            'role'        => ['required', Rule::in(array_keys(User::ROLES))],
         ]);
+        if ($error = $this->selfDemotionError($data)) return back()->withInput()->withErrors(['role' => $error]);
+        $role = $data['role'];
+        unset($data['role']);
 
         $data['is_active']  = $r->boolean('is_active');
         $data['short_name'] = $this->buildShortName(
@@ -115,7 +119,10 @@ class EmployeeController extends Controller
         }
 
         try {
-            Employee::create($data);
+            $userRoleBefore = ! empty($data['user_id']) ? User::whereKey($data['user_id'])->value('role') : null;
+            $employee = new Employee($data);
+            $employee->forceFill(['role' => $role])->save();
+            $this->logRoleChange($employee, $userRoleBefore);
         } catch (\Illuminate\Database\QueryException $e) {
             if ($e->getCode() === '23000') {
                 return back()->withInput()->withErrors([
@@ -150,7 +157,11 @@ class EmployeeController extends Controller
                 'exists:users,id',
                 Rule::unique('employees', 'user_id')->ignore($employee->id),
             ],
+            'role'        => ['required', Rule::in(array_keys(User::ROLES))],
         ]);
+        if ($error = $this->selfDemotionError($data, $employee)) return back()->withInput()->withErrors(['role' => $error]);
+        $role = $data['role'];
+        unset($data['role']);
 
         $data['is_active'] = $r->boolean('is_active');
         $newShort = $this->buildShortName($data['last_name'], $data['first_name'], $data['middle_name'] ?? '');
@@ -163,7 +174,9 @@ class EmployeeController extends Controller
         $data['short_name'] = $newShort;
 
         try {
-            $employee->update($data);
+            $userRoleBefore = ! empty($data['user_id']) ? User::whereKey($data['user_id'])->value('role') : null;
+            $employee->fill($data)->forceFill(['role' => $role])->save();
+            $this->logRoleChange($employee, $userRoleBefore);
         } catch (\Illuminate\Database\QueryException $e) {
             if ($e->getCode() === '23000') {
                 return back()->withInput()->withErrors([
@@ -175,6 +188,29 @@ class EmployeeController extends Controller
 
         \App\Models\AuditLog::write('employees', 'updated', 'Изменён сотрудник ' . $employee->short_name, ['subject_type' => 'employee', 'subject_id' => $employee->id, 'section_id' => null]);
         return redirect()->route('employees.index')->with('ok', 'Сотрудник обновлён');
+    }
+
+    /**
+     * Админ не может снять роль админа с себя: ни сменой роли своей карточки, ни отвязкой своей учётной записи.
+     */
+    private function selfDemotionError(array $data, ?Employee $employee = null): ?string
+    {
+        $me = auth()->id();
+        $linksMe = (int) ($data['user_id'] ?? 0) === $me;
+        if ($linksMe && $data['role'] !== 'admin') return 'Нельзя снять роль админа с самого себя.';
+        if ($employee && (int) $employee->user_id === $me && ! $linksMe) return 'Нельзя отвязать свою учётную запись от своей карточки.';
+
+        return null;
+    }
+
+    /** Журнал: роль учётной записи изменилась через карточку сотрудника. */
+    private function logRoleChange(Employee $employee, ?string $before): void
+    {
+        if (! $employee->user_id || $before === null || $before === $employee->role) return;
+
+        $user = $employee->user()->first();
+        \App\Models\AuditLog::write('users', 'role', "Роль {$user->name} ({$user->email}): {$employee->role} — в карточке сотрудника {$employee->short_name}",
+            ['subject_type' => 'user', 'subject_id' => $user->id, 'section_id' => null, 'changes' => ['роль' => [$before, $employee->role]]]);
     }
 
     public function destroy(Employee $employee)

@@ -60,6 +60,17 @@
             </div>
 
             <div>
+                <label class="block text-sm text-gray-600 mb-1">Роль</label>
+                <select name="role" required class="w-full border rounded px-3 py-2 bg-white">
+                    @foreach(\App\Models\User::ROLES as $k => $v)
+                        <option value="{{ $k }}" @selected(old('role', $employee->role ?? 'executor') === $k)>{{ $v }}</option>
+                    @endforeach
+                </select>
+                @error('role') <div class="text-red-600 text-xs mt-1">{{ $message }}</div> @enderror
+                <p class="text-xs text-gray-500 mt-1">Права в системе. Привязанная учётная запись получает эту роль.</p>
+            </div>
+
+            <div>
                 <label class="inline-flex items-center">
                     <input type="hidden" name="is_active" value="0">
                     <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $employee->is_active))

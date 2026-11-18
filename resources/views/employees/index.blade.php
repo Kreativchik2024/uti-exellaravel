@@ -72,6 +72,7 @@
                         <th class="p-3 text-left">Должность</th>
                         <th class="p-3 text-left">Участок</th>
                         <th class="p-3 text-left">Учётка</th>
+                        <th class="p-3 text-left">Роль</th>
                         <th class="p-3 text-center">Активен</th>
                         @if(auth()->user()->isAdmin())<th class="p-3 text-right">Действия</th>@endif
                     </tr>
@@ -94,6 +95,7 @@
                                     <span class="text-amber-600 text-xs">— не привязан —</span>
                                 @endif
                             </td>
+                            <td class="p-3 text-sm">{{ \App\Models\User::ROLES[$e->role ?? 'executor'] ?? $e->role }}</td>
                             <td class="p-3 text-center">
                                 @if($e->is_active)
                                     <span class="text-green-700">✓</span>

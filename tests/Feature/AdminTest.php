@@ -42,6 +42,15 @@ class AdminTest extends TestCase
         }
     }
 
+    /** Карточка сотрудника для учётной записи с ролью — так теперь назначается роль. */
+    private function employeeCard(User $admin, User $user, string $role, string $last = 'Новиков')
+    {
+        return $this->asUser($admin)->post('/employees', [
+            'last_name' => $last, 'first_name' => 'Пётр', 'middle_name' => 'Сергеевич', 'is_active' => 1,
+            'user_id' => $user->id, 'role' => $role,
+        ]);
+    }
+
     // ---------------------------------------------------------------- пользователи
 
     public function test_change_role_approve_deactivate_and_reset_password(): void
@@ -52,7 +61,7 @@ class AdminTest extends TestCase
         $this->asUser($admin)->patch("/users/{$user->id}/approve")->assertRedirect();
         $this->assertTrue($user->fresh()->is_active);
 
-        $this->asUser($admin)->patch("/users/{$user->id}/role", ['role' => 'master'])->assertRedirect();
+        $this->employeeCard($admin, $user, 'master')->assertSessionHasNoErrors()->assertRedirect();
         $this->assertSame('master', $user->fresh()->role);
 
         $this->asUser($admin)->patch("/users/{$user->id}/password", ['password' => 'NewPass123!', 'password_confirmation' => 'NewPass123!'])
@@ -66,18 +75,23 @@ class AdminTest extends TestCase
     public function test_admin_cannot_demote_or_deactivate_himself(): void
     {
         $admin = $this->admin();
+        $card = $admin->employee;
+        $base = ['last_name' => $card->last_name, 'first_name' => $card->first_name, 'middle_name' => $card->middle_name, 'is_active' => 1];
 
-        $this->asUser($admin)->patch("/users/{$admin->id}/role", ['role' => 'executor'])->assertSessionHasErrors();
+        // ни сменой роли своей карточки, ни отвязкой своей учётной записи
+        $this->asUser($admin)->put("/employees/{$card->id}", $base + ['user_id' => $admin->id, 'role' => 'executor'])->assertSessionHasErrors('role');
+        $this->asUser($admin)->put("/employees/{$card->id}", $base + ['user_id' => '', 'role' => 'admin'])->assertSessionHasErrors('role');
         $this->asUser($admin)->patch("/users/{$admin->id}/deactivate");
 
         $this->assertSame('admin', $admin->fresh()->role);
+        $this->assertSame($admin->id, $card->fresh()->user_id);
         $this->assertTrue($admin->fresh()->is_active);
     }
 
     public function test_otk_role_is_assignable_and_has_worker_rights(): void
     {
         $user = User::factory()->create(['role' => 'executor']);
-        $this->asUser($this->admin())->patch("/users/{$user->id}/role", ['role' => 'otk'])->assertSessionHasNoErrors();
+        $this->employeeCard($this->admin(), $user, 'otk')->assertSessionHasNoErrors();
 
         $user = $user->fresh();
         $this->assertSame('otk', $user->role);
@@ -89,8 +103,41 @@ class AdminTest extends TestCase
     public function test_invalid_role_is_rejected(): void
     {
         $user = User::factory()->create();
-        $this->asUser($this->admin())->patch("/users/{$user->id}/role", ['role' => 'superuser'])->assertSessionHasErrors('role');
+        $this->employeeCard($this->admin(), $user, 'superuser')->assertSessionHasErrors('role');
         $this->assertSame('executor', $user->fresh()->role);
+    }
+
+    public function test_role_is_changed_on_employee_not_on_user(): void
+    {
+        $admin = $this->admin();
+        $worker = $this->worker('executor');
+        $card = $worker->employee;
+
+        // У пользователя роль больше не меняется
+        $this->asUser($admin)->patch("/users/{$worker->id}/role", ['role' => 'master'])->assertNotFound();
+        $this->assertSame('executor', $worker->fresh()->role);
+        $users = $this->asUser($admin)->get('/users')->assertOk()->getContent();
+        $this->assertStringNotContainsString('name="role" onchange', $users);
+        $this->assertStringContainsString(route('employees.edit', $card->id), $users);
+
+        // Меняется в карточке сотрудника — учётная запись получает её
+        $this->asUser($admin)->put("/employees/{$card->id}", [
+            'last_name' => $card->last_name, 'first_name' => $card->first_name, 'middle_name' => $card->middle_name,
+            'is_active' => 1, 'user_id' => $worker->id, 'role' => 'repair',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('repair', $card->fresh()->role);
+        $this->assertSame('repair', $worker->fresh()->role);
+        $this->assertStringContainsString('Ремонтник', $this->asUser($admin)->get('/employees')->getContent());
+    }
+
+    public function test_employee_created_without_role_keeps_user_role(): void
+    {
+        // Импорт и прочее создание без формы не меняют роль учётной записи
+        $master = User::factory()->create(['role' => 'master']);
+        $card = Employee::create(['user_id' => $master->id, 'last_name' => 'Мастеров', 'first_name' => 'Иван', 'short_name' => 'Мастеров И.', 'is_active' => true]);
+
+        $this->assertSame('master', $card->fresh()->role);
+        $this->assertSame('master', $master->fresh()->role);
     }
 
     // ---------------------------------------------------------------- сотрудники
@@ -100,14 +147,14 @@ class AdminTest extends TestCase
         $admin = $this->admin();
 
         $this->asUser($admin)->post('/employees', [
-            'last_name' => 'Новиков', 'first_name' => 'Пётр', 'middle_name' => 'Сергеевич', 'is_active' => 1,
+            'last_name' => 'Новиков', 'first_name' => 'Пётр', 'middle_name' => 'Сергеевич', 'is_active' => 1, 'role' => 'executor',
         ])->assertSessionHasNoErrors()->assertRedirect();
 
         $employee = Employee::where('last_name', 'Новиков')->firstOrFail();
         $this->assertSame('Новиков П.С.', $employee->short_name, 'короткое ФИО собирается автоматически');
 
         $this->asUser($admin)->put("/employees/{$employee->id}", [
-            'last_name' => 'Новиков', 'first_name' => 'Пётр', 'middle_name' => 'Сергеевич', 'is_active' => 0,
+            'last_name' => 'Новиков', 'first_name' => 'Пётр', 'middle_name' => 'Сергеевич', 'is_active' => 0, 'role' => 'executor',
         ])->assertSessionHasNoErrors();
         $this->assertFalse($employee->fresh()->is_active);
     }

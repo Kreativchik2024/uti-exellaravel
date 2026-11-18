@@ -78,7 +78,6 @@ Route::get('/employees', [EmployeeController::class, 'index'])
 
 Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/users',                     [UserController::class, 'index'])->name('users.index');
-    Route::patch('/users/{user}/role',       [UserController::class, 'updateRole'])->name('users.role');
     Route::patch('/users/{user}/approve',    [UserController::class, 'approve'])->name('users.approve');
     Route::patch('/users/{user}/deactivate', [UserController::class, 'deactivate'])->name('users.deactivate');
     Route::patch('/users/{user}/password',   [UserController::class, 'resetPassword'])->name('users.password');

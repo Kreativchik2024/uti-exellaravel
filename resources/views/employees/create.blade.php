@@ -47,10 +47,15 @@
 
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Учётная запись (логин)</label>
+                @php
+                    // Пришли со страницы пользователей («нет карточки — создать») — учётка уже выбрана, роль — её текущая
+                    $preUser = (string) old('user_id', request('user_id'));
+                    $preRole = old('role', $users->firstWhere('id', (int) $preUser)?->role ?? 'executor');
+                @endphp
                 <select name="user_id" class="w-full border rounded px-3 py-2 bg-white">
                     <option value="">— не привязан —</option>
                     @foreach($users as $u)
-                        <option value="{{ $u->id }}" @selected((string) old('user_id') === (string) $u->id)>
+                        <option value="{{ $u->id }}" @selected($preUser === (string) $u->id)>
                             {{ $u->name }} ({{ $u->email }})
                         </option>
                     @endforeach
@@ -60,6 +65,17 @@
                     Сотрудник без привязки к учётке не появляется в форме записи.
                     Один логин можно привязать только к одному сотруднику.
                 </p>
+            </div>
+
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Роль</label>
+                <select name="role" required class="w-full border rounded px-3 py-2 bg-white">
+                    @foreach(\App\Models\User::ROLES as $k => $v)
+                        <option value="{{ $k }}" @selected($preRole === $k)>{{ $v }}</option>
+                    @endforeach
+                </select>
+                @error('role') <div class="text-red-600 text-xs mt-1">{{ $message }}</div> @enderror
+                <p class="text-xs text-gray-500 mt-1">Права в системе. Привязанная учётная запись получает эту роль.</p>
             </div>
 
             <div>

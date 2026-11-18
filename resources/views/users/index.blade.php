@@ -21,7 +21,7 @@
             <input name="q" value="{{ request('q') }}" placeholder="Имя или email" class="border rounded px-3 py-1">
             <select name="role" class="border rounded px-3 py-1">
                 <option value="">Все роли</option>
-                @foreach(['admin'=>'Админ','master'=>'Мастер','executor'=>'Исполнитель','otk'=>'ОТК','repair'=>'Ремонтник'] as $k=>$v)
+                @foreach(\App\Models\User::ROLES as $k=>$v)
                     <option value="{{ $k }}" @selected(request('role')===$k)>{{ $v }}</option>
                 @endforeach
             </select>
@@ -55,14 +55,13 @@
                         <td class="p-2">{{ $u->name }}</td>
                         <td class="p-2">{{ $u->email }}</td>
                         <td class="p-2">
-                            <form method="POST" action="{{ route('users.role', $u) }}">
-                                @csrf @method('PATCH')
-                                <select name="role" onchange="this.form.submit()" class="border rounded px-2 py-0.5">
-                                    @foreach(['admin'=>'Админ','master'=>'Мастер','executor'=>'Исполнитель','otk'=>'ОТК','repair'=>'Ремонтник'] as $k=>$v)
-                                        <option value="{{ $k }}" @selected($u->role===$k)>{{ $v }}</option>
-                                    @endforeach
-                                </select>
-                            </form>
+                            {{-- Роль меняется в карточке сотрудника --}}
+                            <div>{{ \App\Models\User::ROLES[$u->role] ?? $u->role }}</div>
+                            @if($u->employee)
+                                <a href="{{ route('employees.edit', $u->employee->id) }}" class="text-xs underline" style="color: var(--ui-accent-text)">изменить у сотрудника</a>
+                            @else
+                                <a href="{{ route('employees.create', ['user_id' => $u->id]) }}" class="text-xs underline" style="color: var(--ui-bad)">нет карточки — создать</a>
+                            @endif
                         </td>
                         <td class="p-2">
                             {{-- Участки пользователя: список + назначение --}}

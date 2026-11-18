@@ -48,7 +48,8 @@ class AuditLogTest extends TestCase
         $this->post('/login', ['email' => $admin->email, 'password' => 'wrong']);
         $this->assertTrue(AuditLog::where('action', 'login_failed')->exists());
 
-        $this->asUser($admin)->patch("/users/{$user->id}/role", ['role' => 'master']);
+        // роль назначается в карточке сотрудника
+        $this->asUser($admin)->post('/employees', ['last_name' => 'Ролев', 'first_name' => 'Пётр', 'is_active' => 1, 'user_id' => $user->id, 'role' => 'master']);
         $this->asUser($admin)->patch("/users/{$user->id}/password", ['password' => 'NewPass123!', 'password_confirmation' => 'NewPass123!']);
 
         $role = AuditLog::where('action', 'role')->firstOrFail();

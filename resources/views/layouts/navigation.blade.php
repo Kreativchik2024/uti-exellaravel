@@ -13,7 +13,7 @@
 
         $initials = collect(preg_split('/\s+/u', trim($user->name)))
             ->filter()->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode('');
-        $roleLabel = ['admin' => 'Администратор', 'master' => 'Мастер', 'executor' => 'Исполнитель', 'otk' => 'ОТК', 'repair' => 'Ремонтник'][$user->role] ?? '';
+        $roleLabel = \App\Models\User::ROLES[$user->role] ?? '';
         $isAdminArea = request()->routeIs('users.*') || request()->routeIs('employees.*') || request()->routeIs('firmware.categories.*') || request()->routeIs('sections.*') || request()->routeIs('audit.*') || request()->routeIs('system.*') || request()->routeIs('fault-codes.*');
     @endphp
 
