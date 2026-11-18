@@ -127,8 +127,8 @@
         </form>
     @endif
 
-    {{-- Акт на замену: нужен при замене по браку ПГП --}}
-    @if($record->repair_action === 'replacement' && $record->pgp_record_id)
+    {{-- Акт на замену: нужен при любой замене --}}
+    @if($record->repair_action === 'replacement')
         <div class="pt-3 space-y-2" style="border-top: 1px solid var(--ui-border)">
             <div class="flex items-center justify-between gap-2">
                 <span class="text-sm font-semibold" style="color: var(--ui-text)">Акт на замену</span>

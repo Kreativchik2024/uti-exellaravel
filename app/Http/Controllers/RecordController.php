@@ -551,10 +551,10 @@ class RecordController extends Controller
         if ($repairOpen) {
             $query->whereNotNull('pgp_record_id')->where('is_repaired', false);
         }
-        // Ссылка из меню технолога (ОТК): ПГП, где была замена и нужен акт
+        // Ссылка из меню технолога (ОТК): исследования, где была замена и нужен акт
         $actNeeded = $sheet === 'research' && $request->query('act') === 'needed';
         if ($actNeeded) {
-            $query->whereNotNull('pgp_record_id')->where('repair_action', 'replacement')->whereNull('act_done_at');
+            $query->whereIn('id', app(\App\Services\PgpDefectResearch::class)->actsNeeded()?->select('id') ?? [0]);
         }
 
         if (array_key_exists('record_date', $cfg['fields'])) {

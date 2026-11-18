@@ -136,7 +136,11 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
 
         // В меню ОТК — строка со списком, в списке — это исследование
         $menu = $this->asUser($otk)->get(route('dashboard'))->assertOk()->getContent();
-        $this->assertStringContainsString('ПГП: нужен акт на замену', $menu);
+        $this->assertStringContainsString('Нужен акт на замену', $menu);
+        // и в карточке ПГП, в блоке технолога — замена и «Нужен акт»
+        $pgpCard = $this->asUser($otk)->get("/records/pgp/{$pgp->id}")->getContent();
+        $this->assertStringContainsString("Исследование №{$research->id}", $pgpCard);
+        $this->assertStringContainsString('МОТОРАМА · Кросс 3 · МИНИ ПК', $pgpCard);
         $list = $this->asUser($otk)->get('/records/research?act=needed')->assertOk()->getContent();
         $this->assertStringContainsString("/records/research/{$research->id}\"", $list);
         $this->assertStringContainsString('нужен акт', $list);
@@ -156,6 +160,32 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
         $history = $this->asUser($this->worker('master'))->get("/records/pgp/{$pgp->id}")->getContent();
         $this->assertStringContainsString("Исследование №{$research->id}: замена", $history);
         $this->assertStringContainsString("Исследование №{$research->id}: акт на замену оформлен", $history);
+    }
+
+    public function test_replacement_in_manual_research_without_pgp_also_needs_act(): void
+    {
+        // Как на сервере: исследование внесено вручную (без ссылки на ПГП), замена и «отправлен в конвейер»
+        [, , $leaf] = $this->blocks();
+        $research = $this->research(['pgp_record_id' => null]);
+        $repair = $this->worker('repair');
+        $this->repairPatch($repair, $research, ['repair_action' => 'replacement', 'repair_node' => 'g' . $leaf->id])->assertSessionHasNoErrors();
+        $this->asUser($repair)->patch("/records/research/{$research->id}/research-status", ['repair_status' => 'conveyor']);
+        $research->refresh();
+        $this->assertSame('conveyor', $research->repair_status);
+        $this->assertTrue($research->needsAct());
+
+        $otk = $this->worker('otk');
+        $this->actingAs($otk);
+        $this->assertSame(1, app(\App\Services\PgpDefectResearch::class)->actsNeededCount());
+        $this->assertStringContainsString("/records/research/{$research->id}\"", $this->asUser($otk)->get('/records/research?act=needed')->getContent());
+
+        $card = $this->asUser($otk)->get("/records/research/{$research->id}")->getContent();
+        $this->assertStringContainsString('Нужен акт', $card);
+        $this->assertStringContainsString('Акт оформлен', $card);   // кнопка
+
+        $this->asUser($otk)->patch("/records/research/{$research->id}/research-act")->assertRedirect();
+        $this->actingAs($otk);
+        $this->assertSame(0, app(\App\Services\PgpDefectResearch::class)->actsNeededCount());
     }
 
     public function test_custom_variant_goes_to_admin_review(): void

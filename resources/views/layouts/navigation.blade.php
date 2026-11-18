@@ -176,12 +176,12 @@
                             </a>
                         @endif
 
-                        {{-- Технолог (ОТК): ПГП, где была замена и нужен акт --}}
+                        {{-- Технолог (ОТК): исследования, где была замена и нужен акт --}}
                         @if($user->isOtk() || $user->canManageContent())
                             @php $actSvc = app(\App\Services\PgpDefectResearch::class); $actCount = $actSvc->actsNeeded() ? $actSvc->actsNeededCount() : null; @endphp
                             @if($actCount !== null)
                                 <a href="{{ route('records.index', ['research', 'act' => 'needed']) }}" class="ui-menu__item justify-between">
-                                    <span style="color: var(--ui-text-2)">ПГП: нужен акт на замену</span>
+                                    <span style="color: var(--ui-text-2)">Нужен акт на замену</span>
                                     <span class="font-semibold tabular-nums" style="color: {{ $actCount ? 'var(--ui-bad)' : 'var(--ui-muted)' }}">{{ $actCount }}</span>
                                 </a>
                             @endif

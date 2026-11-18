@@ -20,10 +20,13 @@ class ResearchRecord extends Model
         'replacement' => 'Замена',
     ];
 
-    /** Нужен акт: замена по браку ПГП, а технолог ещё не отметил «Акт оформлен». */
+    /**
+     * Нужен акт: в исследовании была замена, а технолог ещё не отметил «Акт оформлен».
+     * Любое исследование — и заведённое по браку ПГП, и внесённое вручную.
+     */
     public function needsAct(): bool
     {
-        return $this->repair_action === 'replacement' && $this->pgp_record_id && ! $this->act_done_at;
+        return $this->repair_action === 'replacement' && ! $this->act_done_at;
     }
 
     public function repairItemModel()

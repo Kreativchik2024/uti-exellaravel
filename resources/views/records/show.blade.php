@@ -304,6 +304,27 @@
                             @if($record->tech_updated_at)
                                 <p class="text-xs" style="color: var(--ui-muted)">Изменено {{ $record->tech_updated_at->format('d.m.Y H:i') }}</p>
                             @endif
+
+                            {{-- Замены по этому борту (из исследований) и акт на них --}}
+                            @php $replacements = $record->researches()->where('repair_action', 'replacement')->orderBy('id')->get(); @endphp
+                            @if($replacements->isNotEmpty())
+                                <div class="pt-3 space-y-2" style="border-top: 1px solid var(--ui-border)">
+                                    <div class="text-xs font-semibold uppercase tracking-wide" style="color: var(--ui-muted)">Замены</div>
+                                    @foreach($replacements as $rep)
+                                        <a href="{{ route('records.show', ['research', $rep->id]) }}" class="block rounded-lg px-2.5 py-2 hover:opacity-80" style="background: var(--ui-surface-2)">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-sm font-medium" style="color: var(--ui-text)">Исследование №{{ $rep->id }}</span>
+                                                @if($rep->act_done_at)
+                                                    <x-status-pill value="Акт оформлен" tone="good" />
+                                                @else
+                                                    <x-status-pill value="Нужен акт" tone="bad" />
+                                                @endif
+                                            </div>
+                                            <div class="text-xs mt-0.5" style="color: var(--ui-text-2)">{{ $rep->repair_item }}</div>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
                     </section>
                 @endif
