@@ -97,6 +97,11 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 
     Route::get('/audit', [\App\Http\Controllers\AuditController::class, 'index'])->name('audit.index');
 
+    // Свои варианты узлов для «Ремонт / Замена» — проверка администратором
+    Route::get('/repair-items',                        [\App\Http\Controllers\RepairItemController::class, 'index'])->name('repair-items.index');
+    Route::patch('/repair-items/{repairItem}/approve', [\App\Http\Controllers\RepairItemController::class, 'approve'])->name('repair-items.approve');
+    Route::delete('/repair-items/{repairItem}',        [\App\Http\Controllers\RepairItemController::class, 'reject'])->name('repair-items.reject');
+
     // Справочник кодов неисправностей
     Route::get('/fault-codes',                [\App\Http\Controllers\FaultCodeController::class, 'index'])->name('fault-codes.index');
     Route::post('/fault-codes',               [\App\Http\Controllers\FaultCodeController::class, 'store'])->name('fault-codes.store');
@@ -185,6 +190,9 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::patch('/records/{sheet}/{id}/tech', [RecordController::class, 'tech'])->middleware('role:otk')->name('records.tech');
     // Исследования: статус кнопками — ремонтник (и мастер, админ); комментарии — все
     Route::patch('/records/{sheet}/{id}/research-status', [RecordController::class, 'researchStatus'])->middleware('role:repair,master,admin')->name('records.researchStatus');
+    // Ремонт / замена и узел — ремонтник (мастер, админ); акт на замену — технолог ОТК (мастер, админ)
+    Route::patch('/records/{sheet}/{id}/research-repair', [RecordController::class, 'researchRepair'])->middleware('role:repair,master,admin')->name('records.researchRepair');
+    Route::patch('/records/{sheet}/{id}/research-act', [RecordController::class, 'researchAct'])->middleware('role:otk,master,admin')->name('records.researchAct');
     Route::post('/records/{sheet}/{id}/comments', [RecordController::class, 'comment'])->middleware('throttle:30,1')->name('records.comment');
     Route::delete('/records/{sheet}/{id}',   [RecordController::class, 'destroy'])->name('records.destroy');
 });

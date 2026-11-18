@@ -31,7 +31,7 @@ class BoardHistory
         $researchIds = $researches->pluck('id')->all();
 
         $statusLogs = $researchIds
-            ? AuditLog::query()->where('area', 'research')->where('action', 'status')->where('subject_type', 'record')
+            ? AuditLog::query()->where('area', 'research')->whereIn('action', ['status', 'repair', 'act'])->where('subject_type', 'record')
                 ->whereIn('subject_id', $researchIds)->with('user')->orderBy('id')->get()
             : collect();
         $techLogs = AuditLog::query()->where('area', 'pgp')->where('action', 'tech')->where('subject_type', 'record')
@@ -53,8 +53,7 @@ class BoardHistory
 
         foreach ($researches as $r) {
             $details = array_filter([
-                $r->category ? 'Узел: ' . $r->category : null,
-                $r->replacement ? 'Замена: ' . $r->replacement : null,
+                $r->category ? 'Категория: ' . $r->category : null,
             ]);
             $events[] = [
                 'at'    => $r->created_at,
@@ -77,6 +76,23 @@ class BoardHistory
         }
 
         foreach ($statusLogs as $log) {
+            $who = $log->user?->name ?? $log->user_name;
+            $url = route('records.show', ['research', $log->subject_id]);
+            // «Исследование #12: Замена — МОТОРАМА · Кросс 3» / «… акт на замену оформлен (…)»
+            $after = trim((string) preg_replace('/^Исследование #\d+:\s*/u', '', (string) $log->summary));
+
+            if ($log->action === 'repair') {
+                $isReplacement = str_starts_with($after, 'Замена');
+                $events[] = ['at' => $log->created_at, 'title' => "Исследование №{$log->subject_id}: " . ($isReplacement ? 'замена' : 'ремонт'),
+                    'text' => $after, 'tone' => $isReplacement ? 'warn' : 'neutral', 'who' => $who, 'url' => $url];
+                continue;
+            }
+            if ($log->action === 'act') {
+                $events[] = ['at' => $log->created_at, 'title' => "Исследование №{$log->subject_id}: акт на замену оформлен",
+                    'text' => null, 'tone' => 'good', 'who' => $who, 'url' => $url];
+                continue;
+            }
+
             // «Исследование #12: Не обработан → В работе» — новый этап после стрелки
             $to = trim((string) (preg_split('/→/u', (string) $log->summary)[1] ?? ''));
             $events[] = [
@@ -84,8 +100,8 @@ class BoardHistory
                 'title' => "Исследование №{$log->subject_id}: " . ($to ?: 'статус изменён'),
                 'text'  => null,
                 'tone'  => $this->toneOfLabel($to),
-                'who'   => $log->user?->name ?? $log->user_name,
-                'url'   => route('records.show', ['research', $log->subject_id]),
+                'who'   => $who,
+                'url'   => $url,
             ];
         }
 

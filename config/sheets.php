@@ -252,9 +252,8 @@ $map = [
                 'analysis_actions'=> ['label'=>'Действия для анализа','type'=>'textarea','rules'=>'nullable|string'],
                 'found_defect'    => ['label'=>'Дефект при анализе','type'=>'textarea','rules'=>'nullable|string'],
                 'result'          => ['label'=>'Результат','type'=>'textarea','rules'=>'nullable|string'],
-                // Что заменено: список узлов участка (заполняется ниже) и ранее вписанные варианты; можно вписать свой
-                'replacement'     => ['label'=>'Замена','type'=>'combo','rules'=>'nullable|string|max:120',
-                                      'placeholder'=>'Выберите, что заменено, или впишите своё', 'options'=>[]],
+                // Ремонт / замена и узел — не в общей форме, а в панели «Ремонт» карточки исследования
+                // (ремонтник, мастер, админ): App\Services\RepairCatalog, RecordController::researchRepair
                 // «Отремонтировано» следует из статуса: «Отправлен в конвейер» = да (App\Models\ResearchRecord)
                 'repair_status'   => ['label'=>'Статус','type'=>'select',
                                       'rules'=>'nullable|in:' . implode(',', array_keys(\App\Models\ResearchRecord::STATUSES)),
@@ -522,8 +521,6 @@ $researchNodes = array_values(array_map(
     array_filter($map, fn ($cfg, $slug) => $slug !== 'research' && $cfg['section'] === $map['research']['section'], ARRAY_FILTER_USE_BOTH)
 ));
 $map['research']['fields']['category']['options'] = $researchNodes;
-// Замена: те же узлы и «Без замены» (вписанные ранее варианты добавляются в список сами — RecordController::comboOptions)
-$map['research']['fields']['replacement']['options'] = array_merge(['Без замены'], $researchNodes);
 
 return [
     'map' => $map,

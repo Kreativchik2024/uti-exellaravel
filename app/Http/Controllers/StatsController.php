@@ -733,8 +733,8 @@ class StatsController extends Controller
     }
 
     /**
-     * Замены в исследованиях: что и сколько раз меняли за период, по каким узлам.
-     * Одно и то же написание в разном регистре и с лишними пробелами — одна строка; «Без замены» не считается.
+     * Ремонт и замена в исследованиях: какой узел сколько раз ремонтировали и меняли за период, по каким категориям.
+     * Узел — из панели «Ремонт» (дерево блоков справочника кодов или свой вариант).
      */
     public function zone7(Request $r, StatsService $s)
     {
@@ -745,18 +745,18 @@ class StatsController extends Controller
 
         $data = Cache::remember($cacheKey, 120, function () use ($from, $to, $targetUser, $s) {
             $cfg = $this->sheets()['research'] ?? null;
-            if (!$cfg || !isset($cfg['fields']['replacement'])) return [];
+            if (!$cfg) return [];
 
             $table = (new $cfg['model'])->getTable();
             $scope = $s->workerScopeSql($cfg, $targetUser);
             [$dateSql, $dateBindings] = $this->sqlDateRange($from, $to);
 
             $res = DB::select(
-                "SELECT `replacement` AS name, `category` AS category, COUNT(*) AS cnt,
+                "SELECT `repair_item` AS name, `repair_action` AS action, `category` AS category, COUNT(*) AS cnt,
                         MIN(record_date) AS first_date, MAX(record_date) AS last_date
                  FROM `$table`
-                 WHERE (`replacement` IS NOT NULL AND `replacement` != '')" . $scope['sql'] . $dateSql . "
-                 GROUP BY `replacement`, `category`",
+                 WHERE (`repair_item` IS NOT NULL AND `repair_item` != '' AND `repair_action` IN ('repair', 'replacement'))" . $scope['sql'] . $dateSql . "
+                 GROUP BY `repair_item`, `repair_action`, `category`",
                 array_merge($scope['bindings'], $dateBindings)
             );
 
@@ -764,11 +764,12 @@ class StatsController extends Controller
             foreach ($res as $row) {
                 $name = trim(preg_replace('/\s+/u', ' ', (string) $row->name));
                 $key  = mb_strtolower($name);
-                if ($name === '' || $key === 'без замены') continue;
+                if ($name === '') continue;
 
-                $agg[$key] ??= ['name' => $name, 'count' => 0, 'categories' => [], 'first_date' => null, 'last_date' => null, 'spelled' => []];
+                $agg[$key] ??= ['name' => $name, 'count' => 0, 'replacements' => 0, 'repairs' => 0, 'categories' => [], 'first_date' => null, 'last_date' => null, 'spelled' => []];
                 $e = &$agg[$key];
                 $e['count'] += (int) $row->cnt;
+                $e[$row->action === 'replacement' ? 'replacements' : 'repairs'] += (int) $row->cnt;
                 $e['spelled'][$name] = ($e['spelled'][$name] ?? 0) + (int) $row->cnt;
                 $cat = trim((string) $row->category) ?: 'Без категории';
                 $e['categories'][$cat] = ($e['categories'][$cat] ?? 0) + (int) $row->cnt;
@@ -784,9 +785,11 @@ class StatsController extends Controller
                 arsort($e['spelled']);
                 arsort($e['categories']);
                 $rows[] = [
-                    'name'       => array_key_first($e['spelled']),   // самое частое написание
-                    'count'      => $e['count'],
-                    'categories' => $e['categories'],
+                    'name'         => array_key_first($e['spelled']),   // самое частое написание
+                    'count'        => $e['count'],
+                    'replacements' => $e['replacements'],
+                    'repairs'      => $e['repairs'],
+                    'categories'   => $e['categories'],
                     'first_date' => $e['first_date'],
                     'last_date'  => $e['last_date'],
                 ];

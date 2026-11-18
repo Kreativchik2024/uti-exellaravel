@@ -14,6 +14,23 @@ class ResearchRecord extends Model
         'conveyor' => ['label' => 'Отправлен в конвейер', 'tone' => 'good'],
     ];
 
+    /** Что сделал ремонтник с узлом. При замене технологу (ОТК) нужен акт. */
+    public const REPAIR_ACTIONS = [
+        'repair'      => 'Ремонт',
+        'replacement' => 'Замена',
+    ];
+
+    /** Нужен акт: замена по браку ПГП, а технолог ещё не отметил «Акт оформлен». */
+    public function needsAct(): bool
+    {
+        return $this->repair_action === 'replacement' && $this->pgp_record_id && ! $this->act_done_at;
+    }
+
+    public function repairItemModel()
+    {
+        return $this->belongsTo(RepairItem::class, 'repair_item_id');
+    }
+
     /** [ключ => подпись] — для выпадающего списка в форме. */
     public static function statusOptions(): array
     {
@@ -34,14 +51,17 @@ class ResearchRecord extends Model
         'worker1', 'worker2', 'worker3', 'worker4', 'worker5',
         'fuselage_no', 'fuselage_serial', 'frame_serial', 'bracket_serial',
         'reported_defect', 'rejected_by', 'analysis_actions', 'found_defect',
-        'result', 'replacement', 'is_repaired', 'fault_code', 'created_by', 'updated_by',
+        'result', 'is_repaired', 'fault_code', 'created_by', 'updated_by',
     ];
     // pgp_record_id — только явно (forceFill): ставится при автосоздании по браку ПГП
 
     protected $casts = [
         'record_date' => 'date',
         'is_repaired' => 'boolean',
+        'act_done_at' => 'datetime',
     ];
+    // repair_action, repair_item, repair_group_id, repair_item_id, act_done_* — только явно (forceFill):
+    // ставятся в панели «Ремонт» и кнопкой «Акт оформлен», не через общую форму
 
     public function creator()
     {

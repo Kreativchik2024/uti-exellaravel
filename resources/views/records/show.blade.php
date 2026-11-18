@@ -264,6 +264,9 @@
                             <a href="{{ route('records.show', ['pgp', $record->pgp_record_id]) }}#board-history" class="block text-sm underline" style="color: var(--ui-accent-text)">История борта по этапам</a>
                         @endif
                     </section>
+
+                    {{-- Ремонт / замена и узел; акт на замену --}}
+                    @include('records._repair_panel')
                 @endif
 
                 @if($sheet === 'pgp')

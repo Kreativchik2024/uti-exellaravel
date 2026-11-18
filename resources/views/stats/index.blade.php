@@ -609,7 +609,7 @@
         @if(isset(app(\App\Services\SectionContext::class)->sheets()['research']))
         <div class="ui-card p-5">
             <div class="stat-card-head mb-3">
-                <h3 class="font-semibold text-lg text-gray-800">7. Замены в исследованиях</h3>
+                <h3 class="font-semibold text-lg text-gray-800">7. Ремонт и замена в исследованиях</h3>
                 <div class="flex gap-2">
                     <button x-show="!expanded7" @click="toggleZone7()" class="ui-btn ui-btn--ghost ui-btn--sm">Показать</button>
                     <button x-show="expanded7" @click="toggleZone7()" class="ui-btn ui-btn--ghost ui-btn--sm">Скрыть</button>
@@ -624,17 +624,19 @@
                         <button @click="resetDates7()" class="text-sm text-gray-500 hover:text-gray-800 underline">Сбросить даты</button>
                     </div>
                     <div class="mb-4 flex flex-wrap gap-4 items-baseline text-sm">
-                        <span class="text-gray-600">Видов замен: <strong class="text-lg text-gray-800" x-text="zone7Rows.length"></strong></span>
-                        <span class="text-gray-600">Всего замен: <strong class="text-lg text-blue-700" x-text="zone7Total()"></strong></span>
+                        <span class="text-gray-600">Узлов: <strong class="text-lg text-gray-800" x-text="zone7Rows.length"></strong></span>
+                        <span class="text-gray-600">Замен: <strong class="text-lg text-red-700" x-text="zone7Rows.reduce((s, r) => s + Number(r.replacements), 0)"></strong></span>
+                        <span class="text-gray-600">Ремонтов: <strong class="text-lg text-blue-700" x-text="zone7Rows.reduce((s, r) => s + Number(r.repairs), 0)"></strong></span>
                     </div>
                     <div class="overflow-x-auto table-scroll">
                         <table class="min-w-full text-sm">
                             <thead class="bg-gray-50 text-gray-600">
                                 <tr>
                                     <th class="p-3 text-left w-12">#</th>
-                                    <th class="p-3 text-left">Замена</th>
-                                    <th class="p-3 text-left">Узлы</th>
-                                    <th class="p-3 text-right">Кол-во</th>
+                                    <th class="p-3 text-left">Узел</th>
+                                    <th class="p-3 text-left">Категории</th>
+                                    <th class="p-3 text-right">Замен</th>
+                                    <th class="p-3 text-right">Ремонтов</th>
                                     <th class="p-3 text-left">Первая</th>
                                     <th class="p-3 text-left">Последняя</th>
                                 </tr>
@@ -645,14 +647,15 @@
                                         <td class="p-3 text-gray-400" x-text="idx + 1"></td>
                                         <td class="p-3 font-semibold text-gray-900" x-text="row.name"></td>
                                         <td class="p-3 text-gray-600" x-text="Object.entries(row.categories).map(([c, n]) => c + ' (' + n + ')').join(', ')"></td>
-                                        <td class="p-3 text-right font-bold text-blue-700" x-text="row.count"></td>
+                                        <td class="p-3 text-right font-bold text-red-700" x-text="row.replacements"></td>
+                                        <td class="p-3 text-right font-bold text-blue-700" x-text="row.repairs"></td>
                                         <td class="p-3 text-gray-500" x-text="formatDate(row.first_date)"></td>
                                         <td class="p-3 text-gray-500" x-text="formatDate(row.last_date)"></td>
                                     </tr>
                                 </template>
                             </tbody>
                         </table>
-                        <div x-show="zone7Rows.length === 0" class="p-3 text-gray-500 text-sm">Нет замен за период</div>
+                        <div x-show="zone7Rows.length === 0" class="p-3 text-gray-500 text-sm">Нет ремонтов и замен за период</div>
                     </div>
                 </div>
             </div>

@@ -73,6 +73,20 @@ class PgpDefectResearch
         return $this->openForRepair()?->count() ?? 0;
     }
 
+    /** ПГП, где нужен акт: по браку ПГП была замена, технолог (ОТК) ещё не отметил «Акт оформлен». */
+    public function actsNeeded(): ?Builder
+    {
+        if (! isset($this->sections->sheets()['research'])) return null;
+
+        return ResearchRecord::query()->whereNotNull('pgp_record_id')
+            ->where('repair_action', 'replacement')->whereNull('act_done_at');
+    }
+
+    public function actsNeededCount(): int
+    {
+        return $this->actsNeeded()?->count() ?? 0;
+    }
+
     /** Какие из записей ПГП уже отремонтированы. @return array<int, true> id => true */
     public function repairedPgpIds(array $pgpIds): array
     {

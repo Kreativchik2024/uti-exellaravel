@@ -551,6 +551,11 @@ class RecordController extends Controller
         if ($repairOpen) {
             $query->whereNotNull('pgp_record_id')->where('is_repaired', false);
         }
+        // Ссылка из меню технолога (ОТК): ПГП, где была замена и нужен акт
+        $actNeeded = $sheet === 'research' && $request->query('act') === 'needed';
+        if ($actNeeded) {
+            $query->whereNotNull('pgp_record_id')->where('repair_action', 'replacement')->whereNull('act_done_at');
+        }
 
         if (array_key_exists('record_date', $cfg['fields'])) {
             $query->orderByDesc('record_date')->orderByDesc('id');
@@ -581,7 +586,7 @@ class RecordController extends Controller
             ? app(\App\Services\PgpDefectResearch::class)->repairedPgpIds($records->pluck('id')->all())
             : [];
 
-        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter', 'techOpen', 'repairOpen', 'repairedIds'));
+        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter', 'techOpen', 'repairOpen', 'actNeeded', 'repairedIds'));
     }
 
     public function show(string $sheet, int $id)
@@ -609,10 +614,12 @@ class RecordController extends Controller
             && isset(app(\App\Services\PgpDefectResearch::class)->repairedPgpIds([$record->id])[$record->id]);
         // Исследование: все исследования той же детали с их комментариями (деталь может возвращаться)
         $partHistory = $sheet === 'research' ? $record->samePartHistory() : collect();
+        // Исследование: дерево блоков и свои варианты для панели «Ремонт»
+        $repairPicker = $sheet === 'research' ? app(\App\Services\RepairCatalog::class)->pickerData($record) : null;
         // ПГП: история борта по этапам (проверки, исследования, статусы, комментарии, пометки ОТК)
         $boardHistory = $sheet === 'pgp' ? app(\App\Services\BoardHistory::class)->for($record) : null;
 
-        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups', 'isTimeLocked', 'history', 'historyLabels', 'isRepaired', 'partHistory', 'boardHistory'));
+        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups', 'isTimeLocked', 'history', 'historyLabels', 'isRepaired', 'partHistory', 'boardHistory', 'repairPicker'));
     }
 
     public function create(Request $r, string $sheet)
@@ -835,6 +842,61 @@ class RecordController extends Controller
         }
 
         return back()->with('ok', 'Статус: ' . $statuses[$data['repair_status']]['label']);
+    }
+
+    /**
+     * Панель «Ремонт» исследования (ремонтник, мастер, админ): ремонт или замена и какой узел —
+     * блок из дерева справочника кодов, подтверждённый свой вариант или новый (уходит на проверку администратору).
+     */
+    public function researchRepair(Request $r, string $sheet, int $id)
+    {
+        abort_unless($sheet === 'research', 404);
+        $record = $this->cfg($sheet)['model']::findOrFail($id);
+
+        $data = $r->validate([
+            'repair_action' => ['required', \Illuminate\Validation\Rule::in(array_keys(\App\Models\ResearchRecord::REPAIR_ACTIONS))],
+            'repair_node'   => ['nullable', 'string', 'max:20'],
+            'custom_name'   => ['nullable', 'string', 'max:150'],
+            'custom_group'  => ['nullable', 'integer'],
+        ], [], ['repair_action' => 'Ремонт или замена', 'custom_name' => 'Свой вариант']);
+
+        $picked = app(\App\Services\RepairCatalog::class)->resolve(
+            $data['repair_node'] ?? null, $data['custom_name'] ?? null, isset($data['custom_group']) ? (int) $data['custom_group'] : null,
+            $record, (int) auth()->id());
+
+        $actions = \App\Models\ResearchRecord::REPAIR_ACTIONS;
+        $record->forceFill([
+            'repair_action'   => $data['repair_action'],
+            'repair_item'     => $picked['label'],
+            'repair_group_id' => $picked['group_id'],
+            'repair_item_id'  => $picked['item_id'],
+            'updated_by'      => auth()->id(),
+        ])->save();
+
+        \App\Models\AuditLog::write('research', 'repair', "Исследование #{$record->id}: {$actions[$data['repair_action']]} — {$picked['label']}" . ($picked['pending'] ? ' (свой вариант, на проверке)' : ''),
+            ['subject_type' => 'record', 'subject_id' => $record->id, 'section_id' => null]);
+
+        $msg = "{$actions[$data['repair_action']]}: {$picked['label']}";
+        if ($picked['pending']) $msg .= ' — свой вариант отправлен на проверку администратору';
+        if ($record->needsAct()) $msg .= '. Технологу (ОТК) нужно оформить акт';
+
+        return back()->with('ok', $msg);
+    }
+
+    /** Технолог (ОТК), мастер или админ отмечает: акт на замену оформлен — ПГП уходит из списка «нужен акт». */
+    public function researchAct(Request $r, string $sheet, int $id)
+    {
+        abort_unless($sheet === 'research', 404);
+        $record = $this->cfg($sheet)['model']::findOrFail($id);
+        abort_unless($record->repair_action === 'replacement', 422, 'Акт нужен только при замене');
+
+        if (! $record->act_done_at) {
+            $record->forceFill(['act_done_at' => now(), 'act_done_by' => auth()->id()])->save();
+            \App\Models\AuditLog::write('research', 'act', "Исследование #{$record->id}: акт на замену оформлен ({$record->repair_item})",
+                ['subject_type' => 'record', 'subject_id' => $record->id, 'section_id' => null]);
+        }
+
+        return back()->with('ok', 'Акт на замену отмечен как оформленный');
     }
 
     /** Комментарий к исследованию. Комментарии копятся — видна вся история по детали. */
