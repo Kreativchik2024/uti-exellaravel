@@ -59,7 +59,8 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
         $html = $this->asUser($repair)->get("/records/research/{$research->id}")->assertOk()->getContent();
         $this->assertStringContainsString('repairPicker(', $html);
         $this->assertStringContainsString('МИНИ ПК', $html);
-        $this->assertStringContainsString('name="repair_action"', $html);
+        $this->assertStringContainsString("[repair_action]'", $html);
+        $this->assertStringContainsString('Добавить пункт ремонта или замены', $html);
 
         // Ремонт — акт не нужен
         $this->repairPatch($repair, $research, ['repair_action' => 'repair', 'repair_node' => 'g' . $leaf->id])->assertSessionHasNoErrors();
@@ -80,6 +81,81 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
         foreach (['executor', 'otk'] as $role) {
             $this->repairPatch($this->worker($role), $research, ['repair_action' => 'repair', 'repair_node' => 'g' . $leaf->id])->assertForbidden();
         }
+    }
+
+    public function test_master_saves_several_repair_and_replacement_items(): void
+    {
+        [$top, $mid, $leaf] = $this->blocks();
+        $research = $this->research();
+        $master = $this->worker('master');
+
+        $this->repairPatch($master, $research, ['items' => [
+            ['repair_action' => 'repair', 'repair_node' => 'g' . $leaf->id],
+            ['repair_action' => 'replacement', 'repair_node' => 'g' . $mid->id],
+            ['repair_action' => 'repair', 'repair_node' => 'g' . $leaf->id],   // повтор — один раз
+        ]])->assertSessionHasNoErrors();
+
+        $research->refresh();
+        $this->assertSame([['repair', 'МОТОРАМА · Кросс 3 · МИНИ ПК'], ['replacement', 'МОТОРАМА · Кросс 3']],
+            $research->repairItems->map(fn ($i) => [$i->action, $i->label])->all());
+        // Сводка: есть замена — нужен акт технологу
+        $this->assertSame('replacement', $research->repair_action);
+        $this->assertSame('МОТОРАМА · Кросс 3 · МИНИ ПК; МОТОРАМА · Кросс 3', $research->repair_item);
+        $this->assertTrue($research->needsAct());
+        $this->assertSame('Ремонт и замена', $research->repairActionLabel());
+
+        // Частые узлы для выбора одним касанием
+        $this->actingAs($master);
+        $freq = app(\App\Services\RepairCatalog::class)->pickerData($research)['frequent'];
+        $this->assertEqualsCanonicalizing(['g' . $leaf->id, 'g' . $mid->id], $freq['all']);
+        $this->assertSame(['g' . $leaf->id], $freq['repair']);
+        $this->assertSame(['g' . $mid->id], $freq['replacement']);
+
+        // Статистика — по каждому пункту
+        $rows = collect($this->asUser($master)->getJson('/stats/zone7')->assertOk()->json())->keyBy('name');
+        $this->assertSame(1, $rows['МОТОРАМА · Кросс 3 · МИНИ ПК']['repairs']);
+        $this->assertSame(1, $rows['МОТОРАМА · Кросс 3']['replacements']);
+
+        // Пересохранение заменяет список: остался только ремонт — акт не нужен
+        $this->repairPatch($master, $research, ['items' => [['repair_action' => 'repair', 'repair_node' => 'g' . $top->id]]])->assertSessionHasNoErrors();
+        $research->refresh();
+        $this->assertCount(1, $research->repairItems);
+        $this->assertSame('repair', $research->repair_action);
+        $this->assertFalse($research->needsAct());
+
+        // Пустой пункт — ошибка
+        $this->repairPatch($master, $research, ['items' => [['repair_action' => 'repair', 'repair_node' => 'g' . $top->id], ['repair_action' => 'replacement']]])
+            ->assertSessionHasErrors('repair_node');
+    }
+
+    public function test_picker_suggests_by_defect_and_offers_previous_repair_of_same_part(): void
+    {
+        [, $mid, $leaf] = $this->blocks();
+        $master = $this->worker('master');
+        $old = $this->research(['frame_serial' => 'MR-4242', 'reported_defect' => 'Нет связи', 'record_date' => '2026-11-01']);
+        $this->repairPatch($master, $old, ['items' => [
+            ['repair_action' => 'replacement', 'repair_node' => 'g' . $mid->id],
+            ['repair_action' => 'repair', 'repair_node' => 'g' . $leaf->id],
+        ]])->assertSessionHasNoErrors();
+
+        // Та же деталь вернулась с тем же отказом
+        $new = $this->research(['frame_serial' => 'MR-4242', 'reported_defect' => '  нет связи ', 'record_date' => '2026-11-15']);
+        $this->actingAs($master);
+        $data = app(\App\Services\RepairCatalog::class)->pickerData($new);
+
+        $this->assertEqualsCanonicalizing(['g' . $mid->id, 'g' . $leaf->id], $data['suggested']['keys']);
+        $this->assertSame($old->id, $data['previous']['id']);
+        $this->assertSame([['replacement', 'g' . $mid->id], ['repair', 'g' . $leaf->id]],
+            array_map(fn ($r) => [$r['action'], $r['node']], $data['previous']['rows']));
+
+        $html = $this->asUser($master)->get("/records/research/{$new->id}")->assertOk()->getContent();
+        $this->assertStringContainsString('Как в прошлый раз', $html);
+
+        // Другая деталь, другой отказ — ни подсказки, ни прошлого
+        $other = $this->research(['frame_serial' => 'MR-9999', 'reported_defect' => 'Не взлетает']);
+        $data = app(\App\Services\RepairCatalog::class)->pickerData($other);
+        $this->assertNull($data['suggested']);
+        $this->assertNull($data['previous']);
     }
 
     public function test_vmg_vmr_and_kommutaciya_blocks_are_not_offered_for_repair(): void
@@ -320,7 +396,7 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
         $this->asUser($repair)->patch("/records/research/{$research->id}/research-status", ['repair_status' => 'conveyor']);
 
         $html = $this->asUser($master)->get("/records/pgp/{$pgp->id}")->assertOk()->getContent();
-        $this->assertStringContainsString("Исследование №{$research->id}: Отправлен в конвейер", $html);
+        $this->assertStringContainsString("Исследование №{$research->id}: Отправлен на испытания", $html);
         // Порядок — внутри ленты (в заголовке «Сейчас: …» тот же текст)
         $timeline = mb_substr($html, mb_strpos($html, '<ol'));
         $order = array_map(fn ($t) => mb_strpos($timeline, $t), [
@@ -328,7 +404,7 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
             "Исследование №{$research->id} заведено",
             "Исследование №{$research->id}: В работе",
             'Меняем модуль связи',
-            "Исследование №{$research->id}: Отправлен в конвейер",
+            "Исследование №{$research->id}: Отправлен на испытания",
         ]);
         $this->assertNotContains(false, $order, 'все этапы есть в истории');
         $sorted = $order;

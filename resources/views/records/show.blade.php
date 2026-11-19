@@ -229,6 +229,7 @@
                     @php
                         $currentStatus = $record->repair_status ?: 'new';
                         $canSetStatus = auth()->user()->isRepair() || auth()->user()->canManageContent();
+                        $nextStatus = $record->nextStatus();
                     @endphp
                     <section class="ui-card p-4 space-y-3">
                         <div class="flex items-center justify-between gap-2">
@@ -240,9 +241,11 @@
                                 @csrf @method('PATCH')
                                 @foreach(\App\Models\ResearchRecord::STATUSES as $key => $s)
                                     <button type="submit" name="repair_status" value="{{ $key }}"
-                                            class="ui-pill ui-pill--{{ $s['tone'] }} rs-btn {{ $key === $currentStatus ? 'rs-btn--current' : '' }}"
-                                            @if($key === $currentStatus) aria-pressed="true" @endif>
+                                            class="ui-pill ui-pill--{{ $s['tone'] }} rs-btn {{ $key === $currentStatus ? 'rs-btn--current' : '' }} {{ $key === $nextStatus ? 'rs-btn--next' : '' }}"
+                                            @if($key === $currentStatus) aria-pressed="true" @endif
+                                            @if($key === $nextStatus) title="Следующий шаг" @endif>
                                         <span class="ui-pill__dot" aria-hidden="true"></span>{{ $s['label'] }}
+                                        @if($key === $nextStatus)<span class="rs-btn__next">дальше</span>@endif
                                     </button>
                                 @endforeach
                             </form>
@@ -294,7 +297,7 @@
                             @endif
 
                             {{-- Ремонты и замены по этому борту (из исследований) и проверка технолога --}}
-                            @php $repairs = $record->researches()->whereNotNull('repair_action')->orderBy('id')->get(); @endphp
+                            @php $repairs = $record->researches()->whereNotNull('repair_action')->with('repairItems')->orderBy('id')->get(); @endphp
                             @if($repairs->isNotEmpty())
                                 <div class="pt-3 space-y-2" style="border-top: 1px solid var(--ui-border)">
                                     <div class="text-xs font-semibold uppercase tracking-wide" style="color: var(--ui-muted)">Ремонт и замена</div>
@@ -302,7 +305,7 @@
                                         @php
                                             $kind = $rep->techCheckKind();
                                             [$pill, $tone] = match (true) {
-                                                $kind === null       => ['В ремонте', 'neutral'],
+                                                $kind === null       => ['Отправлен в сборку', 'neutral'],
                                                 (bool) $rep->act_done_at => [$kind === 'act' ? 'Акт оформлен' : 'Принято', 'good'],
                                                 default              => [$kind === 'act' ? 'Нужен акт' : 'Ждёт приёмки', 'bad'],
                                             };
@@ -310,11 +313,15 @@
                                         <a href="{{ route('records.show', ['research', $rep->id]) }}" class="block rounded-lg px-2.5 py-2 hover:opacity-80" style="background: var(--ui-surface-2)">
                                             <div class="flex items-center justify-between gap-2">
                                                 <span class="text-sm font-medium" style="color: var(--ui-text)">
-                                                    {{ \App\Models\ResearchRecord::REPAIR_ACTIONS[$rep->repair_action] ?? $rep->repair_action }} · №{{ $rep->id }}
+                                                    {{ $rep->repairActionLabel() }} · №{{ $rep->id }}
                                                 </span>
                                                 <x-status-pill :value="$pill" :tone="$tone" />
                                             </div>
-                                            <div class="text-xs mt-0.5" style="color: var(--ui-text-2)">{{ $rep->repair_item }}</div>
+                                            @forelse($rep->repairItems as $it)
+                                                <div class="text-xs mt-0.5" style="color: var(--ui-text-2)">{{ $it->actionLabel() }}: {{ $it->label }}</div>
+                                            @empty
+                                                <div class="text-xs mt-0.5" style="color: var(--ui-text-2)">{{ $rep->repair_item }}</div>
+                                            @endforelse
                                         </a>
                                     @endforeach
                                 </div>

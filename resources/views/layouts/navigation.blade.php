@@ -126,6 +126,10 @@
                                 <span class="flex-1">Узлы ремонта и замены</span>
                                 @if($repairPending)<span class="text-xs font-semibold tabular-nums" style="color: var(--ui-bad)" title="Ждут проверки">{{ $repairPending }}</span>@endif
                             </a>
+                            <a href="{{ route('field-masks.index') }}" class="ui-menu__item {{ request()->routeIs('field-masks.*') ? 'ui-menu__item--active' : '' }}">
+                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M4 12h10M4 17h6m9-3l-3 3m0 0l-3-3m3 3V10"/></svg>
+                                Маски полей
+                            </a>
                             <a href="{{ route('audit.index') }}" class="ui-menu__item {{ request()->routeIs('audit.*') ? 'ui-menu__item--active' : '' }}">
                                 <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
                                 Журнал действий
@@ -204,6 +208,18 @@
                                     <span style="color: var(--ui-text-2)">Брак ПГП на ремонт</span>
                                     <span class="font-semibold tabular-nums" style="color: {{ $repairCount ? 'var(--ui-bad)' : 'var(--ui-muted)' }}">{{ $repairCount }}</span>
                                 </a>
+                                {{-- По статусам: сколько ещё не начато и сколько в работе --}}
+                                @if($repairCount)
+                                    @php $byStatus = $repairSvc->openForRepairByStatus(); @endphp
+                                    @foreach(['new' => 'не обработан', 'in_work' => 'в работе', 'analysis' => 'в разборе'] as $rsKey => $rsLabel)
+                                        @if($byStatus[$rsKey] ?? 0)
+                                            <a href="{{ route('records.index', ['research', 'repair' => 'open', 'rs' => $rsKey]) }}" class="ui-menu__item justify-between !py-1 pl-6 text-xs">
+                                                <span style="color: var(--ui-muted)">— {{ $rsLabel }}</span>
+                                                <span class="font-semibold tabular-nums" style="color: var(--ui-text-2)">{{ $byStatus[$rsKey] }}</span>
+                                            </a>
+                                        @endif
+                                    @endforeach
+                                @endif
                             @endif
                         @endif
 
@@ -339,6 +355,7 @@
                 <a href="{{ route('employees.index') }}" class="ui-menu__item {{ request()->routeIs('employees.*') ? 'ui-menu__item--active' : '' }}">Сотрудники</a>
                 <a href="{{ route('fault-codes.index') }}" class="ui-menu__item {{ request()->routeIs('fault-codes.*') ? 'ui-menu__item--active' : '' }}">Коды неисправностей</a>
                 <a href="{{ route('repair-items.index') }}" class="ui-menu__item {{ request()->routeIs('repair-items.*') ? 'ui-menu__item--active' : '' }}">Узлы ремонта и замены</a>
+                <a href="{{ route('field-masks.index') }}" class="ui-menu__item {{ request()->routeIs('field-masks.*') ? 'ui-menu__item--active' : '' }}">Маски полей</a>
                 <a href="{{ route('audit.index') }}" class="ui-menu__item {{ request()->routeIs('audit.*') ? 'ui-menu__item--active' : '' }}">Журнал действий</a>
                 <a href="{{ route('system.index') }}" class="ui-menu__item {{ request()->routeIs('system.*') ? 'ui-menu__item--active' : '' }}">Состояние сервера</a>
                 <a href="{{ route('firmware.categories.index') }}" class="ui-menu__item {{ request()->routeIs('firmware.categories.*') ? 'ui-menu__item--active' : '' }}">Категории прошивок</a>

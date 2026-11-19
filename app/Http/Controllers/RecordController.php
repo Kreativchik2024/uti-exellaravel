@@ -523,6 +523,9 @@ class RecordController extends Controller
         $repairOpen = $sheet === 'research' && $request->query('repair') === 'open';
         if ($repairOpen) {
             $query->whereNotNull('pgp_record_id')->where('is_repaired', false);
+            // Из меню ремонтника: только «Не обработан» или только «В работе»
+            $rs = $request->query('rs');
+            if (is_string($rs) && isset(\App\Models\ResearchRecord::STATUSES[$rs])) $query->where('repair_status', $rs);
         }
         // ПГП: борта после ремонта, чтобы не терялись в общем списке —
         // returned=1 — вернулись и ждут перепроверки; repaired=1 — все, кто был в ремонте (в т.ч. уже сданные)
@@ -543,8 +546,15 @@ class RecordController extends Controller
         }
         // Ссылка из меню технолога (ОТК): исследования, где была замена и нужен акт
         $actNeeded = $sheet === 'research' && $request->query('act') === 'needed';
+        $actKind = null;
+        $actTabs = null;
         if ($actNeeded) {
-            $query->whereIn('id', app(\App\Services\PgpDefectResearch::class)->actsNeeded()?->select('id') ?? [0]);
+            $svc = app(\App\Services\PgpDefectResearch::class);
+            // Вкладки технолога: все / нужен акт / ждёт приёмки
+            $actKind = in_array($request->query('kind'), ['act', 'accept'], true) ? $request->query('kind') : null;
+            $src = $actKind ? $svc->actsNeededOfKind($actKind) : $svc->actsNeeded();
+            $query->whereIn('id', $src?->select('id') ?? [0]);
+            $actTabs = $svc->actsNeededCounts();
         }
 
         if (array_key_exists('record_date', $cfg['fields'])) {
@@ -585,7 +595,7 @@ class RecordController extends Controller
             }
         }
 
-        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter', 'techOpen', 'repairOpen', 'actNeeded', 'returnedOpen', 'repairedOpen', 'repairTabs', 'repairMarks'));
+        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter', 'techOpen', 'repairOpen', 'actNeeded', 'returnedOpen', 'repairedOpen', 'repairTabs', 'repairMarks', 'actKind', 'actTabs'));
     }
 
     public function show(string $sheet, int $id)

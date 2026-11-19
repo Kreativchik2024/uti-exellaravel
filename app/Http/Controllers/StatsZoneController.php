@@ -455,13 +455,21 @@ class StatsZoneController extends Controller
             $scope = $s->workerScopeSql($cfg, $targetUser);
             [$dateSql, $dateBindings] = $this->sqlDateRange($from, $to);
 
+            // По пунктам ремонта/замены (в исследовании их может быть несколько); фильтры — по полям исследования.
+            // Исследования без пунктов (ремонт записан только сводкой) — по сводке.
             $res = DB::select(
-                "SELECT `repair_item` AS name, `repair_action` AS action, `category` AS category, COUNT(*) AS cnt,
+                "SELECT ri.`label` AS name, ri.`action` AS action, `category` AS category, COUNT(*) AS cnt,
                         MIN(record_date) AS first_date, MAX(record_date) AS last_date
+                 FROM `research_repair_items` ri JOIN `$table` ON `$table`.`id` = ri.`research_record_id`
+                 WHERE (ri.`label` != '' AND ri.`action` IN ('repair', 'replacement'))" . $scope['sql'] . $dateSql . "
+                 GROUP BY ri.`label`, ri.`action`, `category`
+                 UNION ALL
+                 SELECT `repair_item`, `repair_action`, `category`, COUNT(*), MIN(record_date), MAX(record_date)
                  FROM `$table`
-                 WHERE (`repair_item` IS NOT NULL AND `repair_item` != '' AND `repair_action` IN ('repair', 'replacement'))" . $scope['sql'] . $dateSql . "
+                 WHERE (`repair_item` IS NOT NULL AND `repair_item` != '' AND `repair_action` IN ('repair', 'replacement'))
+                   AND NOT EXISTS (SELECT 1 FROM `research_repair_items` x WHERE x.`research_record_id` = `$table`.`id`)" . $scope['sql'] . $dateSql . "
                  GROUP BY `repair_item`, `repair_action`, `category`",
-                array_merge($scope['bindings'], $dateBindings)
+                array_merge($scope['bindings'], $dateBindings, $scope['bindings'], $dateBindings)
             );
 
             $agg = [];

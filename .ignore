@@ -1,0 +1,12 @@
+# Пропускается при поиске Claude Code (Grep/Glob, ripgrep). Read по явному пути работает.
+vendor/
+node_modules/
+storage/
+public/build/
+bootstrap/cache/
+.venv*/
+*.min.js
+*.min.css
+*.map
+composer.lock
+package-lock.json

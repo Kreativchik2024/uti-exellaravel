@@ -102,7 +102,7 @@ class PgpRepairFlowTest extends TestCase
         $research = $this->research(['repair_status' => 'analysis', 'category' => 'Кросс 3']);
 
         $html = $this->asUser($this->worker('repair'))->get("/records/research/{$research->id}")->assertOk()->getContent();
-        foreach (['Не обработан' => 'bad', 'В работе' => 'neutral', 'Отправлен в разбор' => 'warn', 'Отправлен в конвейер' => 'good'] as $label => $tone) {
+        foreach (['Не обработан' => 'bad', 'В работе' => 'neutral', 'Отправлен в разбор' => 'warn', 'Отправлен на испытания' => 'good'] as $label => $tone) {
             $this->assertStringContainsString($label, $html);
             $this->assertStringContainsString("ui-pill--{$tone} rs-btn", $html);
         }

@@ -115,9 +115,32 @@
             </nav>
         @endif
 
+        {{-- Технолог (ОТК): вкладки — все / нужен акт / ждёт приёмки --}}
+        @if($actTabs ?? null)
+            @php
+                $aTabs = [
+                    ['key' => null,     'label' => 'Все',             'count' => $actTabs['act'] + $actTabs['accept']],
+                    ['key' => 'act',    'label' => 'Нужен акт',       'count' => $actTabs['act']],
+                    ['key' => 'accept', 'label' => 'Ждёт приёмки',    'count' => $actTabs['accept']],
+                ];
+            @endphp
+            <nav class="flex flex-wrap items-center gap-2" aria-label="Проверка технолога">
+                <span class="text-sm font-medium mr-1" style="color: var(--ui-muted)">Технолог:</span>
+                @foreach($aTabs as $tab)
+                    @php $on = ($actKind ?? null) === $tab['key']; @endphp
+                    <a href="{{ route('records.index', array_filter([$sheet, 'act' => 'needed', 'kind' => $tab['key'], 'q' => $q ?: null])) }}"
+                       class="ui-btn ui-btn--sm {{ $on ? 'ui-btn--primary' : 'ui-btn--ghost' }}" @if($on) aria-current="page" @endif>
+                        {{ $tab['label'] }}
+                        <span class="tabular-nums text-xs font-semibold px-1.5 rounded-full"
+                              style="background: {{ $on ? 'rgba(255,255,255,.22)' : ($tab['count'] ? 'var(--ui-bad-soft)' : 'var(--ui-surface-hover)') }}">{{ $tab['count'] }}</span>
+                    </a>
+                @endforeach
+            </nav>
+        @endif
+
         @if(($techOpen ?? false) || ($repairOpen ?? false) || ($actNeeded ?? false) || ($returnedOpen ?? false) || ($repairedOpen ?? false))
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm rounded-lg px-3 py-2" style="background: var(--ui-surface-2); color: var(--ui-text-2)">
-                <span>{{ ($repairedOpen ?? false) ? 'Все борта, которые были в ремонте: «после ремонта» — уже сданы, «в ремонте» — ещё нет' : (($returnedOpen ?? false) ? 'Борта вернулись на ПГП после ремонта. Перепроверьте, откройте запись, нажмите «Изменить» и поставьте статус «Сдан»' : (($actNeeded ?? false) ? 'Ждут технолога: замена — нужен акт, ремонт в конвейере — приёмка. Откройте исследование и отметьте «Акт оформлен» или «Принято технологом»' : (($repairOpen ?? false) ? 'Показан брак ПГП, ещё не отремонтированный' : 'Показаны необработанные рекламации ПГП'))) }}</span>
+                <span>{{ ($repairedOpen ?? false) ? 'Все борта, которые были в ремонте: «после ремонта» — уже сданы, «отправлен в сборку» — ещё нет' : (($returnedOpen ?? false) ? 'Борта вернулись на ПГП после ремонта. Перепроверьте, откройте запись, нажмите «Изменить» и поставьте статус «Сдан»' : (($actNeeded ?? false) ? 'Ждут технолога: замена — нужен акт, ремонт на испытаниях — приёмка. Откройте исследование и отметьте «Акт оформлен» или «Принято технологом»' : (($repairOpen ?? false) ? 'Показан брак ПГП, ещё не отремонтированный' : 'Показаны необработанные рекламации ПГП'))) }}</span>
                 <a href="{{ route('records.index', $sheet) }}" class="font-semibold underline" style="color: var(--ui-accent-text)">Показать все</a>
             </div>
         @endif

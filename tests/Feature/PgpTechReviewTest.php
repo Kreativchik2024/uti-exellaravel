@@ -71,13 +71,36 @@ class PgpTechReviewTest extends TestCase
         $master = $this->worker('master');
         $open = $this->defect();
         $this->defect(['tech_processed' => true]);
-        $this->defect(['status' => 'Сдан']);   // не брак
+        $this->defect(['status' => 'Сдан', 'frame_serial' => 'MR-9001', 'fuselage_number' => 'FZ-9001']);   // не брак, другой борт
 
         $this->actingAs($master);   // счётчик считается для текущего участка пользователя
         $this->assertSame(1, app(PgpComplaints::class)->openCount());
 
         $this->asUser($this->worker('otk'))->patch("/records/pgp/{$open->id}/tech", ['tech_processed' => 1]);
         $this->assertSame(0, app(PgpComplaints::class)->openCount());
+    }
+
+    public function test_defect_closed_when_same_board_passed_later(): void
+    {
+        $this->actingAs($this->worker('master'));
+        $board = ['frame_serial' => 'MR-1234', 'fuselage_number' => 'FZ-1234'];
+
+        $old = $this->defect($board + ['record_date' => '2026-11-10']);
+        $other = $this->defect(['frame_serial' => 'MR-5555', 'fuselage_number' => 'FZ-5555', 'record_date' => '2026-11-10']);
+        $this->assertSame(2, app(PgpComplaints::class)->openCount());
+
+        // Тот же борт (по фюзеляжу) позже сдан — старый брак больше не висит; чужой борт остаётся
+        $this->defect(['frame_serial' => 'MR-0000', 'fuselage_number' => 'FZ-1234', 'status' => 'Сдан', 'record_date' => '2026-11-12']);
+        $this->assertSame(1, app(PgpComplaints::class)->openCount());
+
+        $html = $this->asUser($this->worker('master'))->get('/records/pgp?tech=open')->assertOk()->getContent();
+        $this->assertStringContainsString("/records/pgp/{$other->id}\"", $html);
+        $this->assertStringNotContainsString("/records/pgp/{$old->id}\"", $html);
+
+        // «Сдан» раньше брака не закрывает его
+        $this->defect($board + ['status' => 'Сдан', 'record_date' => '2026-11-01']);
+        $this->defect(['frame_serial' => 'MR-7777', 'fuselage_number' => 'FZ-7777', 'status' => 'Сдан', 'record_date' => '2026-11-01']);
+        $this->assertSame(1, app(PgpComplaints::class)->openCount());
     }
 
     public function test_tech_open_filter_lists_only_open_complaints(): void

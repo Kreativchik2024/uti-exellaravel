@@ -15,7 +15,7 @@
     @case('in_repair')
         <span class="inline-flex flex-wrap items-center gap-1">
             <x-status-pill :value="$record->status ?? null" />
-            <span class="ui-badge-warn">в ремонте</span>
+            <span class="ui-badge-warn">отправлен в сборку</span>
         </span>
         @break
     @default

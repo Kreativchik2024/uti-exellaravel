@@ -6,18 +6,23 @@ use Illuminate\Database\Eloquent\Model;
 
 class ResearchRecord extends Model
 {
-    /** Статус исследования: подпись и цвет (тон ui-pill). «Отправлен в конвейер» = отремонтировано. */
+    /** Статус исследования: подпись и цвет (тон ui-pill). «Отправлен на испытания» = отремонтировано (ключ conveyor). Старые подписи — LEGACY_LABELS. */
     public const STATUSES = [
         'new'      => ['label' => 'Не обработан',         'tone' => 'bad'],
         'in_work'  => ['label' => 'В работе',             'tone' => 'neutral'],
         'analysis' => ['label' => 'Отправлен в разбор',   'tone' => 'warn'],
-        'conveyor' => ['label' => 'Отправлен в конвейер', 'tone' => 'good'],
+        'conveyor' => ['label' => 'Отправлен на испытания', 'tone' => 'good'],
+    ];
+
+    /** Прежние подписи статусов (в старых записях журнала действий) → текущие. */
+    public const LEGACY_LABELS = [
+        'Отправлен в конвейер' => 'Отправлен на испытания',
     ];
 
     /** Что сделал ремонтник с узлом. При замене технологу (ОТК) нужен акт. */
     public const REPAIR_ACTIONS = [
-        'repair'      => 'Ремонт',
-        'replacement' => 'Замена',
+        'repair'      => 'Ремонт (без использования комплектующих)',
+        'replacement' => 'Замена (с использованием комплектующих)',
     ];
 
     /**
@@ -48,9 +53,39 @@ class ResearchRecord extends Model
         return null;
     }
 
+    /**
+     * Логичный следующий статус: не обработан → в работе → (ремонт/замена указаны) отправлен на испытания;
+     * из разбора — снова в работу. null — дальше по статусу ничего не нужно.
+     */
+    public function nextStatus(): ?string
+    {
+        return match ($this->repair_status ?: 'new') {
+            'new'      => 'in_work',
+            'in_work'  => $this->repair_action ? 'conveyor' : null,
+            'analysis' => 'in_work',
+            default    => null,
+        };
+    }
+
     public function repairItemModel()
     {
         return $this->belongsTo(RepairItem::class, 'repair_item_id');
+    }
+
+    /** Все пункты ремонта и замены (repair_action / repair_item — сводка по ним). */
+    public function repairItems()
+    {
+        return $this->hasMany(ResearchRepairItem::class)->orderBy('position')->orderBy('id');
+    }
+
+    /** «Ремонт», «Замена» или «Ремонт и замена» — по пунктам; для старых записей — по сводке. */
+    public function repairActionLabel(): ?string
+    {
+        $kinds = $this->repairItems->pluck('action')->unique();
+        if ($kinds->count() > 1) return 'Ремонт и замена';
+        $kind = $kinds->first() ?? $this->repair_action;
+
+        return $kind ? (self::REPAIR_ACTIONS[$kind] ?? $kind) : null;
     }
 
     /** [ключ => подпись] — для выпадающего списка в форме. */

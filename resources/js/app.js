@@ -4,6 +4,7 @@ import '@fontsource-variable/inter';
 
 
 
+import './input-mask';
 import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;

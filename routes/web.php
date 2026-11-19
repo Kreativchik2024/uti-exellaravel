@@ -105,8 +105,15 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::patch('/repair-items/{repairItem}/approve', [\App\Http\Controllers\RepairItemController::class, 'approve'])->name('repair-items.approve');
     Route::delete('/repair-items/{repairItem}',        [\App\Http\Controllers\RepairItemController::class, 'reject'])->name('repair-items.reject');
 
+    // Маски ввода полей (ПГП): библиотека масок и маски у полей
+    Route::get('/field-masks',                         [\App\Http\Controllers\FieldMaskController::class, 'index'])->name('field-masks.index');
+    Route::post('/field-masks',                        [\App\Http\Controllers\FieldMaskController::class, 'store'])->name('field-masks.store');
+    Route::put('/field-masks/{fieldMask}',             [\App\Http\Controllers\FieldMaskController::class, 'update'])->name('field-masks.update');
+    Route::delete('/field-masks/{fieldMask}',          [\App\Http\Controllers\FieldMaskController::class, 'destroy'])->name('field-masks.destroy');
+    Route::put('/field-masks/field/{sheet}/{field}',   [\App\Http\Controllers\FieldMaskController::class, 'saveField'])->name('field-masks.field');
+
     // Справочник кодов неисправностей
-    Route::get('/fault-codes',                [\App\Http\Controllers\FaultCodeController::class, 'index'])->name('fault-codes.index');
+    Route::get('/fault-codes',               [\App\Http\Controllers\FaultCodeController::class, 'index'])->name('fault-codes.index');
     Route::post('/fault-codes',               [\App\Http\Controllers\FaultCodeController::class, 'store'])->name('fault-codes.store');
     Route::get('/fault-codes/template',       [\App\Http\Controllers\FaultCodeController::class, 'template'])->name('fault-codes.template');
     Route::get('/fault-codes/export',         [\App\Http\Controllers\FaultCodeController::class, 'export'])->name('fault-codes.export');
@@ -197,7 +204,9 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::patch('/records/{sheet}/{id}/research-status', [RecordReviewController::class, 'researchStatus'])->middleware('role:repair,master,admin')->name('records.researchStatus');
     // Ремонт / замена и узел — ремонтник (мастер, админ); акт на замену — технолог ОТК (мастер, админ)
     Route::patch('/records/{sheet}/{id}/research-repair', [RecordReviewController::class, 'researchRepair'])->middleware('role:repair,master,admin')->name('records.researchRepair');
-    Route::patch('/records/{sheet}/{id}/research-act', [RecordReviewController::class, 'researchAct'])->middleware('role:otk,master,admin')->name('records.researchAct');
+    // Отмена последнего сохранения ремонта или статуса (в течение пары минут, тем же пользователем)
+    Route::post('/records/{sheet}/{id}/research-undo', [RecordReviewController::class, 'researchUndo'])->middleware('role:repair,master,admin')->name('records.researchUndo');
+    Route::patch('/records/{sheet}/{id}/research-act',[RecordReviewController::class, 'researchAct'])->middleware('role:otk,master,admin')->name('records.researchAct');
     Route::post('/records/{sheet}/{id}/comments', [RecordReviewController::class, 'comment'])->middleware('throttle:30,1')->name('records.comment');
     Route::delete('/records/{sheet}/{id}',   [RecordController::class, 'destroy'])->name('records.destroy');
 });

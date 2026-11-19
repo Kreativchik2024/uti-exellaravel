@@ -73,6 +73,13 @@ class PgpDefectResearch
         return $this->openForRepair()?->count() ?? 0;
     }
 
+    /** Брак ПГП на ремонт по статусам: ['new' => 3, 'in_work' => 2, …]. */
+    public function openForRepairByStatus(): array
+    {
+        return $this->openForRepair()?->selectRaw('repair_status, COUNT(*) AS c')->groupBy('repair_status')
+            ->pluck('c', 'repair_status')->map(fn ($c) => (int) $c)->all() ?? [];
+    }
+
     /**
      * Ждут технолога (ОТК): замена — нужен акт; ремонт, отправленный в конвейер, — нужна приёмка.
      * Любое исследование — заведённое по браку ПГП и внесённое вручную (см. ResearchRecord::techCheckKind).
@@ -89,6 +96,21 @@ class PgpDefectResearch
     public function actsNeededCount(): int
     {
         return $this->actsNeeded()?->count() ?? 0;
+    }
+
+    /** Список технолога по виду: 'act' — нужен акт на замену, 'accept' — ремонт ждёт приёмки. */
+    public function actsNeededOfKind(string $kind): ?Builder
+    {
+        $q = $this->actsNeeded();
+        if (! $q) return null;
+
+        return $kind === 'act' ? $q->where('repair_action', 'replacement') : $q->where('repair_action', 'repair');
+    }
+
+    /** @return array{act: int, accept: int} */
+    public function actsNeededCounts(): array
+    {
+        return ['act' => $this->actsNeededOfKind('act')?->count() ?? 0, 'accept' => $this->actsNeededOfKind('accept')?->count() ?? 0];
     }
 
     /**

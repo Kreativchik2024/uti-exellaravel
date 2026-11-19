@@ -271,9 +271,12 @@ class BoardHistory
             $after = trim((string) preg_replace('/^Исследование #\d+:\s*/u', '', (string) $log->summary));
 
             if ($log->action === 'repair') {
-                $isReplacement = str_starts_with($after, 'Замена');
+                // «Замена — A; Ремонт — B» — пунктов может быть несколько
+                // «Замена — …» (старые) или «Замена (с использованием комплектующих) — …»
+                $isReplacement = (bool) preg_match('/(^|; )Замена( \([^)]*\))? — /u', $after);
+                $isRepair = (bool) preg_match('/(^|; )Ремонт( \([^)]*\))? — /u', $after);
                 $events[] = ['at' => $log->created_at, 'stage' => 'repair', 'rank' => 1,
-                    'title' => "Исследование №{$log->subject_id}: " . ($isReplacement ? 'замена' : 'ремонт'),
+                    'title' => "Исследование №{$log->subject_id}: " . ($isReplacement && $isRepair ? 'ремонт и замена' : ($isReplacement ? 'замена' : 'ремонт')),
                     'text' => $after, 'tone' => $isReplacement ? 'warn' : 'neutral', 'who' => $who, 'by' => null, 'url' => $url];
             } elseif ($log->action === 'act') {
                 $accepted = str_contains($after, 'ремонт принят');
@@ -283,6 +286,7 @@ class BoardHistory
             } else {
                 // «Исследование #12: Не обработан → В работе» — новый этап после стрелки
                 $to = trim((string) (preg_split('/→/u', (string) $log->summary)[1] ?? ''));
+                $to = ResearchRecord::LEGACY_LABELS[$to] ?? $to;
                 $events[] = ['at' => $log->created_at, 'stage' => 'repair', 'rank' => 1,
                     'title' => "Исследование №{$log->subject_id}: " . ($to ?: 'статус изменён'),
                     'text' => null, 'tone' => $this->toneOfLabel($to), 'who' => $who, 'by' => null, 'url' => $url];

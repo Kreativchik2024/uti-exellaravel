@@ -69,6 +69,19 @@
              data-ok="{{ session('ok') }}"
              data-error="{{ session('error') ?: (isset($errors) && $errors->any() ? $errors->first() : '') }}"></div>
 
+        {{-- «Сохранено · Отменить»: после сохранения ремонта или статуса исследования (RecordReviewController::rememberUndo) --}}
+        @if($undo = session('undo'))
+            <div class="ui-undo" role="status" x-data="{ show: true, left: {{ (int) $undo['seconds'] }} }"
+                 x-init="const t = setInterval(() => { if (--left <= 0) { show = false; clearInterval(t); } }, 1000)" x-show="show" x-transition.opacity>
+                <span class="ui-undo__text">✓ {{ $undo['message'] }}</span>
+                <form method="POST" action="{{ $undo['url'] }}">
+                    @csrf
+                    <button type="submit" class="ui-undo__btn">Отменить <span class="tabular-nums opacity-70" x-text="'· ' + left"></span></button>
+                </form>
+                <button type="button" class="ui-undo__x" aria-label="Закрыть" @click="show = false">×</button>
+            </div>
+        @endif
+
         {{-- ПАНЕЛЬ ОНЛАЙН --}}
         @include('partials.presence')
 

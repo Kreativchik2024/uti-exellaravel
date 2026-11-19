@@ -37,34 +37,39 @@
         @endforeach
     </div>
 
-    {{-- Лента по времени: этап, что произошло, кто делал и кто внёс --}}
-    <ol class="px-4 py-3 space-y-2.5">
-        @forelse($boardHistory['events'] as $ev)
-            <li class="flex gap-3">
-                <span class="ui-pill--{{ $ev['tone'] }} w-2.5 h-2.5 mt-1.5 shrink-0 rounded-full" aria-hidden="true" style="background: var(--pill-fg)"></span>
-                <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
-                        <span class="min-w-0">
-                            <span class="bj-chip">{{ \App\Services\BoardHistory::STAGES[$ev['stage']] ?? '' }}</span>
-                            @if($ev['url'])
-                                <a href="{{ $ev['url'] }}" @if($draft) target="_blank" @endif class="font-medium hover:underline" style="color: var(--ui-text)">{{ $ev['title'] }}</a>
-                            @else
-                                <span class="font-medium" style="color: var(--ui-text)">{{ $ev['title'] }}</span>
-                            @endif
-                        </span>
-                        <span class="text-xs tabular-nums" style="color: var(--ui-muted)">{{ $ev['at']?->format('d.m.Y H:i') }}</span>
-                    </div>
-                    @if($ev['who'] || $ev['by'])
-                        <div class="text-xs" style="color: var(--ui-muted)">
-                            @if($ev['who'])делал: <span style="color: var(--ui-text-2)">{{ $ev['who'] }}</span>@endif
-                            @if($ev['who'] && $ev['by'] && $ev['by'] !== $ev['who']) · @endif
-                            @if($ev['by'] && $ev['by'] !== $ev['who'])внёс: <span style="color: var(--ui-text-2)">{{ $ev['by'] }}</span>@endif
-                        </div>
-                    @endif
-                    @if($ev['text'])
-                        <div class="text-sm whitespace-pre-line" style="color: var(--ui-text-2)">{{ $ev['text'] }}</div>
-                    @endif
-                </div>
+    {{-- Лента по времени, по дням: время слева, цветная точка на линии, карточка — этап, что произошло, кто делал и кто внёс --}}
+    @php $days = collect($boardHistory['events'])->groupBy(fn ($ev) => $ev['at']?->format('d.m.Y') ?? 'Без даты'); @endphp
+    <ol class="bj-feed px-4 py-3">
+        @forelse($days as $day => $dayEvents)
+            <li class="bj-day">
+                <div class="bj-day__head">{{ $day }}</div>
+                <ol class="bj-day__list">
+                    @foreach($dayEvents as $ev)
+                        <li class="bj-ev ui-pill--{{ $ev['tone'] }}">
+                            <span class="bj-ev__time tabular-nums">{{ $ev['at']?->format('H:i') }}</span>
+                            <span class="bj-ev__dot" aria-hidden="true"></span>
+                            <div class="bj-ev__card">
+                                <div class="bj-ev__top">
+                                    <span class="bj-chip">{{ \App\Services\BoardHistory::STAGES[$ev['stage']] ?? '' }}</span>
+                                </div>
+                                @if($ev['url'])
+                                    <a href="{{ $ev['url'] }}" @if($draft) target="_blank" @endif class="bj-ev__title hover:underline">{{ $ev['title'] }}</a>
+                                @else
+                                    <span class="bj-ev__title">{{ $ev['title'] }}</span>
+                                @endif
+                                @if($ev['text'])
+                                    <div class="bj-ev__text">{{ $ev['text'] }}</div>
+                                @endif
+                                @if($ev['who'] || ($ev['by'] && $ev['by'] !== $ev['who']))
+                                    <div class="bj-ev__people">
+                                        @if($ev['who'])<span>Делал: <b>{{ $ev['who'] }}</b></span>@endif
+                                        @if($ev['by'] && $ev['by'] !== $ev['who'])<span>Внёс: <b>{{ $ev['by'] }}</b></span>@endif
+                                    </div>
+                                @endif
+                            </div>
+                        </li>
+                    @endforeach
+                </ol>
             </li>
         @empty
             <li class="text-sm" style="color: var(--ui-muted)">{{ $draft ? 'По этим номерам ничего не найдено — борт новый' : 'Событий нет' }}</li>

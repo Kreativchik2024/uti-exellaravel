@@ -18,8 +18,12 @@ class RepairItemController extends Controller
     {
         $groups = $catalog->groups();
         $items = RepairItem::with('creator:id,name')->orderBy('is_approved')->orderByDesc('id')->get();
-        $used = ResearchRecord::whereIn('repair_item_id', $items->pluck('id'))
+        // В скольких исследованиях выбран (по пунктам ремонта/замены и по сводке у исследований без пунктов)
+        $used = \App\Models\ResearchRepairItem::whereIn('item_id', $items->pluck('id'))
+            ->selectRaw('item_id, COUNT(DISTINCT research_record_id) AS c')->groupBy('item_id')->pluck('c', 'item_id');
+        $legacy = ResearchRecord::whereIn('repair_item_id', $items->pluck('id'))->whereDoesntHave('repairItems')
             ->selectRaw('repair_item_id, COUNT(*) AS c')->groupBy('repair_item_id')->pluck('c', 'repair_item_id');
+        foreach ($legacy as $id => $c) $used[$id] = ($used[$id] ?? 0) + $c;
 
         return view('repair-items.index', [
             'pending'  => $items->where('is_approved', false),
@@ -37,7 +41,13 @@ class RepairItemController extends Controller
 
         // В исследованиях, где выбран этот вариант, — актуальное название
         $label = $catalog->itemLabel($repairItem);
-        ResearchRecord::where('repair_item_id', $repairItem->id)->update(['repair_item' => $label]);
+        \App\Models\ResearchRepairItem::where('item_id', $repairItem->id)->update(['label' => $label]);
+        ResearchRecord::where('repair_item_id', $repairItem->id)->whereDoesntHave('repairItems')->update(['repair_item' => $label]);
+        // Сводка по пунктам — заново, где этот узел среди пунктов
+        $ids = \App\Models\ResearchRepairItem::where('item_id', $repairItem->id)->distinct()->pluck('research_record_id');
+        foreach (ResearchRecord::with('repairItems')->whereIn('id', $ids)->get() as $rec) {
+            $rec->forceFill(['repair_item' => mb_substr($rec->repairItems->pluck('label')->implode('; '), 0, 255)])->saveQuietly();
+        }
 
         AuditLog::write('research', 'repair_item', "Подтверждён узел «{$label}»", ['subject_type' => 'repair_item', 'subject_id' => $repairItem->id, 'section_id' => null]);
 

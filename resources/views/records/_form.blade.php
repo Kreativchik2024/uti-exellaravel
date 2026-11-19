@@ -326,6 +326,7 @@
                         @elseif($type === 'combo')
                             <input type="text" name="{{ $name }}" value="{{ $value }}"
                                    list="combo-{{ $name }}" autocomplete="off"
+                                   @if(!empty($f['masks'])) data-masks="{{ json_encode($f['masks'], JSON_UNESCAPED_UNICODE) }}" @endif
                                    @if($isReq) required @endif @if($isTimeLocked) disabled @endif
                                    placeholder="{{ $f['placeholder'] ?? '' }}"
                                    class="{{ $baseInput }} @error($name) !border-red-400 !ring-red-500/15 @enderror">
@@ -371,7 +372,8 @@
                                    @if($isTimeLocked) disabled @endif
                                    data-lookup-field="{{ $name }}"
                                    data-lookup-url="{{ route('records.lookup', $sheet) }}"
-                                   placeholder="Введите {{ mb_strtolower($label) }}…"
+                                   @if(!empty($f['masks'])) data-masks="{{ json_encode($f['masks'], JSON_UNESCAPED_UNICODE) }}" @endif
+                                   placeholder="{{ !empty($f['masks']) ? $f['placeholder'] : 'Введите ' . mb_strtolower($label) . '…' }}"
                                    class="lookup-input {{ $baseInput }} @error($name) !border-red-400 !ring-red-500/15 @enderror">
 
                         @elseif($type === 'textarea')
@@ -422,6 +424,7 @@
                             <input type="text" name="{{ $name }}" value="{{ $value }}"
                                    @if($isReq) required @endif @if($isTimeLocked) disabled @endif
                                    placeholder="{{ $f['placeholder'] ?? '' }}"
+                                   @if(!empty($f['masks'])) data-masks="{{ json_encode($f['masks'], JSON_UNESCAPED_UNICODE) }}" @endif autocomplete="off"
                                    class="{{ $baseInput }} @error($name) !border-red-400 !ring-red-500/15 @enderror">
                         @endif
 
