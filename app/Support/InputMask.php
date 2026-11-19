@@ -3,13 +3,21 @@
 namespace App\Support;
 
 /**
- * Маска ввода поля: 9 — цифра, A — буква (латиница или кириллица), * — буква или цифра,
- * \X — символ X как есть; остальные символы — постоянные (подставляются сами).
- * Пример: «УМН-9999», «AA-999999», «\9-99».
+ * Маска ввода поля: цифра — 0, 9 или #; буква — Я, А (рус.) или A (лат.); буква или цифра — ?, _ или *;
+ * \X — символ X как есть (например \0 — сам ноль); остальные символы — постоянные (подставляются сами).
+ * Пример: «УМН-0000», «ЯЯ-000000», «\0-00».
  * Тот же разбор — в resources/js/input-mask.js (подсказка при вводе).
  */
 class InputMask
 {
+    /**
+     * Значки места для ввода — с запасом, чтобы маску можно было набрать «как видишь»:
+     * цифра — 9, 0 или #; буква — A (лат.), А (рус.) или Я; буква или цифра — *, ? или _.
+     */
+    public const DIGIT  = ['9', '0', '#'];
+    public const LETTER = ['A', 'А', 'Я'];
+    public const ANY    = ['*', '?', '_'];
+
     /** @return list<array{t: string, ch: string}> t: 9 | A | * | lit */
     public static function tokens(string $pattern): array
     {
@@ -18,7 +26,12 @@ class InputMask
         for ($i = 0, $n = count($chars); $i < $n; $i++) {
             $c = $chars[$i];
             if ($c === '\\' && $i + 1 < $n) { $out[] = ['t' => 'lit', 'ch' => $chars[++$i]]; continue; }
-            $out[] = in_array($c, ['9', 'A', '*'], true) ? ['t' => $c, 'ch' => $c] : ['t' => 'lit', 'ch' => $c];
+            $out[] = match (true) {
+                in_array($c, self::DIGIT, true)  => ['t' => '9', 'ch' => $c],
+                in_array($c, self::LETTER, true) => ['t' => 'A', 'ch' => $c],
+                in_array($c, self::ANY, true)    => ['t' => '*', 'ch' => $c],
+                default                          => ['t' => 'lit', 'ch' => $c],
+            };
         }
 
         return $out;
@@ -70,7 +83,9 @@ class InputMask
     {
         if (trim($pattern) === '') return 'Маска пустая.';
         $tokens = self::tokens($pattern);
-        if (! array_filter($tokens, fn ($t) => $t['t'] !== 'lit')) return 'В маске нет ни одного места для ввода: добавьте 9, A или *.';
+        if (! array_filter($tokens, fn ($t) => $t['t'] !== 'lit')) {
+            return 'В маске нет места для ввода: обозначьте цифру знаком 0 (или 9), букву — Я (или А), букву или цифру — ? (или _). Например: УМН-0000.';
+        }
 
         return null;
     }

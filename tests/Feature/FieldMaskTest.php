@@ -25,6 +25,16 @@ class FieldMaskTest extends TestCase
         $this->assertFalse(InputMask::matches('\9-99', '8-12'));
         $this->assertSame('УМН-0000', InputMask::placeholder('УМН-9999'));
         $this->assertNotNull(InputMask::error('УМН-'));
+
+        // Маску можно набрать «как видишь»: 0 — цифра, Я / русская А — буква, ? и _ — буква или цифра
+        $this->assertTrue(InputMask::matches('УМН-0000', 'УМН-0421'));
+        $this->assertTrue(InputMask::matches('ЯЯ-##', 'MR-12'));
+        $this->assertTrue(InputMask::matches('АА-99', 'MR-12'));   // кириллическая «А»
+        $this->assertTrue(InputMask::matches('??-__', 'A1-b2'));
+        $this->assertTrue(InputMask::matches('\0-00', '0-12'));
+        $this->assertFalse(InputMask::matches('\0-00', '5-12'));
+        $this->assertNull(InputMask::error('УМН-____'));
+        $this->assertNull(InputMask::error('АА-'));
     }
 
     public function test_only_admin_manages_masks(): void

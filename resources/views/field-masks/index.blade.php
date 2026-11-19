@@ -34,14 +34,15 @@
         <section class="ui-card p-4 text-sm space-y-2" style="color: var(--ui-text-2)">
             <div class="font-semibold" style="color: var(--ui-text)">Как писать маску</div>
             <div class="fm-legend">
-                <span><code>9</code> — цифра</span>
-                <span><code>A</code> — буква (латинская A)</span>
-                <span><code>*</code> — буква или цифра</span>
-                <span><code>\9</code> — символ «9» как есть</span>
+                <span><code>0</code> — цифра <span class="opacity-60">(можно и 9 или #)</span></span>
+                <span><code>Я</code> — буква <span class="opacity-60">(можно и А)</span></span>
+                <span><code>?</code> — буква или цифра <span class="opacity-60">(можно и _ или *)</span></span>
                 <span>остальное (<code>-</code>, <code>УМН</code>, <code>/</code>…) — подставляется само</span>
             </div>
             <div class="text-xs" style="color: var(--ui-muted)">
-                Примеры: <code>УМН-9999</code> → УМН-0421 · <code>AA-999999</code> → MR-004512 · у поля может быть несколько масок — подойдёт любая.
+                Примеры: <code>УМН-0000</code> → УМН-0421 · <code>ЯЯ-000000</code> → MR-004512 · <code>???-??</code> → A1B-7C.
+                Нужен сам символ «0» или «Я» — поставьте перед ним <code>\</code>: <code>\0-00</code> → 0-12.
+                Набирать маску удобнее кнопками «+ цифра», «+ буква» у формы. У поля может быть несколько масок — подойдёт любая.
                 Уже внесённые значения при правке записи не проверяются.
             </div>
         </section>
@@ -93,7 +94,11 @@
                             @csrf
                             <input type="hidden" name="sheet" value="{{ $sheet }}">
                             <input type="hidden" name="attach_field" value="{{ $fd['name'] }}">
-                            <input type="text" name="pattern" x-model="np" required maxlength="120" placeholder="Маска, напр. УМН-9999" class="ui-input !py-1.5 text-sm font-mono">
+                            <input type="text" name="pattern" x-model="np" required maxlength="120" placeholder="Маска, напр. УМН-0000" class="ui-input !py-1.5 text-sm font-mono">
+                            <span class="fm-build">
+                                <button type="button" @click="np += '0'">+ цифра</button><button type="button" @click="np += 'Я'">+ буква</button><button type="button" @click="np += '?'">+ буква или цифра</button><button type="button" @click="np += '-'">+ «-»</button><button type="button" x-show="np" @click="np = [...np].slice(0, -1).join('')">⌫</button>
+                            </span>
+                            <span class="text-xs" style="color: var(--ui-bad)" x-show="np && !InputMask.tokens(np).some(t => t.t !== 'lit')" x-cloak>Нет места для ввода — добавьте цифру или букву кнопками</span>
                             <input type="text" name="name" required maxlength="100" placeholder="Название, напр. Номер УМН" class="ui-input !py-1.5 text-sm">
                             <input type="text" name="hint" maxlength="255" placeholder="Пояснение (необязательно)" class="ui-input !py-1.5 text-sm">
                             <span class="text-xs" style="color: var(--ui-muted)" x-show="np" x-text="'Будет выглядеть: ' + InputMask.placeholder(np)"></span>
@@ -147,7 +152,13 @@
             <form method="POST" action="{{ route('field-masks.store') }}" class="fm-lib" style="background: var(--ui-surface-2)" x-data="{ p: '' }">
                 @csrf
                 <input type="hidden" name="sheet" value="{{ $sheet }}">
-                <input type="text" name="pattern" x-model="p" required maxlength="120" placeholder="Новая маска, напр. AA-999999" class="ui-input !py-1.5 text-sm font-mono">
+                <div class="flex flex-col gap-1">
+                    <input type="text" name="pattern" x-model="p" required maxlength="120" placeholder="Новая маска, напр. ЯЯ-000000" class="ui-input !py-1.5 text-sm font-mono">
+                    <span class="fm-build">
+                                <button type="button" @click="p += '0'">+ цифра</button><button type="button" @click="p += 'Я'">+ буква</button><button type="button" @click="p += '?'">+ буква или цифра</button><button type="button" @click="p += '-'">+ «-»</button><button type="button" x-show="p" @click="p = [...p].slice(0, -1).join('')">⌫</button>
+                            </span>
+                            <span class="text-xs" style="color: var(--ui-bad)" x-show="p && !InputMask.tokens(p).some(t => t.t !== 'lit')" x-cloak>Нет места для ввода — добавьте цифру или букву кнопками</span>
+                </div>
                 <input type="text" name="name" required maxlength="100" placeholder="Название" class="ui-input !py-1.5 text-sm">
                 <input type="text" name="hint" maxlength="255" placeholder="Пояснение (необязательно)" class="ui-input !py-1.5 text-sm">
                 <span class="text-xs" style="color: var(--ui-muted)" x-text="p ? InputMask.placeholder(p) : ''"></span>
@@ -166,7 +177,10 @@
         .fm-chip { display: inline-flex; align-items: center; gap: .3rem; padding: .15rem .25rem .15rem .4rem; border-radius: 8px; background: var(--ui-accent-soft); }
         .fm-chip__x { width: 1.3rem; height: 1.3rem; border-radius: 6px; color: var(--ui-muted); }
         .fm-chip__x:hover { background: var(--ui-bad-soft); color: var(--ui-bad); }
-        .fm-lib { display: grid; grid-template-columns: 11rem 1fr 1fr auto auto; gap: .5rem; align-items: center; padding: .6rem 1rem; border-top: 1px solid var(--ui-border); }
+        .fm-build { display: inline-flex; flex-wrap: wrap; gap: .25rem; }
+        .fm-build button { padding: .15rem .45rem; border-radius: 6px; font-size: .72rem; font-weight: 600; background: var(--ui-surface-2); color: var(--ui-accent-text); border: 1px solid var(--ui-border); }
+        .fm-build button:hover { background: var(--ui-accent-soft); }
+        .fm-lib { display: grid; grid-template-columns: 14rem 1fr 1fr auto auto; gap: .5rem; align-items: center; padding: .6rem 1rem; border-top: 1px solid var(--ui-border); }
         @media (max-width: 760px) {
             .fm-row { grid-template-columns: 1fr; }
             .fm-lib { grid-template-columns: 1fr; }
