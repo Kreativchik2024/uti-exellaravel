@@ -686,6 +686,7 @@ class RecordController extends Controller
         }
 
         $this->applyIpSuffix($cfg, $r);
+        \App\Services\FieldPrefills::clean($cfg, $r);   // осталась только заготовка — поле пустое
         $this->applyAutodetect($cfg, $r);
         $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
         $rules = $this->withSnapshotRules($cfg, $rules);
@@ -789,6 +790,7 @@ class RecordController extends Controller
         $this->normalizeBooleans($cfg, $r);
 
         $this->applyIpSuffix($cfg, $r);
+        \App\Services\FieldPrefills::clean($cfg, $r);   // осталась только заготовка — поле пустое
         $this->applyAutodetect($cfg, $r);
         $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
         $rules = $this->withSnapshotRules($cfg, $rules);
@@ -915,7 +917,12 @@ class RecordController extends Controller
             return response()->json(['ok' => false, 'error' => $error], $status);
         }
 
-        $expiresAt = now()->addHours(3)->timestamp;
+        // ПИН действует 12 часов, но не дольше сеанса (автовыход через auth.max_session_hours после входа);
+        // при выходе — ручном или принудительном — сессия сбрасывается вместе с подтверждениями
+        $expiresAt = now()->addHours(12)->timestamp;
+        $sessionHours = (int) config('auth.max_session_hours');
+        $started = (int) $r->session()->get(\App\Http\Middleware\LogoutWhenIdle::STARTED, 0);
+        if ($sessionHours > 0 && $started) $expiresAt = min($expiresAt, $started + $sessionHours * 3600);
 
         $verified = $r->session()->get('verified_workers', []);
         $verified[$employee->id] = $expiresAt;

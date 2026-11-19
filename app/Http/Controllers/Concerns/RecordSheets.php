@@ -31,7 +31,7 @@ trait RecordSheets
             $cfg['fields'][$name]['rules'] = [...$rules, \Illuminate\Validation\Rule::in($allowed)];
         }
 
-        // Маски полей, которые настроил админ (Админ → Маски полей)
-        return app(\App\Services\FieldMasks::class)->apply($cfg, $sheet);
+        // Заготовки полей, которые настроил админ (Админ → Заготовки полей)
+        return app(\App\Services\FieldPrefills::class)->apply($cfg, $sheet);
     }
 }

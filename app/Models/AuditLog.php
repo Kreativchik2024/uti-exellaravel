@@ -29,7 +29,7 @@ class AuditLog extends Model
         'chat'      => 'Чат',
         'system'    => 'Обслуживание',
         'fault_codes' => 'Коды неисправностей',
-        'field_masks' => 'Маски полей',
+        'field_prefills' => 'Заготовки полей',
     ];
 
     public const ACTIONS = [

@@ -58,6 +58,24 @@ class RecordPermissionsTest extends TestCase
         $this->assertSame($this->nameOf($colleague), PgpRecord::firstOrFail()->worker2);
     }
 
+    public function test_colleague_pin_lasts_12_hours_but_not_past_session(): void
+    {
+        $exec = $this->worker();
+        $colleague = $this->worker();
+
+        $res = $this->asUser($exec)->postJson('/records-pin-check', ['short_name' => $this->nameOf($colleague), 'pin' => '1234'])->assertOk();
+        $this->assertEqualsWithDelta(now()->addHours(12)->timestamp, $res->json('expires_at'), 5);
+
+        // Через 11 часов ПИН ещё действует
+        $this->travel(11)->hours();
+        $this->asUser($exec)->post('/records/pgp', array_merge($this->validRecord('pgp', $this->nameOf($exec)), ['worker2' => $this->nameOf($colleague)]))
+            ->assertSessionHasNoErrors();
+
+        // Сеанс начался 11 часов назад — ПИН, введённый сейчас, действует до конца сеанса, а не ещё 12 часов
+        $res = $this->asUser($exec)->postJson('/records-pin-check', ['short_name' => $this->nameOf($colleague), 'pin' => '1234'])->assertOk();
+        $this->assertLessThanOrEqual(now()->addHours(1)->timestamp + 5, $res->json('expires_at'));
+    }
+
     public function test_same_worker_twice_is_rejected(): void
     {
         $master = $this->worker('master');

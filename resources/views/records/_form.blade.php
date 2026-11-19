@@ -139,7 +139,7 @@
                         @if($canManageWorkers)
                             До 5 сотрудников. Без повторов.
                         @else
-                            Себя — без ПИН. Другого — с его личным ПИН (действует 3 часа).
+                            Себя — без ПИН. Другого — с его личным ПИН (действует 12 часов или до выхода из системы).
                         @endif
                     </p>
                 </div>
@@ -286,6 +286,10 @@
                             @endif
                         </label>
 
+                        @php
+                            // Заготовка (Админ → Заготовки полей): в пустом поле уже стоит начало текста, дальше — свободный ввод
+                            if (!empty($f['prefill']) && ($value === null || $value === '') && !$isTimeLocked) $value = $f['prefill'];
+                        @endphp
                         @if($type === 'ip_suffix')
                             @php
                                 // Маска IP: фиксированный префикс + последний октет
@@ -326,7 +330,7 @@
                         @elseif($type === 'combo')
                             <input type="text" name="{{ $name }}" value="{{ $value }}"
                                    list="combo-{{ $name }}" autocomplete="off"
-                                   @if(!empty($f['masks'])) data-masks="{{ json_encode($f['masks'], JSON_UNESCAPED_UNICODE) }}" @endif
+                                   @if(!empty($f['prefill'])) data-prefill="{{ $f['prefill'] }}" @endif
                                    @if($isReq) required @endif @if($isTimeLocked) disabled @endif
                                    placeholder="{{ $f['placeholder'] ?? '' }}"
                                    class="{{ $baseInput }} @error($name) !border-red-400 !ring-red-500/15 @enderror">
@@ -372,8 +376,8 @@
                                    @if($isTimeLocked) disabled @endif
                                    data-lookup-field="{{ $name }}"
                                    data-lookup-url="{{ route('records.lookup', $sheet) }}"
-                                   @if(!empty($f['masks'])) data-masks="{{ json_encode($f['masks'], JSON_UNESCAPED_UNICODE) }}" @endif
-                                   placeholder="{{ !empty($f['masks']) ? $f['placeholder'] : 'Введите ' . mb_strtolower($label) . '…' }}"
+                                   @if(!empty($f['prefill'])) data-prefill="{{ $f['prefill'] }}" @endif
+                                   placeholder="Введите {{ mb_strtolower($label) }}…"
                                    class="lookup-input {{ $baseInput }} @error($name) !border-red-400 !ring-red-500/15 @enderror">
 
                         @elseif($type === 'textarea')
@@ -424,7 +428,7 @@
                             <input type="text" name="{{ $name }}" value="{{ $value }}"
                                    @if($isReq) required @endif @if($isTimeLocked) disabled @endif
                                    placeholder="{{ $f['placeholder'] ?? '' }}"
-                                   @if(!empty($f['masks'])) data-masks="{{ json_encode($f['masks'], JSON_UNESCAPED_UNICODE) }}" @endif autocomplete="off"
+                                   @if(!empty($f['prefill'])) data-prefill="{{ $f['prefill'] }}" @endif autocomplete="off"
                                    class="{{ $baseInput }} @error($name) !border-red-400 !ring-red-500/15 @enderror">
                         @endif
 

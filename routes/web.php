@@ -105,12 +105,9 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::patch('/repair-items/{repairItem}/approve', [\App\Http\Controllers\RepairItemController::class, 'approve'])->name('repair-items.approve');
     Route::delete('/repair-items/{repairItem}',        [\App\Http\Controllers\RepairItemController::class, 'reject'])->name('repair-items.reject');
 
-    // Маски ввода полей (ПГП): библиотека масок и маски у полей
-    Route::get('/field-masks',                         [\App\Http\Controllers\FieldMaskController::class, 'index'])->name('field-masks.index');
-    Route::post('/field-masks',                        [\App\Http\Controllers\FieldMaskController::class, 'store'])->name('field-masks.store');
-    Route::put('/field-masks/{fieldMask}',             [\App\Http\Controllers\FieldMaskController::class, 'update'])->name('field-masks.update');
-    Route::delete('/field-masks/{fieldMask}',          [\App\Http\Controllers\FieldMaskController::class, 'destroy'])->name('field-masks.destroy');
-    Route::put('/field-masks/field/{sheet}/{field}',   [\App\Http\Controllers\FieldMaskController::class, 'saveField'])->name('field-masks.field');
+    // Заготовки полей (ПГП): текст, который уже стоит в пустом поле формы
+    Route::get('/field-prefills',         [\App\Http\Controllers\FieldPrefillController::class, 'index'])->name('field-prefills.index');
+    Route::put('/field-prefills/{sheet}', [\App\Http\Controllers\FieldPrefillController::class, 'save'])->name('field-prefills.save');
 
     // Справочник кодов неисправностей
     Route::get('/fault-codes',               [\App\Http\Controllers\FaultCodeController::class, 'index'])->name('fault-codes.index');

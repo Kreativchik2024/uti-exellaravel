@@ -4,7 +4,6 @@ import '@fontsource-variable/inter';
 
 
 
-import './input-mask';
 import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;
@@ -86,4 +85,20 @@ Alpine.start();
     document.addEventListener('focusout', hide);
     window.addEventListener('scroll', () => { if (anchor) place(); }, true);
     window.addEventListener('resize', () => { if (anchor) place(); });
+})();
+
+// Заготовка поля (Админ → Заготовки полей, data-prefill): в пустом поле уже стоит начало текста.
+// Курсор — сразу после заготовки; если к ней ничего не дописали — при отправке поле пустое.
+(() => {
+    const bind = (el) => {
+        if (el.dataset.prefillBound) return;
+        el.dataset.prefillBound = '1';
+        const text = el.dataset.prefill || '';
+        el.addEventListener('focus', () => {
+            if (el.value === text) requestAnimationFrame(() => { try { el.setSelectionRange(text.length, text.length); } catch (e) {} });
+        });
+        el.form?.addEventListener('submit', () => { if (el.value.trim() === text.trim()) el.value = ''; }, true);
+    };
+    const init = () => document.querySelectorAll('[data-prefill]').forEach(bind);
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
 })();
