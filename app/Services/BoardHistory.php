@@ -256,7 +256,8 @@ class BoardHistory
         return [
             'at'    => $p->created_at,
             'stage' => 'pgp',
-            'title' => 'Проверка на ПГП: ' . ($status ?: 'без статуса') . ($p->record_date ? ' (' . $p->record_date->format('d.m.Y') . ')' : ''),
+            'title' => ($p->after_research_id ? "Повторная проверка на ПГП после исследования №{$p->after_research_id}: " : 'Проверка на ПГП: ')
+                . ($status ?: 'без статуса') . ($p->record_date ? ' (' . $p->record_date->format('d.m.Y') . ')' : ''),
             'text'  => $text ? implode(' · ', $text) : null,
             'tone'  => $passed ? 'good' : 'bad',
             'who'   => $this->workers($p),

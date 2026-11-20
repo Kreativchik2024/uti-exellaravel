@@ -18,7 +18,7 @@ class PgpRecord extends Model
         'manet_number', 'manet_worker', 'manet_record_date', 'manet_health', 'manet_status_text',
 
         'status', 'technologist', 'wait_minutes', 'defect_reason', 'actions_taken',
-        'created_by', 'updated_by', 'fault_code',
+        'created_by', 'updated_by', 'fault_code', 'after_research_id',
     ];
 
     protected function casts(): array
@@ -64,15 +64,32 @@ class PgpRecord extends Model
     }
 
     /**
-     * Борт вернулся на ПГП после ремонта: запись ещё «не сдан», а исследование по ней отправлено в конвейер.
-     * Такую запись перепроверяет и правит любой исполнитель (не только тот, кто её создал, и без ограничения 24 ч):
-     * после проверки ставит «Сдан» в этой же записи — борт в статистике считается один раз, как сданный.
+     * Цепочка документов борта: эта запись «Не сдан» → исследование (ремонт) → повторная проверка —
+     * НОВАЯ запись ПГП с after_research_id = исследование → «Сдан» или снова в ремонт.
      */
+    public function afterResearch()
+    {
+        return $this->belongsTo(ResearchRecord::class, 'after_research_id');
+    }
+
+    /** Повторная проверка после ремонта (новая запись ПГП, связанная с исследованием). */
+    public function isRecheck(): bool
+    {
+        return $this->after_research_id !== null;
+    }
+
+    /** Ремонт по этой записи, отправленный на испытания и ещё без повторной проверки, — или null. */
+    public function pendingRecheckResearch(): ?ResearchRecord
+    {
+        if ($this->status === 'Сдан' || ! $this->exists) return null;
+
+        return $this->researches()->where('repair_status', 'conveyor')->whereDoesntHave('recheck')->orderByDesc('id')->first();
+    }
+
+    /** Борт вернулся на ПГП после ремонта и ждёт повторной проверки (новой записью — см. pendingRecheckResearch). */
     public function returnedFromRepair(): bool
     {
-        if ($this->status === 'Сдан' || ! $this->exists) return false;
-
-        return $this->researches()->where('repair_status', 'conveyor')->exists();
+        return $this->pendingRecheckResearch() !== null;
     }
 
     public function updater()

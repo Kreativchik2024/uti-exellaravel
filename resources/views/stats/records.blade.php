@@ -6,7 +6,7 @@
             </span>
             <div>
                 @php
-                    $kinds = $board !== null ? ['all' => 'Все', 'good' => 'Сдано', 'defect' => 'Не сдано'] : ['all' => 'Все', 'good' => 'Исправные', 'defect' => 'Брак'];
+                    $kinds = $board !== null ? ['all' => 'Все', 'good' => 'Сдано', 'repaired' => 'Сдано после ремонта', 'defect' => 'Не сдано'] : ['all' => 'Все', 'good' => 'Исправные', 'defect' => 'Брак'];
                 @endphp
                 <h2>{{ $cfg['title'] }}@if($boardLabel) · {{ $boardLabel }}@endif{{ $kind !== 'all' ? ' — ' . mb_strtolower($kinds[$kind]) : '' }}</h2>
                 <p class="text-sm mt-0.5" style="color: var(--ui-muted)">

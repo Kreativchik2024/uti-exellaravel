@@ -218,16 +218,54 @@
 
             {{-- Боковая колонка --}}
             <aside class="space-y-5 lg:sticky" style="top: calc(var(--ui-nav-h) + 16px)">
-                {{-- Борт вернулся на ПГП после ремонта: перепроверить и поставить «Сдан» в этой же записи --}}
-                @if($sheet === 'pgp' && $record->returnedFromRepair())
-                    <section class="ui-card p-4 space-y-2" style="border-color: var(--ui-accent)">
-                        <h3 class="text-sm font-semibold" style="color: var(--ui-accent-text)">Вернулся после ремонта</h3>
-                        <p class="text-sm" style="color: var(--ui-text-2)">
-                            Перепроверьте борт на ПГП и поставьте статус «Сдан» в этой записи — так борт посчитается в статистике один раз, как сданный.
-                        </p>
-                        @can('update', $record)
-                            <a href="{{ route('records.edit', [$sheet, $record->id]) }}" class="ui-btn w-full">Перепроверить и поставить «Сдан»</a>
-                        @endcan
+                {{-- ПГП: цепочка документов борта — проверка «Не сдан» → ремонт → повторная проверка (новая запись) → «Сдан» --}}
+                @if($sheet === 'pgp')
+                    @php
+                        $pendingResearch = $record->pendingRecheckResearch();
+                        $chainResearches = $record->researches()->with('recheck')->orderBy('id')->get();
+                        $prevResearch = $record->afterResearch;
+                    @endphp
+                    @if($pendingResearch)
+                        <section class="ui-card p-4 space-y-2" style="border-color: var(--ui-accent)">
+                            <h3 class="text-sm font-semibold" style="color: var(--ui-accent-text)">Вернулся после ремонта</h3>
+                            <p class="text-sm" style="color: var(--ui-text-2)">
+                                Проверьте борт на ПГП новой записью — она свяжется с исследованием №{{ $pendingResearch->id }}, а эта запись останется как была.
+                            </p>
+                            <a href="{{ route('records.create', ['pgp', 'from' => $record->id]) }}" class="ui-btn w-full">Повторная проверка на ПГП</a>
+                        </section>
+                    @endif
+                    @if($prevResearch || $chainResearches->isNotEmpty())
+                        <section class="ui-card p-4 space-y-1.5 text-sm">
+                            <h3 class="font-semibold" style="color: var(--ui-text)">Документы борта</h3>
+                            @if($prevResearch)
+                                <p style="color: var(--ui-text-2)">Повторная проверка после ремонта:
+                                    <a href="{{ route('records.show', ['research', $prevResearch->id]) }}" class="underline">исследование №{{ $prevResearch->id }}</a>@if($prevResearch->pgp_record_id),
+                                    первая проверка — <a href="{{ route('records.show', ['pgp', $prevResearch->pgp_record_id]) }}" class="underline">запись №{{ $prevResearch->pgp_record_id }}</a>@endif
+                                </p>
+                            @endif
+                            @foreach($chainResearches as $cr)
+                                <p style="color: var(--ui-text-2)">
+                                    Ремонт: <a href="{{ route('records.show', ['research', $cr->id]) }}" class="underline">исследование №{{ $cr->id }}</a>
+                                    @if($cr->recheck)
+                                        → повторная проверка <a href="{{ route('records.show', ['pgp', $cr->recheck->id]) }}" class="underline">№{{ $cr->recheck->id }}</a>: <b>{{ $cr->recheck->status ?: 'без статуса' }}</b>
+                                    @endif
+                                </p>
+                            @endforeach
+                        </section>
+                    @endif
+                @endif
+                {{-- Исследование борта: первая проверка и повторная проверка после ремонта (цепочка документов) --}}
+                @if($sheet === 'research' && ($record->pgp_record_id || $record->recheck))
+                    <section class="ui-card p-4 space-y-1.5 text-sm">
+                        <h3 class="font-semibold" style="color: var(--ui-text)">Документы борта</h3>
+                        @if($record->pgp_record_id)
+                            <p style="color: var(--ui-text-2)">Проверка на ПГП: <a href="{{ route('records.show', ['pgp', $record->pgp_record_id]) }}" class="underline">запись №{{ $record->pgp_record_id }}</a></p>
+                        @endif
+                        @if($record->recheck)
+                            <p style="color: var(--ui-text-2)">Повторная проверка: <a href="{{ route('records.show', ['pgp', $record->recheck->id]) }}" class="underline">запись №{{ $record->recheck->id }}</a> — <b>{{ $record->recheck->status ?: 'без статуса' }}</b></p>
+                        @elseif($record->repair_status === 'conveyor' && $record->pgp_record_id)
+                            <p style="color: var(--ui-muted)">Повторной проверки на ПГП ещё не было.</p>
+                        @endif
                     </section>
                 @endif
                 {{-- Исследование: статус цветными кнопками (ремонтник, мастер, админ), остальным — только метка --}}

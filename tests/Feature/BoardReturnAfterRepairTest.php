@@ -9,8 +9,8 @@ use Tests\Support\SiteHelpers;
 use Tests\TestCase;
 
 /**
- * Борт после ремонта возвращается на ПГП: его запись правит любой исполнитель (не только создатель, без лимита 24 ч)
- * и ставит «Сдан» — в статистике борт считается один раз, как сданный.
+ * Борт после ремонта возвращается на ПГП: он в списке «Вернулись после ремонта», проверяют его НОВОЙ записью
+ * (связана с исследованием), первая запись остаётся «Не сдан». В статистике: не сдан + сдан, из сданных — после ремонта.
  */
 class BoardReturnAfterRepairTest extends TestCase
 {
@@ -29,7 +29,7 @@ class BoardReturnAfterRepairTest extends TestCase
         return [$pgp, ResearchRecord::where('pgp_record_id', $pgp->id)->firstOrFail()];
     }
 
-    public function test_any_executor_rechecks_returned_board_and_sets_delivered(): void
+    public function test_returned_board_is_listed_and_rechecked_by_new_record(): void
     {
         $author = $this->worker('executor', 'Автор А.А.');
         $other  = $this->worker('executor', 'Другой Д.Д.');
@@ -49,36 +49,32 @@ class BoardReturnAfterRepairTest extends TestCase
         $this->assertStringContainsString("/records/pgp/{$pgp->id}\"", $this->asUser($other)->get('/records/pgp?returned=1')->getContent());
         $card = $this->asUser($other)->get("/records/pgp/{$pgp->id}")->assertOk()->getContent();
         $this->assertStringContainsString('Вернулся после ремонта', $card);
-        $this->assertStringContainsString("/records/pgp/{$pgp->id}/edit", $card);
 
         // В списке — вкладка «Вернулись после ремонта» с числом и метка «После ремонта: проверить»
         $list = $this->asUser($other)->get('/records/pgp')->getContent();
         $this->assertStringContainsString('Вернулись после ремонта', $list);
         $this->assertStringContainsString('После ремонта: проверить', $list);
 
-        // Другой исполнитель правит (несмотря на 3 дня) и ставит «Сдан»
-        $this->assertStringContainsString('Борт вернулся после ремонта', $this->asUser($other)->get("/records/pgp/{$pgp->id}/edit")->assertOk()->getContent());
-        $oldDate = $pgp->record_date->toDateString();
-        $data = array_merge($this->validRecord('pgp', $pgp->worker1), ['status' => 'Сдан', 'technologist' => $this->technologistName(),
-            'record_date' => $oldDate]);
-        $this->asUser($other)->put("/records/pgp/{$pgp->id}", $data)->assertSessionHasNoErrors()->assertRedirect();
-        $this->assertSame('Сдан', $pgp->fresh()->status);
-        // Дата — день фактической сдачи, а не день ухода в ремонт
-        $this->assertSame(now()->toDateString(), $pgp->fresh()->record_date->toDateString());
+        // Старую запись не правят: повторная проверка — новой записью с карточки
+        $this->asUser($other)->get("/records/pgp/{$pgp->id}/edit")->assertRedirect();
+        $this->assertStringContainsString("/records/pgp/create?from={$pgp->id}", $card);
+        $this->asUser($other)->post('/records/pgp', array_merge($this->validRecord('pgp', $this->nameOf($other)),
+            ['status' => 'Сдан', 'fuselage_number' => $pgp->fuselage_number]))->assertSessionHasNoErrors();
+        $recheck = \App\Models\PgpRecord::latest('id')->first();
+        $this->assertSame($research->id, $recheck->after_research_id);
+        $this->assertSame('Не сдан', $pgp->fresh()->status);
 
-        // В списке «Были в ремонте» — с меткой «после ремонта»
+        // «Были в ремонте» — первая запись с пометкой «перепроверен»
         $repaired = $this->asUser($other)->get('/records/pgp?repaired=1')->getContent();
         $this->assertStringContainsString("/records/pgp/{$pgp->id}\"", $repaired);
-        $this->assertStringContainsString('после ремонта', $repaired);
+        $this->assertStringContainsString('перепроверен', $repaired);
 
-        // Статистика: один борт, сданный, без брака
+        // Статистика как есть: первая проверка — «не сдан», повторная — «сдан», из сданных — «после ремонта»
         $this->actingAs($this->worker('master'));
         $types = app(\App\Services\StatsService::class)->boardTypes(now()->subDays(10), now(), null);
-        $this->assertSame(1, $types['total']);
+        $this->assertSame(2, $types['total']);
         $this->assertSame(1, $types['delivered']);
+        $this->assertSame(1, $types['after_repair']);
         $this->assertSame(0, app(\App\Services\PgpDefectResearch::class)->returnedFromRepairCount());
-
-        // Сдан — больше не «после ремонта»: чужой исполнитель снова не правит
-        $this->asUser($other)->get("/records/pgp/{$pgp->id}/edit")->assertRedirect();
     }
 }

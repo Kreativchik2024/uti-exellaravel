@@ -242,6 +242,16 @@ class StatsService
      *
      * @return array{total:int, delivered:int, types: array<string, array{label:string,total:int,delivered:int}>, none: array{total:int,delivered:int}}|null
      */
+    /**
+     * «Сдан после ремонта»: повторная проверка после ремонта со статусом «Сдан» (after_research_id)
+     * или старая запись, сданная на месте, по которой было исследование.
+     */
+    private function afterRepairSql(string $table): string
+    {
+        return "(`$table`.`status` = 'Сдан' AND (`$table`.`after_research_id` IS NOT NULL"
+             . " OR EXISTS (SELECT 1 FROM `research_records` AS rr WHERE rr.`pgp_record_id` = `$table`.`id`)))";
+    }
+
     /** Записи ПГП с фильтрами карточек «Борта по типам». */
     private function boardQuery(array $cfg, ?Carbon $from, ?Carbon $to, ?User $user, ?string $worker)
     {
@@ -270,6 +280,7 @@ class StatsService
         }
 
         if ($kind === 'good') $q->where('status', 'Сдан');
+        elseif ($kind === 'repaired') $q->whereRaw($this->afterRepairSql($q->getModel()->getTable()));
         elseif ($kind === 'defect') $q->where(fn ($w) => $w->whereNull('status')->orWhere('status', '<>', 'Сдан'));
 
         return $q->orderByDesc($this->metaFor($cfg)['dateField'])->orderByDesc('id');
@@ -312,14 +323,16 @@ class StatsService
 
         $q = $this->boardQuery($cfg, $from, $to, $user, $worker);
 
+        $table = (new $cfg['model'])->getTable();
         $rows = $q->selectRaw("COALESCE(NULLIF(board_type, ''), '_none') as t")
             ->selectRaw('COUNT(*) as total')
             ->selectRaw("SUM(CASE WHEN status = 'Сдан' THEN 1 ELSE 0 END) as delivered")
+            ->selectRaw('SUM(CASE WHEN ' . $this->afterRepairSql($table) . ' THEN 1 ELSE 0 END) as after_repair')
             ->groupBy('t')
             ->get()
             ->keyBy('t');
 
-        $row = fn ($k) => ['total' => (int) ($rows[$k]->total ?? 0), 'delivered' => (int) ($rows[$k]->delivered ?? 0)];
+        $row = fn ($k) => ['total' => (int) ($rows[$k]->total ?? 0), 'delivered' => (int) ($rows[$k]->delivered ?? 0), 'after_repair' => (int) ($rows[$k]->after_repair ?? 0)];
 
         $types = [];
         foreach (\App\Support\BoardTypes::labels() as $code => $label) {
@@ -333,6 +346,7 @@ class StatsService
         return [
             'total'     => (int) $rows->sum('total'),
             'delivered' => (int) $rows->sum('delivered'),
+            'after_repair' => (int) $rows->sum('after_repair'),   // из сданных — после ремонта
             'types'     => $types,
             'none'      => $row('_none'),
         ];

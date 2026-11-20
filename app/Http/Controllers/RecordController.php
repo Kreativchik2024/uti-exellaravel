@@ -581,6 +581,11 @@ class RecordController extends Controller
         Gate::authorize('create', $cfg['model']);
 
         $defaults              = $this->defaults($sheet, $cfg);
+        // ПГП: «Повторная проверка» с карточки вернувшегося борта (?from=ID) — данные борта из прошлой записи
+        if ($sheet === 'pgp' && ($fromId = (int) $r->query('from'))) {
+            $from = $cfg['model']::find($fromId);
+            if ($from && $from->returnedFromRepair()) $defaults += app(\App\Services\PgpBoardLookup::class)->prefill($from);
+        }
         $employeesList         = $this->employeesForSelect();
         $lookups               = [];
         $canManageWorkers      = $this->canManageWorkersWithoutPin();
@@ -656,15 +661,12 @@ class RecordController extends Controller
 
         $this->prepareInput($cfg, $r);
 
-        // ПГП: борт с таким фюзеляжем уже есть — новую запись не заводим, открываем его запись
-        // (вернулся после ремонта — на правку, с тем, что успели ввести; в ремонте или сдан — карточку).
-        // До проверки полей: кнопка «Открыть запись борта» отправляет и недозаполненную форму.
-        if ($sheet === 'pgp' && ($found = app(\App\Services\PgpBoardLookup::class)->forUser($r->input('fuselage_number')))) {
-            $redirect = redirect()->to($found['url'])->with('ok', 'Дубль не создан: борт с фюзеляжем ' . trim((string) $r->input('fuselage_number')) . ' уже есть. ' . $found['text']);
-            if (! $found['editable']) return $redirect;
-            $input = array_filter($r->except(['_token', '_method', '_submit_token', 'open_existing']), fn ($v) => is_array($v) ? array_filter($v, 'filled') : filled($v));
-
-            return $redirect->withInput($input);
+        // ПГП: борт с таким фюзеляжем уже есть — старую запись не переписываем (App\Services\PgpBoardLookup):
+        // вернулся после ремонта — новая запись станет повторной проверкой (связь с ремонтом ниже);
+        // ещё в ремонте или уже сдан — новую запись не заводим.
+        $boardFound = $sheet === 'pgp' ? app(\App\Services\PgpBoardLookup::class)->check($r->input('fuselage_number')) : null;
+        if ($boardFound && $boardFound['blocked']) {
+            return back()->withInput()->withErrors(['fuselage_number' => $boardFound['text']]);
         }
 
         $data = $this->validateRecord($cfg, $r);
@@ -676,6 +678,8 @@ class RecordController extends Controller
         $this->validateWorkers($data, $exempt);
 
         $data['created_by'] = auth()->id();
+        // Повторная проверка после ремонта — новый документ цепочки, связанный с исследованием
+        if ($boardFound) $data['after_research_id'] = $boardFound['research']->id;
         $this->finalizeData($sheet, $cfg, $data);
 
         // --- Защита от дублей ---
@@ -710,7 +714,8 @@ class RecordController extends Controller
         $research = $this->researchForPgpDefect($sheet, $record);
 
         return redirect()->route('records.index', $sheet)
-            ->with('ok', 'Запись добавлена' . ($research ? ". Брак — заведено исследование №{$research->id}" : ''));
+            ->with('ok', ($boardFound ? "Повторная проверка после ремонта (исследование №{$boardFound['research']->id}) записана" : 'Запись добавлена')
+                . ($research ? ". Брак — заведено исследование №{$research->id}" : ''));
     }
 
     public function edit(Request $r, string $sheet, int $id)
@@ -770,14 +775,6 @@ class RecordController extends Controller
         $data['updated_by'] = auth()->id();
         $this->finalizeData($sheet, $cfg, $data);
 
-        // Борт вернулся после ремонта и сдан — в статистике он считается днём фактической сдачи,
-        // а не днём, когда уходил в ремонт (прежняя дата остаётся в журнале изменений)
-        $deliveredAfterRepair = $record instanceof \App\Models\PgpRecord && $record->returnedFromRepair()
-            && ($data['status'] ?? null) === 'Сдан';
-        if ($deliveredAfterRepair && array_key_exists('record_date', $data)) {
-            $data['record_date'] = now()->toDateString();
-        }
-
         try {
             $record->update($data);
         } catch (QueryException $e) {
@@ -789,9 +786,7 @@ class RecordController extends Controller
 
         $research = $this->researchForPgpDefect($sheet, $record);
 
-        $msg = $deliveredAfterRepair
-            ? 'Борт после ремонта сдан — дата записи: ' . now()->format('d.m.Y') . ' (день фактической сдачи)'
-            : 'Запись обновлена' . ($research ? ". Брак — заведено исследование №{$research->id}" : '');
+        $msg = 'Запись обновлена' . ($research ? ". Брак — заведено исследование №{$research->id}" : '');
 
         return redirect()->route('records.index', $sheet)->with('ok', $msg);
     }

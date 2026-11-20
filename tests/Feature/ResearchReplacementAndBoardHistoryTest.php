@@ -413,18 +413,17 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
 
         // Борт вернулся на ПГП и сдан — текущий этап «Сдан на ПГП», история общая по номеру борта
         $this->travel(5)->minutes();
-        // Повторная сдача с тем же фюзеляжем — не новая запись, а та же (PgpBoardLookup), её и сдаём
+        // Повторная проверка с тем же фюзеляжем — новая запись, связанная с ремонтом; история общая по борту
         $exec = $this->exec;
         $count = PgpRecord::count();
-        $this->asUser($exec)->post('/records/pgp', array_merge($this->validRecord('pgp', $this->nameOf($exec)), ['status' => 'Сдан', 'fuselage_number' => $pgp->fuselage_number]))
-            ->assertRedirect("/records/pgp/{$pgp->id}/edit");
-        $this->assertSame($count, PgpRecord::count());
-        $this->asUser($exec)->put("/records/pgp/{$pgp->id}", array_merge($this->validRecord('pgp', $this->nameOf($exec)), ['status' => 'Сдан', 'fuselage_number' => $pgp->fuselage_number]))
+        $this->asUser($exec)->post('/records/pgp', array_merge($this->validRecord('pgp', $this->nameOf($exec)), ['status' => 'Сдан', 'fuselage_number' => $pgp->fuselage_number, 'frame_serial' => $pgp->frame_serial]))
             ->assertSessionHasNoErrors();
-        $html = $this->asUser($master)->get("/records/pgp/{$pgp->id}")->assertOk()->getContent();
+        $this->assertSame($count + 1, PgpRecord::count());
+        $recheck = PgpRecord::latest('id')->first();
+        $html = $this->asUser($master)->get("/records/pgp/{$recheck->id}")->assertOk()->getContent();
         $this->assertStringContainsString('Сдан на ПГП', $html);
         $this->assertStringContainsString('Проверка на ПГП: Не сдан', $html);
         $this->assertStringContainsString('Меняем модуль связи', $html);
-        $this->assertStringContainsString('Повторная проверка на ПГП: Сдан', $html);
+        $this->assertStringContainsString("Повторная проверка на ПГП после исследования №{$research->id}: Сдан", $html);
     }
 }

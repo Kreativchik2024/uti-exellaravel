@@ -25,8 +25,6 @@ class RecordPolicy
     public function update(User $u, $record): bool
     {
         if ($this->canManage($u)) return true;
-        // Борт вернулся на ПГП после ремонта — перепроверяет и ставит «Сдан» любой исполнитель
-        if ($record instanceof \App\Models\PgpRecord && $u->isWorker() && $record->returnedFromRepair()) return true;
         return (int) $record->created_by === (int) $u->id;
     }
 

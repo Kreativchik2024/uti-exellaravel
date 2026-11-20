@@ -126,6 +126,12 @@ class ResearchRecord extends Model
     }
 
     /** Запись ПГП, по браку которой заведено исследование. */
+    /** Повторная проверка на ПГП после этого ремонта (новая запись ПГП). */
+    public function recheck()
+    {
+        return $this->hasOne(PgpRecord::class, 'after_research_id');
+    }
+
     public function pgpRecord()
     {
         return $this->belongsTo(PgpRecord::class, 'pgp_record_id');

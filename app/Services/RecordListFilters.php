@@ -84,7 +84,11 @@ class RecordListFilters
     }
 
     /**
-     * Пометки строк ПГП о ремонте: 'returned' — вернулся, ждёт перепроверки; 'after' — сдан после ремонта; 'in_repair' — в ремонте.
+     * Пометки строк ПГП о ремонте (цепочка документов борта):
+     *  'after'     — сдан после ремонта (повторная проверка «Сдан» или старая запись, сданная на месте);
+     *  'returned'  — вернулся после ремонта, ждёт повторной проверки;
+     *  'rechecked' — по ремонту уже есть повторная проверка (новая запись);
+     *  'in_repair' — в ремонте.
      * @return array<int, string> id записи => пометка
      */
     public function repairMarks(string $sheet, iterable $records): array
@@ -92,12 +96,18 @@ class RecordListFilters
         $ids = collect($records)->pluck('id');
         if ($sheet !== 'pgp' || $ids->isEmpty()) return [];
 
-        $byPgp = ResearchRecord::whereIn('pgp_record_id', $ids)->get(['pgp_record_id', 'repair_status'])->groupBy('pgp_record_id');
+        $byPgp = ResearchRecord::whereIn('pgp_record_id', $ids)->withExists('recheck')
+            ->get(['id', 'pgp_record_id', 'repair_status'])->groupBy('pgp_record_id');
         $marks = [];
         foreach ($records as $rec) {
-            $rs = $byPgp[$rec->id] ?? null;
-            if (! $rs) continue;
-            $marks[$rec->id] = $rec->status === 'Сдан' ? 'after' : ($rs->contains('repair_status', 'conveyor') ? 'returned' : 'in_repair');
+            $rs = $byPgp[$rec->id] ?? collect();
+            if ($rec->status === 'Сдан') {
+                if ($rec->after_research_id || $rs->isNotEmpty()) $marks[$rec->id] = 'after';
+                continue;
+            }
+            if ($rs->isEmpty()) continue;
+            $last = $rs->sortByDesc('id')->first();
+            $marks[$rec->id] = $last->recheck_exists ? 'rechecked' : ($last->repair_status === 'conveyor' ? 'returned' : 'in_repair');
         }
 
         return $marks;

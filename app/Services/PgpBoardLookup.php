@@ -4,20 +4,21 @@ namespace App\Services;
 
 use App\Models\PgpRecord;
 use App\Models\ResearchRecord;
-use App\Support\RecordLock;
-use Illuminate\Support\Facades\Gate;
 
 /**
- * Борт уже есть в ПГП (по номеру фюзеляжа): на сдаче новая запись не заводится — открывается его запись
- * со всей информацией и журналом. Так борт после ремонта не дублируется, а после «Сдан» уходит
- * из списка «Вернулись после ремонта».
- *
- *  - вернулся после ремонта или его можно править (свой, моложе суток; мастер/админ) — открыть на правку;
- *  - ещё в ремонте — только карточка: ремонтнику нужно отправить его на испытания;
- *  - уже сдан — карточка (перепроверку сданного борта правит мастер).
+ * Борт уже есть в ПГП (по номеру фюзеляжа) — что делать на новой проверке. Цепочка документов:
+ *   1. проверка «Не сдан» → 2. исследование (ремонт) → 3. повторная проверка — НОВАЯ запись,
+ *   связанная с ремонтом (after_research_id) → «Сдан» (4) или снова «Не сдан» и новый ремонт.
+ * Старую запись не переписываем:
+ *  - returned  — вернулся после ремонта: новая запись станет повторной проверкой, данные борта подставляются;
+ *  - repair    — ещё в ремонте: новую запись не заводим, ремонтнику нужно отправить борт на испытания;
+ *  - delivered — уже сдан: повторно не заводим.
  */
 class PgpBoardLookup
 {
+    /** Данные борта, которые переходят в повторную проверку. */
+    public const BOARD_FIELDS = ['board_number', 'board_type', 'ip_address', 'fuselage_number', 'frame_serial', 'cross3_number', 'bracket_serial', 'manet_number'];
+
     public function __construct(private SectionContext $sections) {}
 
     /** Последняя запись ПГП с этим номером фюзеляжа (на текущем участке). */
@@ -34,35 +35,53 @@ class PgpBoardLookup
     }
 
     /**
-     * Что делать с найденным бортом.
-     * @return array{record: PgpRecord, editable: bool, url: string, state: string, text: string}
+     * Состояние найденного борта.
+     * @return array{record: PgpRecord, state: string, blocked: bool, research: ?ResearchRecord, text: string, url: string, prefill: array}
      */
-    public function target(PgpRecord $rec, bool $editable): array
+    public function target(PgpRecord $rec): array
     {
         $date = $rec->record_date?->format('d.m.Y');
-        if ($rec->returnedFromRepair()) {
+        $research = $rec->pendingRecheckResearch();
+
+        if ($research) {
             $state = 'returned';
-            $text = "Борт вернулся после ремонта (запись №{$rec->id} от {$date}). Новая запись не нужна — перепроверьте его в этой записи и поставьте «Сдан».";
+            $text = "Борт вернулся после ремонта (исследование №{$research->id} по записи №{$rec->id} от {$date}). "
+                  . 'Эта запись станет повторной проверкой и свяжется с ремонтом; данные борта подставлены.';
         } elseif ($rec->status === 'Сдан') {
             $state = 'delivered';
-            $text = "Борт уже сдан (запись №{$rec->id} от {$date}). Повторная запись не создаётся" . ($editable ? ' — при необходимости поправьте эту.' : ' — перепроверку сданного борта оформляет мастер.');
+            $text = "Борт уже сдан (запись №{$rec->id} от {$date}). Повторная запись не создаётся.";
         } else {
             $state = 'repair';
-            $research = $rec->researches()->orderByDesc('id')->first();
-            $where = $research ? "исследование №{$research->id}: " . mb_strtolower(ResearchRecord::STATUSES[$research->repair_status ?? 'new']['label'] ?? (string) $research->repair_status) : 'исследование не заведено';
-            $text = "Борт не сдан и числится в ремонте (запись №{$rec->id} от {$date}, {$where})." . ($editable ? ' Продолжайте в этой записи.' : ' Новая запись не создаётся — ремонтнику нужно отправить его на испытания.');
+            $last = $rec->researches()->orderByDesc('id')->first();
+            $where = $last
+                ? "исследование №{$last->id}: " . mb_strtolower(ResearchRecord::STATUSES[$last->repair_status ?: 'new']['label'] ?? (string) $last->repair_status)
+                : 'исследование не заведено';
+            $text = "Борт не сдан и числится в ремонте (запись №{$rec->id} от {$date}, {$where}). "
+                  . 'Новая запись не создаётся — сначала ремонтник отправляет борт на испытания.';
         }
 
-        return ['record' => $rec, 'editable' => $editable, 'state' => $state, 'text' => $text,
-            'url' => $editable ? route('records.edit', ['pgp', $rec->id]) : route('records.show', ['pgp', $rec->id])];
+        return [
+            'record'   => $rec,
+            'state'    => $state,
+            'blocked'  => $state !== 'returned',
+            'research' => $research,
+            'text'     => $text,
+            'url'      => route('records.show', ['pgp', $rec->id]),
+            'prefill'  => $state === 'returned' ? $this->prefill($rec) : [],
+        ];
     }
 
-    /** Найти (кроме записи $exceptId) и решить для текущего пользователя — с учётом прав и суточной блокировки. */
-    public function forUser(?string $fuselage, ?int $exceptId = null): ?array
+    /** Найти борт по фюзеляжу (кроме записи $exceptId) и описать, что с ним делать. */
+    public function check(?string $fuselage, ?int $exceptId = null): ?array
     {
         $rec = $this->find($fuselage, $exceptId);
-        if (! $rec) return null;
 
-        return $this->target($rec, Gate::allows('update', $rec) && ! RecordLock::isLocked($rec));
+        return $rec ? $this->target($rec) : null;
+    }
+
+    /** Данные борта из прошлой записи — для формы повторной проверки. */
+    public function prefill(PgpRecord $rec): array
+    {
+        return array_filter($rec->only(self::BOARD_FIELDS), fn ($v) => $v !== null && $v !== '');
     }
 }

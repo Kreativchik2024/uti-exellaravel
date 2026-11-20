@@ -32,7 +32,7 @@ class PgpBoardController extends Controller
         $numbers = array_filter(array_map(fn ($v) => trim((string) $v), $numbers), fn ($v) => $v !== '');
         if (! $numbers) return response('');
 
-        $existing = $lookup->forUser($numbers['fuselage_number'] ?? null, $exceptId);
+        $existing = $lookup->check($numbers['fuselage_number'] ?? null, $exceptId);
 
         return response(
             ($existing ? view('records._board_existing', ['existing' => $existing, 'isEdit' => (bool) $exceptId])->render() : '')

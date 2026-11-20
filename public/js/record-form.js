@@ -73,8 +73,24 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!query) { box.innerHTML = ''; return; }
             fetch(box.dataset.url + '?' + query + (box.dataset.except ? '&except=' + encodeURIComponent(box.dataset.except) : ''), { headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
                 .then(function (r) { return r.ok ? r.text() : ''; })
-                .then(function (html) { if (params.toString() === last) box.innerHTML = html; })
+                .then(function (html) { if (params.toString() === last) { box.innerHTML = html; prefill(); } })
                 .catch(function () {});
+        }
+
+        // Борт вернулся после ремонта — данные борта из прошлой записи в ПУСТЫЕ поля (введённое не трогаем)
+        function prefill() {
+            var src = box.querySelector('[data-board-prefill]');
+            if (!src || !form) return;
+            var data;
+            try { data = JSON.parse(src.getAttribute('data-board-prefill') || '{}'); } catch (e) { return; }
+            Object.keys(data).forEach(function (name) {
+                var el = form.querySelector('[name="' + name + '"]:not([type=hidden])');
+                if (!el || el.disabled || el.readOnly || String(el.value || '').trim() !== '') return;
+                if (el.tagName === 'SELECT' && !Array.prototype.some.call(el.options, function (o) { return o.value === String(data[name]); })) return;
+                el.value = data[name];
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            });
         }
 
         names.forEach(function (n) {

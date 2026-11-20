@@ -119,7 +119,7 @@ class StatsController extends Controller
      */
     public function records(Request $r, StatsService $s)
     {
-        $r->validate(['sheet' => ['required', 'string', 'max:60'], 'kind' => ['nullable', 'in:all,good,defect'],
+        $r->validate(['sheet' => ['required', 'string', 'max:60'], 'kind' => ['nullable', 'in:all,good,defect,repaired'],
                       'from' => ['nullable', 'date'], 'to' => ['nullable', 'date'], 'worker' => ['nullable', 'string', 'max:200'],
                       'board' => ['nullable', 'string', 'max:20'], 'post' => ['nullable', 'integer', 'min:0'],
                       'tech' => ['nullable', 'string', 'max:120']]);
@@ -135,6 +135,8 @@ class StatsController extends Controller
 
         // board — карточки «Борта по типам» (ПГП): код типа, '_none' или '_all'; там ✓/✕ — «сдан / не сдан»
         $board = $slug === 'pgp' && $r->filled('board') ? (string) $r->input('board') : null;
+        // «Сдано после ремонта» — только у бортов ПГП
+        if ($kind === 'repaired') { if ($slug === 'pgp') $board ??= '_all'; else $kind = 'all'; }
         // tech — карточки «Борта по технологам» (ПГП): имя технолога или '_none'; видят мастер, технолог, админ
         $tech = $slug === 'pgp' && $r->filled('tech') ? (string) $r->input('tech') : null;
         if ($tech !== null) {

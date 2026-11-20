@@ -450,11 +450,10 @@
         </div>
     @endforeach
 
-    {{-- Борт вернулся после ремонта: при «Сдан» дата записи станет днём фактической сдачи --}}
-    @if($sheet === 'pgp' && isset($record) && $record->returnedFromRepair())
+    {{-- Правка повторной проверки после ремонта — откуда она --}}
+    @if($sheet === 'pgp' && isset($record) && $record->isRecheck())
         <div class="mt-6 rounded-lg px-4 py-3 text-sm" style="background: var(--ui-accent-soft); color: var(--ui-accent-text)">
-            <b>Борт вернулся после ремонта.</b> Перепроверьте его и поставьте статус «Сдан» —
-            дата записи станет сегодняшней ({{ now()->format('d.m.Y') }}), борт посчитается днём фактической сдачи.
+            <b>Повторная проверка после ремонта</b> (исследование №{{ $record->after_research_id }}).
         </div>
     @endif
 

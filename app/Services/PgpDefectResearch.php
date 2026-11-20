@@ -114,8 +114,8 @@ class PgpDefectResearch
     }
 
     /**
-     * Борта, вернувшиеся на ПГП после ремонта: запись ПГП ещё не «Сдан», исследование отправлено в конвейер.
-     * Их перепроверяет любой исполнитель и ставит «Сдан» в этой же записи (PgpRecord::returnedFromRepair).
+     * Борта, вернувшиеся на ПГП после ремонта: запись ПГП ещё не «Сдан», исследование отправлено на испытания, повторной проверки ещё нет.
+     * Повторную проверку заводят новой записью ПГП (after_research_id); после этого борт из списка уходит.
      */
     public function returnedFromRepair(): ?Builder
     {
@@ -124,7 +124,7 @@ class PgpDefectResearch
 
         return $cfg['model']::query()
             ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'Сдан'))
-            ->whereHas('researches', fn ($r) => $r->where('repair_status', 'conveyor'));
+            ->whereHas('researches', fn ($r) => $r->where('repair_status', 'conveyor')->whereDoesntHave('recheck'));
     }
 
     public function returnedFromRepairCount(): int

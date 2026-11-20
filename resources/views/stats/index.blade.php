@@ -145,7 +145,7 @@
                 @endphp
                 @if(!empty($boardTypes))
                     @php
-                        $btCards = [['label' => 'Всего бортов', 'total' => $boardTypes['total'], 'delivered' => $boardTypes['delivered'], 'accent' => true, 'code' => '_all']];
+                        $btCards = [['label' => 'Всего бортов', 'total' => $boardTypes['total'], 'delivered' => $boardTypes['delivered'], 'after_repair' => $boardTypes['after_repair'] ?? 0, 'accent' => true, 'code' => '_all']];
                         foreach ($boardTypes['types'] as $code => $t) $btCards[] = $t + ['accent' => false, 'code' => (string) $code];
                         if ($boardTypes['none']['total'] > 0) $btCards[] = ['label' => 'Тип не указан', 'accent' => false, 'code' => '_none'] + $boardTypes['none'];
                     @endphp
@@ -175,6 +175,12 @@
                                             @if($btOk)<a href="{{ $recUrl('pgp', 'good', $card['code']) }}" class="sheet-card__good sheet-card__link" title="Открыть сданные">✓ {{ number_format($btOk, 0, ',', ' ') }}</a>@else<span class="sheet-card__good">✓ 0</span>@endif
                                             @if($btBad)<a href="{{ $recUrl('pgp', 'defect', $card['code']) }}" class="sheet-card__bad sheet-card__link" title="Открыть несданные">✕ {{ number_format($btBad, 0, ',', ' ') }}</a>@else<span class="sheet-card__bad">✕ 0</span>@endif
                                         </div>
+                                        {{-- Подкатегория сданных: сдан после ремонта (повторная проверка) --}}
+                                        @if($card['after_repair'] ?? 0)
+                                            <div class="sheet-card__split">
+                                                <a href="{{ $recUrl('pgp', 'repaired', $card['code']) }}" class="sheet-card__muted sheet-card__link" title="Открыть сданные после ремонта">в т.ч. после ремонта: {{ number_format($card['after_repair'], 0, ',', ' ') }}</a>
+                                            </div>
+                                        @endif
                                     @else
                                         <div class="sheet-card__split"><span class="sheet-card__muted">нет данных</span></div>
                                     @endif
