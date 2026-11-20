@@ -164,6 +164,28 @@ class StationApiTest extends TestCase
             ->assertOk();
     }
 
+    /**
+     * Регрессия 2026-11-20: цепочка камеры шла по всем вкладкам API станций, включая «Модуль связи»
+     * без camera_serial — на MySQL 500 «Unknown column», считыватель писал «сайт недоступен».
+     * SQLite неизвестную колонку в WHERE не замечает, поэтому проверяем схему таблиц явно.
+     */
+    public function test_camera_chain_only_tables_with_camera_serial(): void
+    {
+        foreach (\App\Http\Controllers\StationController::CAMERA_SHEETS as $sheet => $model) {
+            $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn((new $model)->getTable(), 'camera_serial'),
+                "$sheet: в таблице нет camera_serial");
+        }
+        $this->assertArrayNotHasKey('comm_module', \App\Http\Controllers\StationController::CAMERA_SHEETS);
+
+        $this->worker('executor', 'Иванов И.И.');
+        $this->api('POST', 'comm-module-flash', ['serial_number' => str_repeat('a', 32), 'ip_address' => '60',
+            'employee' => 'Иванов И.И.', 'pin' => '1234'])->assertCreated();
+        $this->api('POST', 'camera-flash', ['camera_serial' => 'MK0773PAZ01648', 'employee' => 'Иванов И.И.', 'pin' => '1234'])
+            ->assertCreated();
+        $chain = $this->api('GET', 'camera/MK0773PAZ01648')->assertOk()->json('chain');
+        $this->assertSame(['night_camera_assembly'], array_column($chain, 'sheet'));
+    }
+
     public function test_site_form_accepts_camera_serial(): void
     {
         $user = $this->worker('master');

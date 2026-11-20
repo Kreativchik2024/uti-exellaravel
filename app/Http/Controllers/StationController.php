@@ -34,6 +34,16 @@ class StationController extends Controller
         'comm_module'           => CommModuleRecord::class,
     ];
 
+    /**
+     * Вкладки с № камеры (camera_serial) — только они в цепочке GET camera/{serial}.
+     * НЕ брать SHEETS целиком: у «Модуля связи» нет camera_serial — 2026-11-20 цепочка падала с 500
+     * («Unknown column camera_serial»), считыватель писал «сайт недоступен» (SQLite в тестах это не ловит).
+     */
+    public const CAMERA_SHEETS = [
+        'night_camera_assembly' => NightCameraAssemblyRecord::class,
+        'camera_bracket'        => CameraBracketRecord::class,
+    ];
+
     /** Сеть модулей связи: на сайте IP — маска 192.168.1.<последнее число>. */
     private const COMM_IP_PREFIX = '192.168.1.';
 
@@ -293,7 +303,7 @@ class StationController extends Controller
     public function camera(string $serial): JsonResponse
     {
         $chain = [];
-        foreach (self::SHEETS as $sheet => $model) {
+        foreach (self::CAMERA_SHEETS as $sheet => $model) {
             $title = config("sheets.map.$sheet.title");
             foreach ($model::where('camera_serial', $serial)->orderBy('record_date')->orderBy('id')->get() as $rec) {
                 $chain[] = [
