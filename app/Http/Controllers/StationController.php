@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CameraBracketRecord;
+use App\Models\CommModuleRecord;
 use App\Models\Employee;
 use App\Models\NightCameraAssemblyRecord;
 use App\Models\Section;
@@ -30,7 +31,11 @@ class StationController extends Controller
     private const SHEETS = [
         'night_camera_assembly' => NightCameraAssemblyRecord::class,
         'camera_bracket'        => CameraBracketRecord::class,
+        'comm_module'           => CommModuleRecord::class,
     ];
+
+    /** Сеть модулей связи: на сайте IP — маска 192.168.1.<последнее число>. */
+    private const COMM_IP_PREFIX = '192.168.1.';
 
     /** До 3 исполнителей, у каждого свой ПИН: workers = [{employee, pin}, …]; один — можно employee + pin. */
     private const MAX_WORKERS = 3;
@@ -118,6 +123,67 @@ class StationController extends Controller
         ] + $workers);
 
         return $this->saved($data, 'night_camera_assembly', $record->id);
+    }
+
+    /**
+     * MANET Flasher: модуль связи прошит и настроен → «Модуль связи».
+     * serial_number — S/N модуля целиком (32 hex из /deviceinfo), ip — полный адрес или только последнее число.
+     */
+    public function commModuleFlash(Request $r): JsonResponse
+    {
+        $data = $r->validate([
+            'serial_number' => ['required', 'string', 'max:120', 'regex:/^[A-Za-z0-9._-]+$/'],
+            'ip_address'    => ['nullable', 'string', 'max:15',
+                                'regex:/^(192\.168\.1\.)?(25[0-4]|2[0-4]\d|1\d\d|[1-9]\d?)$/'],
+            'record_date'   => ['nullable', 'date', 'before_or_equal:today'],
+            'notes'         => ['nullable', 'string', 'max:2000'],
+            'fault_code'    => ['nullable', 'string', 'max:100'],
+            'uid'           => ['nullable', 'string', 'max:64'],
+        ] + self::WORKER_RULES, [
+            'ip_address.regex' => 'IP: последнее число должно быть от 1 до 254.',
+        ]);
+
+        [$workers, $fail] = $this->authorizeWorkers($data, 'comm_module');
+        if ($fail) return $fail;
+        if ($done = $this->alreadySaved($data, 'comm_module')) return $done;
+
+        $ip = filled($data['ip_address'] ?? null)
+            ? self::COMM_IP_PREFIX . preg_replace('/^192\.168\.1\./', '', $data['ip_address'])
+            : null;
+        $date = $data['record_date'] ?? now()->toDateString();
+        $fault = null;
+        if (filled($data['fault_code'] ?? null)) {
+            $this->pinSection('comm_module');
+            $fault = app(FaultCodes::class)->resolve('comm_module', $data['fault_code'], Auth::id());
+        }
+
+        // Тот же модуль в тот же день — одна запись (повтор отправки, перепрошивка); новые IP / брак — обновляются
+        $existing = CommModuleRecord::where('serial_number', $data['serial_number'])
+            ->whereDate('record_date', $date)->first();
+        if ($existing) {
+            $changes = array_filter([
+                'ip_address' => $ip !== null && $ip !== $existing->ip_address ? $ip : null,
+            ]);
+            if ((string) $existing->fault_code !== (string) $fault) {
+                $changes['fault_code'] = $fault;
+            }
+            if ($changes) {
+                $existing->update($changes + ['notes' => $data['notes'] ?? $existing->notes,
+                                              'updated_by' => Auth::id()] + $workers);
+            }
+            return $this->saved($data, 'comm_module', $existing->id, true);
+        }
+
+        $record = CommModuleRecord::create([
+            'record_date'   => $date,
+            'serial_number' => $data['serial_number'],
+            'ip_address'    => $ip,
+            'notes'         => $data['notes'] ?? null,
+            'fault_code'    => $fault,
+            'created_by'    => Auth::id(),
+        ] + $workers);
+
+        return $this->saved($data, 'comm_module', $record->id);
     }
 
     /** Считыватель: кронштейн с камерой собран. */

@@ -134,6 +134,36 @@ class StationApiTest extends TestCase
         $this->assertSame(0, NightCameraAssemblyRecord::where('camera_serial', 'MK8')->count());
     }
 
+    public function test_comm_module_flash_record(): void
+    {
+        $user = $this->worker('executor', 'Иванов И.И.');
+        $sn = 'fbe8b5b858995d597ce5489a2fe95311';
+        $base = ['serial_number' => $sn, 'employee' => 'Иванов И.И.', 'pin' => '1234'];
+
+        // IP — полный адрес или только последнее число; на сайте хранится полный (маска 192.168.1.)
+        $res = $this->api('POST', 'comm-module-flash', $base + ['ip_address' => '192.168.1.51', 'uid' => 'm1'])
+            ->assertCreated()->assertJson(['ok' => true, 'duplicate' => false]);
+        $rec = \App\Models\CommModuleRecord::findOrFail($res->json('id'));
+        $this->assertSame([$sn, '192.168.1.51', 'Иванов И.И.', $user->id],
+            [$rec->serial_number, $rec->ip_address, $rec->worker1, $rec->created_by]);
+        $this->assertStringContainsString('/records/comm_module/', $res->json('url'));
+
+        // повтор из очереди — без дубля; перепрошивка в тот же день с другим IP — та же запись, IP обновлён
+        $this->api('POST', 'comm-module-flash', $base + ['ip_address' => '51', 'uid' => 'm1'])
+            ->assertOk()->assertJson(['duplicate' => true, 'id' => $rec->id]);
+        $this->api('POST', 'comm-module-flash', $base + ['ip_address' => '52', 'uid' => 'm2'])
+            ->assertOk()->assertJson(['duplicate' => true, 'id' => $rec->id]);
+        $this->assertSame('192.168.1.52', $rec->fresh()->ip_address);
+        $this->assertSame(1, \App\Models\CommModuleRecord::count());
+
+        $this->api('POST', 'comm-module-flash', $base + ['ip_address' => '255'])
+            ->assertStatus(422)->assertJsonValidationErrors('ip_address');
+        $this->api('POST', 'comm-module-flash', $base + ['ip_address' => '10.0.0.5'])
+            ->assertStatus(422)->assertJsonValidationErrors('ip_address');
+        $this->api('POST', 'verify', ['employee' => 'Иванов И.И.', 'pin' => '1234', 'sheet' => 'comm_module'])
+            ->assertOk();
+    }
+
     public function test_site_form_accepts_camera_serial(): void
     {
         $user = $this->worker('master');
