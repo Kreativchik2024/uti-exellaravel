@@ -49,6 +49,8 @@ class PgpRecord extends Model
             if (blank($record->board_type) && filled($record->board_number)) {
                 $record->board_type = \App\Support\BoardTypes::detect($record->board_number);
             }
+            // Борт был в ремонте — запись становится повторной проверкой, даже если её завели не через форму
+            app(\App\Services\PgpBoardLookup::class)->autoLink($record);
         });
     }
 

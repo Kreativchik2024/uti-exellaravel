@@ -157,4 +157,22 @@ class PgpBoardDedupTest extends TestCase
         $this->assertStringContainsString("/records/pgp/{$recheck->id}", $list);
         $this->assertStringNotContainsString('F-300', $list);
     }
+
+    /** Связь с ремонтом ставится и без формы (импорт, правка): номер сравнивается без пробелов; старые данные не цепляются. */
+    public function test_record_saved_outside_form_is_linked_to_repair(): void
+    {
+        $author = $this->worker('executor', 'Автор А.А.');
+        [, $research] = $this->defectBoard($author, 'S30Z080213');
+
+        $make = fn (string $fuselage, string $date) => tap(new PgpRecord(), fn ($p) => $p->forceFill(array_merge(
+            $this->validRecord('pgp', $this->nameOf($author)),
+            ['status' => 'Сдан', 'fuselage_number' => $fuselage, 'record_date' => $date, 'created_by' => $author->id]
+        ))->save());
+
+        // Строка из старой таблицы с датой раньше брака — не повторная проверка
+        $this->assertNull($make('S30Z080213', now()->subDays(10)->toDateString())->after_research_id);
+
+        // Импорт сегодня, номер с пробелом — повторная проверка после ремонта
+        $this->assertSame($research->id, $make('S30Z 080213', now()->toDateString())->after_research_id);
+    }
 }

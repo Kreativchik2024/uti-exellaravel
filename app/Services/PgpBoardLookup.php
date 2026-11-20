@@ -22,17 +22,23 @@ class PgpBoardLookup
 
     public function __construct(private SectionContext $sections) {}
 
+    /** Номер фюзеляжа для сравнения: без пробелов («S30Z 080213» = «S30Z080213»); регистр не важен — сравнение в MySQL без учёта регистра. */
+    public static function key(?string $fuselage): string
+    {
+        return preg_replace('/\s+/u', '', (string) $fuselage);
+    }
+
     /** Последняя запись ПГП с этим номером фюзеляжа (на текущем участке). */
     public function find(?string $fuselage, ?int $exceptId = null): ?PgpRecord
     {
-        $fuselage = trim((string) $fuselage);
-        if ($fuselage === '') return null;
+        $key = self::key($fuselage);
+        if ($key === '') return null;
         $model = $this->sections->sheets()['pgp']['model'] ?? PgpRecord::class;
 
         return $model::query()
-            ->where('fuselage_number', $fuselage)
+            ->whereRaw("REPLACE(TRIM(fuselage_number), ' ', '') = ?", [$key])
             ->when($exceptId, fn ($q) => $q->whereKeyNot($exceptId))
-            ->orderByDesc('id')->first();
+            ->orderByDesc('record_date')->orderByDesc('id')->first();   // последняя по дате проверки, не по порядку ввода
     }
 
     /**
@@ -80,6 +86,23 @@ class PgpBoardLookup
         $rec = $this->find($fuselage, $exceptId);
 
         return $rec ? $this->target($rec) : null;
+    }
+
+    /**
+     * Привязать запись к ремонту борта, если пользователь этого не сделал (импорт, правка фюзеляжа, обход формы).
+     * Вызывается из PgpRecord::saving: только пока связи нет, прошлая запись борта не «Сдан» и не позже этой.
+     */
+    public function autoLink(PgpRecord $rec): void
+    {
+        if ($rec->after_research_id !== null) return;
+        if ($rec->exists && ! $rec->isDirty('fuselage_number')) return;
+
+        $prev = $this->find($rec->fuselage_number, $rec->id);
+        if (! $prev || $prev->status === 'Сдан') return;
+        if ($rec->record_date && $prev->record_date && $prev->record_date->gt($rec->record_date)) return;   // старые данные из таблицы
+
+        $research = $prev->researches()->whereDoesntHave('recheck')->orderByDesc('id')->first();
+        if ($research) $rec->after_research_id = $research->id;
     }
 
     /** Данные борта из прошлой записи — для формы повторной проверки. */
