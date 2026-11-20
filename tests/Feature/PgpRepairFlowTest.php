@@ -15,13 +15,15 @@ class PgpRepairFlowTest extends TestCase
     use RefreshDatabase, SiteHelpers;
 
     /** Запись ПГП через форму, как её вводят на участке. */
-    private function postPgp(array $override = []): PgpRecord
+    private function postPgp(array $override = [], bool $startResearch = true): PgpRecord
     {
         $exec = $this->worker();
         $data = array_merge($this->validRecord('pgp', $this->nameOf($exec)), $override);
         $this->asUser($exec)->post('/records/pgp', $data)->assertSessionHasNoErrors();
+        $pgp = PgpRecord::latest('id')->firstOrFail();
+        if ($pgp->status === 'Не сдан' && $startResearch) $this->asUser($exec)->post("/records/pgp/{$pgp->id}/start-research");
 
-        return PgpRecord::latest('id')->firstOrFail();
+        return $pgp;
     }
 
     private function research(array $attrs = []): ResearchRecord
@@ -34,7 +36,11 @@ class PgpRepairFlowTest extends TestCase
 
     public function test_pgp_defect_creates_research_once(): void
     {
-        $pgp = $this->postPgp(['status' => 'Не сдан', 'defect_reason' => 'Нет связи с модулем', 'frame_serial' => 'FR-77']);
+        $pgp = $this->postPgp(['status' => 'Не сдан', 'defect_reason' => 'Нет связи с модулем', 'frame_serial' => 'FR-77'], false);
+        $this->assertSame(0, ResearchRecord::count(), 'само исследование не заводится');
+        $exec = \App\Models\User::findOrFail($pgp->created_by);
+        $this->assertStringContainsString('Завести исследование', $this->asUser($exec)->get("/records/pgp/{$pgp->id}")->getContent());
+        $this->asUser($exec)->post("/records/pgp/{$pgp->id}/start-research")->assertRedirect();
 
         $research = ResearchRecord::where('pgp_record_id', $pgp->id)->first();
         $this->assertNotNull($research, 'по браку ПГП должно появиться исследование');

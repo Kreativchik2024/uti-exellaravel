@@ -29,8 +29,10 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
         $exec = $this->exec ??= $this->worker();
         $this->asUser($exec)->post('/records/pgp', array_merge($this->validRecord('pgp', $this->nameOf($exec)), $override))
             ->assertSessionHasNoErrors();
+        $pgp = PgpRecord::latest('id')->firstOrFail();
+        if ($pgp->status === 'Не сдан') $this->asUser($exec)->post("/records/pgp/{$pgp->id}/start-research");
 
-        return PgpRecord::latest('id')->firstOrFail();
+        return $pgp;
     }
 
     /** Дерево блоков, как в справочнике кодов: МОТОРАМА → Кросс 3 → МИНИ ПК. @return array{0:\App\Models\FaultCodeGroup,1:\App\Models\FaultCodeGroup,2:\App\Models\FaultCodeGroup} */

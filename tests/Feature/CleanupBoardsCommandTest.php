@@ -1,0 +1,78 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\PgpRecord;
+use App\Models\ResearchRecord;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\SiteHelpers;
+use Tests\TestCase;
+
+class CleanupBoardsCommandTest extends TestCase
+{
+    use RefreshDatabase, SiteHelpers;
+
+    private function pgp(string $fuselage, string $status, int $daysAgo): PgpRecord
+    {
+        $p = new PgpRecord();
+        $p->forceFill(array_merge($this->validRecord('pgp', 'Автор А.А.'), [
+            'status' => $status, 'technologist' => $status === 'Сдан' ? $this->technologistName() : null,
+            'fuselage_number' => $fuselage, 'record_date' => now()->subDays($daysAgo)->toDateString(),
+        ]))->saveQuietly();
+
+        return $p;
+    }
+
+    private function research(array $attrs): ResearchRecord
+    {
+        $r = new ResearchRecord();
+        $r->forceFill(array_merge(['worker1' => 'Ремонт Р.Р.', 'repair_status' => 'new', 'is_repaired' => false,
+            'record_date' => now()->toDateString()], $attrs))->saveQuietly();
+
+        return $r;
+    }
+
+    public function test_report_does_not_change_and_apply_cleans_up(): void
+    {
+        // 1. Брак с исследованием, борт потом сдан
+        $bad = $this->pgp('F-1', 'Не сдан', 30);
+        $r1 = $this->research(['pgp_record_id' => $bad->id, 'fuselage_no' => 'F-1', 'record_date' => $bad->record_date]);
+        $ok = $this->pgp(' f-1 ', 'Сдан', 20);
+        // 1б. Старый «Не сдан» без исследования, борт потом проверили снова
+        $old = $this->pgp('F-2', 'Не сдан', 40);
+        $old2 = $this->pgp('F-2', 'Сдан', 35);
+        // 2. По результату
+        $r2 = $this->research(['fuselage_no' => 'F-3', 'result' => 'Устранено']);
+        $r3 = $this->research(['fuselage_no' => 'F-4', 'result' => 'в работе']);
+        // 3. Давний, без признаков; и свежий — не трогаем
+        $r4 = $this->research(['fuselage_no' => 'F-5', 'record_date' => now()->subMonths(4)->toDateString()]);
+        $r5 = $this->research(['fuselage_no' => 'F-6']);
+
+        $this->artisan('boards:cleanup')->assertSuccessful();
+        $this->assertSame('new', $r1->fresh()->repair_status, 'без --apply ничего не меняется');
+        $this->assertSame(5, ResearchRecord::count(), 'и исследования не заводятся');
+
+        $this->artisan('boards:cleanup', ['--apply' => true, '--force' => true])->assertSuccessful();
+
+        $this->assertSame('conveyor', $r1->fresh()->repair_status);
+        $this->assertTrue($r1->fresh()->is_repaired);
+        $this->assertSame($r1->id, $ok->fresh()->after_research_id);
+
+        $created = ResearchRecord::where('pgp_record_id', $old->id)->firstOrFail();
+        $this->assertSame('conveyor', $created->repair_status);
+        $this->assertSame($created->id, $old2->fresh()->after_research_id);
+        $this->assertStringContainsString('чистке базы', $created->analysis_actions);
+
+        $this->assertSame('conveyor', $r2->fresh()->repair_status);
+        $this->assertSame('in_work', $r3->fresh()->repair_status);
+        $this->assertSame('analysis', $r4->fresh()->repair_status);
+        $this->assertStringContainsString('чистке базы', $r4->fresh()->analysis_actions);
+        $this->assertSame('new', $r5->fresh()->repair_status);
+
+        $this->assertSame(0, app(\App\Services\PgpDefectResearch::class)->returnedFromRepairCount());
+        $this->assertDatabaseHas('audit_logs', ['area' => 'research', 'action' => 'cleanup']);
+
+        // Повторный запуск — делать уже нечего
+        $this->artisan('boards:cleanup')->expectsOutputToContain('нет')->assertSuccessful();
+    }
+}

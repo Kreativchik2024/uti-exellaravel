@@ -225,6 +225,18 @@
                         $chainResearches = $record->researches()->with('recheck')->orderBy('id')->get();
                         $prevResearch = $record->afterResearch;
                     @endphp
+                    @if($chainResearches->isEmpty() && app(\App\Services\PgpDefectResearch::class)->isDefect($record))
+                        <section class="ui-card p-4 space-y-2" style="border-color: var(--ui-danger, #dc2626)">
+                            <h3 class="text-sm font-semibold" style="color: var(--ui-text)">Исследование не заведено</h3>
+                            <p class="text-sm" style="color: var(--ui-text-2)">
+                                Борт с браком. Чтобы он ушёл в ремонт и потом вернулся на повторную проверку, заведите по нему исследование.
+                            </p>
+                            <form method="POST" action="{{ route('records.startResearch', ['pgp', $record->id]) }}">
+                                @csrf
+                                <button type="submit" class="ui-btn w-full">Завести исследование</button>
+                            </form>
+                        </section>
+                    @endif
                     @if($pendingResearch)
                         <section class="ui-card p-4 space-y-2" style="border-color: var(--ui-accent)">
                             <h3 class="text-sm font-semibold" style="color: var(--ui-accent-text)">Вернулся после ремонта</h3>

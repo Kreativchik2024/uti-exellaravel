@@ -211,6 +211,7 @@ Route::middleware(['auth', 'workers'])->group(function () {
     // Пометка технолога ПГП — только группа «Технолог»
     Route::patch('/records/{sheet}/{id}/tech', [RecordReviewController::class, 'tech'])->middleware('role:technologist')->name('records.tech');
     // Исследования: статус кнопками — ремонтник (и мастер, админ); комментарии — все
+    Route::post('/records/{sheet}/{id}/start-research', [RecordReviewController::class, 'startResearch'])->middleware('throttle:30,1')->name('records.startResearch');
     Route::patch('/records/{sheet}/{id}/research-status', [RecordReviewController::class, 'researchStatus'])->middleware('role:repair,master,admin')->name('records.researchStatus');
     // Ремонт / замена и узел — ремонтник (мастер, админ); акт на замену — технолог (мастер, админ)
     Route::patch('/records/{sheet}/{id}/research-repair', [RecordReviewController::class, 'researchRepair'])->middleware('role:repair,master,admin')->name('records.researchRepair');

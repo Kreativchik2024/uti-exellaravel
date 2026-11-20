@@ -35,6 +35,21 @@ class RecordReviewController extends Controller
         return back()->with('ok', 'Статус: ' . $statuses[$data['repair_status']]['label']);
     }
 
+    /** Завести исследование по браку записи ПГП — вручную, кнопкой на карточке (само при браке не заводится). */
+    public function startResearch(string $sheet, int $id)
+    {
+        abort_unless($sheet === 'pgp', 404);
+        $pgp = $this->cfg($sheet)['model']::findOrFail($id);
+
+        $research = app(\App\Services\PgpDefectResearch::class)->syncFor($pgp);
+        if (! $research) {
+            return back()->withErrors(['general' => $pgp->researches()->exists()
+                ? 'Исследование по этой записи уже заведено.' : 'Запись не брак — исследование не нужно.']);
+        }
+
+        return redirect()->route('records.show', ['research', $research->id])->with('ok', "Заведено исследование №{$research->id}");
+    }
+
     /** Сколько секунд можно отменить последнее сохранение. */
     public const UNDO_SECONDS = 120;
 

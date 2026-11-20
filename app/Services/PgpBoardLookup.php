@@ -55,7 +55,7 @@ class PgpBoardLookup
             $last = $rec->researches()->orderByDesc('id')->first();
             $where = $last
                 ? "исследование №{$last->id}: " . mb_strtolower(ResearchRecord::STATUSES[$last->repair_status ?: 'new']['label'] ?? (string) $last->repair_status)
-                : 'исследование не заведено';
+                : 'исследование не заведено — заведите его на карточке записи';
             $text = "Борт не сдан и числится в ремонте (запись №{$rec->id} от {$date}, {$where}). "
                   . 'Новая запись не создаётся — сначала ремонтник отправляет борт на испытания.';
         }

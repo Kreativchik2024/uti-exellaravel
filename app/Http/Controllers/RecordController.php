@@ -711,11 +711,8 @@ class RecordController extends Controller
         }
         if ($tokenKey) Cache::put($tokenKey, $record->id, now()->addHours(12));
 
-        $research = $this->researchForPgpDefect($sheet, $record);
-
         return redirect()->route('records.index', $sheet)
-            ->with('ok', ($boardFound ? "Повторная проверка после ремонта (исследование №{$boardFound['research']->id}) записана" : 'Запись добавлена')
-                . ($research ? ". Брак — заведено исследование №{$research->id}" : ''));
+            ->with('ok', $boardFound ? "Повторная проверка после ремонта (исследование №{$boardFound['research']->id}) записана" : 'Запись добавлена');
     }
 
     public function edit(Request $r, string $sheet, int $id)
@@ -784,22 +781,7 @@ class RecordController extends Controller
             throw $e;
         }
 
-        $research = $this->researchForPgpDefect($sheet, $record);
-
-        $msg = 'Запись обновлена' . ($research ? ". Брак — заведено исследование №{$research->id}" : '');
-
-        return redirect()->route('records.index', $sheet)->with('ok', $msg);
-    }
-
-    /**
-     * Брак в ПГП сразу заносится в «Исследования». Только для записей, введённых через форму:
-     * загрузка старых данных из таблицы исследования не плодит.
-     */
-    private function researchForPgpDefect(string $sheet, $record): ?\App\Models\ResearchRecord
-    {
-        if ($sheet !== 'pgp') return null;
-
-        return app(\App\Services\PgpDefectResearch::class)->syncFor($record);
+        return redirect()->route('records.index', $sheet)->with('ok', 'Запись обновлена');
     }
 
     public function destroy(string $sheet, int $id)

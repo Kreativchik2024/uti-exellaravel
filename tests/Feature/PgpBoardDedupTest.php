@@ -94,6 +94,8 @@ class PgpBoardDedupTest extends TestCase
             ->assertSessionHasNoErrors();
         $recheck = PgpRecord::latest('id')->first();
         $this->assertSame($research->id, $recheck->after_research_id);
+        $this->assertSame(0, $recheck->researches()->count(), 'само исследование не заводится');
+        $this->asUser($author)->post("/records/pgp/{$recheck->id}/start-research")->assertRedirect();
         $this->assertSame(1, $recheck->researches()->count(), 'по повторной проверке — новый ремонт');
 
         // Пока новый ремонт идёт — новой записи по борту нет
