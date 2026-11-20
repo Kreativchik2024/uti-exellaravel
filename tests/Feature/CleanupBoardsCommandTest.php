@@ -108,4 +108,24 @@ class CleanupBoardsCommandTest extends TestCase
             $this->assertSame($want, \App\Console\Commands\CleanupBoards::statusByResult($text), $text);
         }
     }
+
+    public function test_pgp_complaints_are_marked_processed(): void
+    {
+        $again   = $this->pgp('C-1', 'Не сдан', 20);
+        $this->pgp('C-1', 'Не сдан', 10);                                  // борт снова проверяли (и снова брак)
+        $repaired = $this->pgp('C-2', 'Не сдан', 20);
+        $this->research(['pgp_record_id' => $repaired->id, 'repair_status' => 'conveyor', 'is_repaired' => true]);
+        $old   = $this->pgp('C-3', 'Не сдан', 40);
+        $fresh = $this->pgp('C-4', 'Не сдан', 2);
+
+        $complaints = fn () => $this->artisan('boards:cleanup', ['--apply' => true, '--force' => true, '--complaints-before' => now()->subDays(30)->toDateString()]);
+        $complaints()->assertSuccessful();
+
+        $this->assertTrue($again->fresh()->tech_processed);
+        $this->assertStringContainsString('чистке базы', $again->fresh()->tech_note);
+        $this->assertTrue($repaired->fresh()->tech_processed);
+        $this->assertTrue($old->fresh()->tech_processed);
+        $this->assertFalse($fresh->fresh()->tech_processed, 'свежая рекламация без признаков остаётся');
+        $this->assertDatabaseHas('audit_logs', ['area' => 'pgp', 'action' => 'cleanup', 'subject_id' => $old->id]);
+    }
 }

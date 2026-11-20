@@ -19,6 +19,10 @@ use Illuminate\Support\Facades\DB;
  *     «разбор» → «Отправлен в разбор»; «в работе» → «В работе»; испытания / сборка / настройка / отремонтирован / исправен… → на испытания.
  *  2б. «Загружено из таблицы» — без автора и не из ПГП (старые данные), результат пустой или не распознан → «Отправлен в разбор» с пометкой.
  *  3. «Давно висит» — всё ещё «Не обработан» дольше --months месяцев → «Отправлен в разбор» с пометкой.
+ * Рекламации ПГП (меню «Необработанные рекламации ПГП», отметка технолога «Обработан»):
+ *  Р1. борт после брака снова проверяли на ПГП — рекламация обработана, дальше живёт новая проверка;
+ *  Р2. исследование по ней «Отправлен на испытания» или «Отправлен в разбор» (с учётом правил выше);
+ *  Р3. только с --complaints-before=ГГГГ-ММ-ДД — заведённые раньше этой даты.
  * Без --apply только показывает отчёт. Изменения идут через модели — попадают в журнал действий.
  */
 class CleanupBoards extends Command
@@ -27,7 +31,8 @@ class CleanupBoards extends Command
         {--apply : Внести изменения (без него — только отчёт)}
         {--months=3 : Через сколько месяцев «Не обработан» уходит в разбор}
         {--force : Не спрашивать подтверждение}
-        {--all : Показать в отчёте все строки, а не первые}';
+        {--all : Показать в отчёте все строки, а не первые}
+        {--complaints-before= : Рекламации ПГП раньше этой даты (ГГГГ-ММ-ДД) отметить обработанными}';
 
     protected $description = 'Навести порядок в необработанных бортах: закрыть отремонтированные, связать проверки, разобрать давние';
 
@@ -56,6 +61,9 @@ class CleanupBoards extends Command
     /** @var array<int, array> план: [rule, research?, pgp?, fuselage, from, to, link?, note?] */
     private array $plan = [];
 
+    /** @var array<int, array{pgp: PgpRecord, rule: string}> рекламации ПГП, которые отметим обработанными */
+    private array $complaints = [];
+
     /** id проверок ПГП, уже занятых как повторные (существующие и запланированные). */
     private array $usedChecks = [];
 
@@ -71,13 +79,15 @@ class CleanupBoards extends Command
         $this->planByResult();
         $this->planImported();
         $this->planStale($months);
+        $this->planComplaints($checks);
 
-        if (! $this->plan) {
+        if (! $this->plan && ! $this->complaints) {
             $this->info('Необработанных бортов, которые можно разобрать по правилам, нет.');
             return self::SUCCESS;
         }
 
-        $this->report($months);
+        if ($this->plan) $this->report($months);
+        if ($this->complaints) $this->reportComplaints();
         if (! $this->option('apply')) {
             $this->line('Это только отчёт. Применить: php artisan boards:cleanup --apply' . ($months !== 3 ? " --months={$months}" : ''));
             return self::SUCCESS;
@@ -87,7 +97,7 @@ class CleanupBoards extends Command
             return self::SUCCESS;
         }
 
-        $done = DB::transaction(fn () => $this->apply());
+        $done = DB::transaction(fn () => $this->apply() + $this->applyComplaints());
         AuditLog::write('research', 'cleanup', "Чистка базы бортов: изменено {$done}", ['section_id' => null]);
         $this->info("Готово, изменено: {$done}");
 
@@ -206,6 +216,74 @@ class CleanupBoards extends Command
                     'fuselage' => $r->fuselage_no ?: $r->module_serial, 'from' => 'new', 'to' => 'analysis', 'link' => null,
                     'note' => 'Отправлено в разбор при чистке базы ' . now()->format('d.m.Y') . " (не обработано дольше {$months} мес.)"];
             });
+    }
+
+    /** Рекламации ПГП (брак без отметки технолога «Обработан»), которые уже разобраны. */
+    private function planComplaints(Collection $checks): void
+    {
+        $this->complaints = [];
+        // В консоли нет пользователя и участка — закрепляем участок с вкладкой ПГП (таблица ПГП общая)
+        $sections = app(\App\Services\SectionContext::class);
+        if (! isset($sections->sheets()['pgp'])) {
+            $withPgp = \App\Models\Section::query()->get()->first(fn ($s) => isset($s->sheets()['pgp']));
+            if ($withPgp) $sections->pin($withPgp);
+        }
+        $query = app(\App\Services\PgpComplaints::class)->openQuery();
+        if (! $query) return;
+
+        $before = $this->option('complaints-before') ? Carbon::parse($this->option('complaints-before'))->startOfDay() : null;
+        $newStatus = collect($this->plan)->mapWithKeys(fn ($p) => [$p['research']->id => $p['to']])->all();
+        $label = fn ($s) => mb_strtolower(ResearchRecord::STATUSES[$s]['label'] ?? $s);
+
+        $query->with('researches:id,pgp_record_id,repair_status')->orderBy('p.id')->get()
+            ->each(function (PgpRecord $pgp) use ($checks, $before, $newStatus, $label) {
+                $list = $checks[self::norm($pgp->fuselage_number)] ?? collect();
+                $later = self::norm($pgp->fuselage_number) === '' ? null
+                    : $list->first(self::laterThan($pgp->record_date, $pgp->created_at, $pgp->id));
+                $statuses = $pgp->researches->map(fn ($r) => $newStatus[$r->id] ?? ($r->repair_status ?: 'new'));
+                $done = $statuses->first(fn ($s) => in_array($s, ['conveyor', 'analysis'], true));
+
+                $rule = match (true) {
+                    (bool) $later => "Борт снова проверяли на ПГП",
+                    (bool) $done  => 'Исследование: ' . $label($done),
+                    $before && $pgp->record_date && $pgp->record_date->lt($before) => 'Заведена до ' . $before->format('d.m.Y'),
+                    default => null,
+                };
+                if ($rule) $this->complaints[] = ['pgp' => $pgp, 'rule' => $rule, 'later' => $later];
+            });
+    }
+
+    private function reportComplaints(): void
+    {
+        $this->info('Рекламации ПГП — отметить «Обработан»: ' . count($this->complaints));
+        $this->table(['Правило', 'Количество'], collect($this->complaints)->countBy('rule')->map(fn ($n, $k) => [$k, $n])->values()->all());
+        $this->table(['Правило', 'ПГП', 'Дата', 'Фюзеляж', 'Следующая проверка'],
+            collect($this->complaints)->take($this->option('all') ? PHP_INT_MAX : 40)->map(fn ($c) => [
+                $c['rule'], '№' . $c['pgp']->id, $c['pgp']->record_date?->format('d.m.Y') ?? '—', $c['pgp']->fuselage_number ?: '—',
+                $c['later'] ? "№{$c['later']->id} ({$c['later']->status}, " . $c['later']->record_date?->format('d.m.Y') . ')' : '—',
+            ])->all());
+        if (! $this->option('all') && count($this->complaints) > 40) $this->line('… и ещё ' . (count($this->complaints) - 40));
+        $left = app(\App\Services\PgpComplaints::class)->openCount() - count($this->complaints);
+        $this->line("Останется необработанных рекламаций: {$left}");
+    }
+
+    private function applyComplaints(): int
+    {
+        $done = 0;
+        foreach ($this->complaints as $c) {
+            $pgp = PgpRecord::find($c['pgp']->id);
+            if (! $pgp || $pgp->tech_processed) continue;
+            $note = '[Обработано при чистке базы ' . now()->format('d.m.Y') . ': ' . mb_strtolower($c['rule'])
+                . ($c['later'] ? ", проверка №{$c['later']->id}" : '') . ']';
+            $pgp->timestamps = false;
+            $pgp->forceFill(['tech_processed' => true, 'tech_note' => trim(trim((string) $pgp->tech_note) . "
+" . $note), 'tech_updated_at' => now()])->save();
+            AuditLog::write('pgp', 'cleanup', "Чистка базы: рекламация ПГП #{$pgp->id} обработана — {$c['rule']}",
+                ['subject_type' => 'record', 'subject_id' => $pgp->id, 'section_id' => null]);
+            $done++;
+        }
+
+        return $done;
     }
 
     private function report(int $months): void
