@@ -38,7 +38,7 @@ class CleanupBoardsCommandTest extends TestCase
         $bad = $this->pgp('F-1', 'Не сдан', 30);
         $r1 = $this->research(['pgp_record_id' => $bad->id, 'fuselage_no' => 'F-1', 'record_date' => $bad->record_date]);
         $ok = $this->pgp(' f-1 ', 'Сдан', 20);
-        // 1б. Старый «Не сдан» без исследования, борт потом проверили снова
+        // Старый «Не сдан» без исследования, борт потом проверили снова — исследование не заводим
         $old = $this->pgp('F-2', 'Не сдан', 40);
         $old2 = $this->pgp('F-2', 'Сдан', 35);
         // 2. По результату
@@ -58,10 +58,9 @@ class CleanupBoardsCommandTest extends TestCase
         $this->assertTrue($r1->fresh()->is_repaired);
         $this->assertSame($r1->id, $ok->fresh()->after_research_id);
 
-        $created = ResearchRecord::where('pgp_record_id', $old->id)->firstOrFail();
-        $this->assertSame('conveyor', $created->repair_status);
-        $this->assertSame($created->id, $old2->fresh()->after_research_id);
-        $this->assertStringContainsString('чистке базы', $created->analysis_actions);
+        $this->assertSame(0, ResearchRecord::where('pgp_record_id', $old->id)->count(), 'новых исследований команда не заводит');
+        $this->assertNull($old2->fresh()->after_research_id);
+        $this->assertSame(5, ResearchRecord::count());
 
         $this->assertSame('conveyor', $r2->fresh()->repair_status);
         $this->assertSame('in_work', $r3->fresh()->repair_status);
@@ -73,6 +72,6 @@ class CleanupBoardsCommandTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['area' => 'research', 'action' => 'cleanup']);
 
         // Повторный запуск — делать уже нечего
-        $this->artisan('boards:cleanup')->expectsOutputToContain('нет')->assertSuccessful();
+        $this->artisan('boards:cleanup')->expectsOutputToContain("нет")->assertSuccessful();
     }
 }

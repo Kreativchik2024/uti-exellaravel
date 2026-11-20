@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\AuditLog;
 use App\Models\PgpRecord;
 use App\Models\ResearchRecord;
-use App\Services\PgpDefectResearch;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -15,7 +14,7 @@ use Illuminate\Support\Facades\DB;
  * Наведение порядка в необработанных бортах (одноразово, по старым данным). Правила по порядку:
  *  1. «Борт снова был на ПГП» — по фюзеляжу после брака есть следующая проверка ПГП: ремонт, значит, закончен →
  *     исследование «Отправлен на испытания», следующая проверка связывается с ним как повторная (after_research_id).
- *     Старая запись «Не сдан» без исследования, у которой есть следующая проверка, — заводим исследование и связываем так же.
+ *     Новых исследований команда не заводит: запись «Не сдан» без исследования остаётся как есть.
  *  2. «По результату» — «Не обработан», но «Результат» заполнен: устранено / не подтверждено → на испытания, в работе → «В работе».
  *  3. «Давно висит» — всё ещё «Не обработан» дольше --months месяцев → «Отправлен в разбор» с пометкой.
  * Без --apply только показывает отчёт. Изменения идут через модели — попадают в журнал действий.
@@ -37,13 +36,13 @@ class CleanupBoards extends Command
     /** id проверок ПГП, уже занятых как повторные (существующие и запланированные). */
     private array $usedChecks = [];
 
-    public function handle(PgpDefectResearch $defects): int
+    public function handle(): int
     {
+        $this->plan = [];
         $months = max(1, (int) $this->option('months'));
         $checks = $this->checksByFuselage();
         $this->usedChecks = PgpRecord::whereNotNull('after_research_id')->pluck('id')->flip()->map(fn () => true)->all();
 
-        $this->planOldDefectsWithoutResearch($checks);
         $research = $this->boardResearch();
         $this->planReturned($research, $checks);
         $this->planByResult();
@@ -64,7 +63,7 @@ class CleanupBoards extends Command
             return self::SUCCESS;
         }
 
-        $done = DB::transaction(fn () => $this->apply($defects));
+        $done = DB::transaction(fn () => $this->apply());
         AuditLog::write('research', 'cleanup', "Чистка базы бортов: изменено {$done}", ['section_id' => null]);
         $this->info("Готово, изменено: {$done}");
 
@@ -114,21 +113,6 @@ class CleanupBoards extends Command
         };
     }
 
-    /** Правило 1б: «Не сдан» без исследования, а борт потом снова проверяли. */
-    private function planOldDefectsWithoutResearch(Collection $checks): void
-    {
-        $rows = PgpRecord::query()->where('status', 'Не сдан')->whereDoesntHave('researches')
-            ->whereNotNull('fuselage_number')->where('fuselage_number', '!=', '')->orderBy('id')->get();
-
-        foreach ($rows as $pgp) {
-            $next = $this->nextCheck($checks[self::norm($pgp->fuselage_number)] ?? collect(), self::laterThan($pgp->record_date, $pgp->created_at, $pgp->id));
-            if (! $next) continue;
-            $this->usedChecks[$next->id] = true;
-            $this->plan[] = ['rule' => 'Связать старый «Не сдан»', 'research' => null, 'pgp' => $pgp, 'fuselage' => $pgp->fuselage_number,
-                'from' => 'нет исследования', 'to' => 'conveyor', 'link' => $next, 'create' => true];
-        }
-    }
-
     /** Правило 1: борт после брака снова был на ПГП (или его запись теперь «Сдан»). */
     private function planReturned(Collection $research, Collection $checks): void
     {
@@ -154,7 +138,7 @@ class CleanupBoards extends Command
 
     private function planned(): array
     {
-        return collect($this->plan)->pluck('research')->filter()->pluck('id')->flip()->all();
+        return collect($this->plan)->pluck('research')->pluck('id')->flip()->all();
     }
 
     /** Правило 2: «Не обработан», но результат уже записан. */
@@ -196,28 +180,20 @@ class CleanupBoards extends Command
         $this->table(['Правило', 'Исследование', 'ПГП', 'Фюзеляж', 'Статус', 'Повторная проверка'],
             collect($this->plan)->take(40)->map(fn ($p) => [
                 $p['rule'],
-                $p['research'] ? '№' . $p['research']->id : 'заведём новое',
+                '№' . $p['research']->id,
                 $p['pgp'] ? '№' . $p['pgp']->id : '—',
                 $p['fuselage'] ?: '—',
-                $p['from'] === $p['to'] ? 'без изменений'
-                    : ($p['from'] === 'нет исследования' ? $p['from'] : $label($p['from'])) . ' -> ' . $label($p['to']),
+                $p['from'] === $p['to'] ? 'без изменений' : $label($p['from']) . ' -> ' . $label($p['to']),
                 $p['link'] ? "№{$p['link']->id} ({$p['link']->status}, " . $p['link']->record_date?->format('d.m.Y') . ')' : '—',
             ])->all());
         if (count($this->plan) > 40) $this->line('… и ещё ' . (count($this->plan) - 40));
     }
 
-    private function apply(PgpDefectResearch $defects): int
+    private function apply(): int
     {
         $done = 0;
         foreach ($this->plan as $p) {
-            $r = $p['research'];
-            if (! empty($p['create'])) {
-                $r = $defects->syncFor($p['pgp']);
-                if (! $r) { $this->warn("ПГП №{$p['pgp']->id}: не брак по правилу статистики — пропущено"); continue; }
-                $p['note'] = 'Исследование заведено при чистке базы ' . now()->format('d.m.Y') . ' — борт позже снова был на ПГП';
-            } else {
-                $r = ResearchRecord::find($r->id);
-            }
+            $r = ResearchRecord::find($p['research']->id);
 
             $r->timestamps = false;                                    // дату изменения записи не трогаем
             $r->repair_status = $p['to'];
