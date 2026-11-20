@@ -12,6 +12,8 @@ class CleanupBoardsCommandTest extends TestCase
 {
     use RefreshDatabase, SiteHelpers;
 
+    private $author = null;
+
     private function pgp(string $fuselage, string $status, int $daysAgo): PgpRecord
     {
         $p = new PgpRecord();
@@ -26,7 +28,8 @@ class CleanupBoardsCommandTest extends TestCase
     private function research(array $attrs): ResearchRecord
     {
         $r = new ResearchRecord();
-        $r->forceFill(array_merge(['worker1' => 'Ремонт Р.Р.', 'repair_status' => 'new', 'is_repaired' => false,
+        $this->author ??= $this->worker('repair');
+        $r->forceFill(array_merge(['worker1' => 'Ремонт Р.Р.', 'repair_status' => 'new', 'is_repaired' => false, 'created_by' => $this->author->id,
             'record_date' => now()->toDateString()], $attrs))->saveQuietly();
 
         return $r;
@@ -44,13 +47,18 @@ class CleanupBoardsCommandTest extends TestCase
         // 2. По результату
         $r2 = $this->research(['fuselage_no' => 'F-3', 'result' => 'Устранено']);
         $r3 = $this->research(['fuselage_no' => 'F-4', 'result' => 'в работе']);
+        $r6 = $this->research(['result' => 'Моторама передана в сборку и дальнейшее испытание']);
+        $r7 = $this->research(['result' => 'Рама в разбор']);
+        // 2б. Загружено из таблицы: без автора; пустой результат → в разбор
+        $r8 = $this->research(['created_by' => null, 'result' => '']);
+        $r9 = $this->research(['created_by' => null, 'result' => 'Борт передан на испытания.']);
         // 3. Давний, без признаков; и свежий — не трогаем
         $r4 = $this->research(['fuselage_no' => 'F-5', 'record_date' => now()->subMonths(4)->toDateString()]);
         $r5 = $this->research(['fuselage_no' => 'F-6']);
 
         $this->artisan('boards:cleanup')->assertSuccessful();
         $this->assertSame('new', $r1->fresh()->repair_status, 'без --apply ничего не меняется');
-        $this->assertSame(5, ResearchRecord::count(), 'и исследования не заводятся');
+        $this->assertSame(9, ResearchRecord::count(), 'и исследования не заводятся');
 
         $this->artisan('boards:cleanup', ['--apply' => true, '--force' => true])->assertSuccessful();
 
@@ -60,10 +68,15 @@ class CleanupBoardsCommandTest extends TestCase
 
         $this->assertSame(0, ResearchRecord::where('pgp_record_id', $old->id)->count(), 'новых исследований команда не заводит');
         $this->assertNull($old2->fresh()->after_research_id);
-        $this->assertSame(5, ResearchRecord::count());
+        $this->assertSame(9, ResearchRecord::count());
 
         $this->assertSame('conveyor', $r2->fresh()->repair_status);
         $this->assertSame('in_work', $r3->fresh()->repair_status);
+        $this->assertSame('conveyor', $r6->fresh()->repair_status);
+        $this->assertSame('analysis', $r7->fresh()->repair_status);
+        $this->assertSame('analysis', $r8->fresh()->repair_status);
+        $this->assertStringContainsString('загружено из таблицы', $r8->fresh()->analysis_actions);
+        $this->assertSame('conveyor', $r9->fresh()->repair_status);
         $this->assertSame('analysis', $r4->fresh()->repair_status);
         $this->assertStringContainsString('чистке базы', $r4->fresh()->analysis_actions);
         $this->assertSame('new', $r5->fresh()->repair_status);

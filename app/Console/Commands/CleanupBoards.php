@@ -15,7 +15,9 @@ use Illuminate\Support\Facades\DB;
  *  1. «Борт снова был на ПГП» — по фюзеляжу после брака есть следующая проверка ПГП: ремонт, значит, закончен →
  *     исследование «Отправлен на испытания», следующая проверка связывается с ним как повторная (after_research_id).
  *     Новых исследований команда не заводит: запись «Не сдан» без исследования остаётся как есть.
- *  2. «По результату» — «Не обработан», но «Результат» заполнен: устранено / не подтверждено → на испытания, в работе → «В работе».
+ *  2. «По результату» — «Не обработан», но «Результат» заполнен (свободный текст, ищем ключевые слова):
+ *     «разбор» → «Отправлен в разбор»; «в работе» → «В работе»; испытания / сборка / настройка / отремонтирован / исправен… → на испытания.
+ *  2б. «Загружено из таблицы» — без автора и не из ПГП (старые данные), результат пустой или не распознан → «Отправлен в разбор» с пометкой.
  *  3. «Давно висит» — всё ещё «Не обработан» дольше --months месяцев → «Отправлен в разбор» с пометкой.
  * Без --apply только показывает отчёт. Изменения идут через модели — попадают в журнал действий.
  */
@@ -28,7 +30,24 @@ class CleanupBoards extends Command
 
     protected $description = 'Навести порядок в необработанных бортах: закрыть отремонтированные, связать проверки, разобрать давние';
 
-    private const RESULT_STATUS = ['устранено' => 'conveyor', 'не подтверждено' => 'conveyor', 'в работе' => 'in_work'];
+    /** Ключевые слова в «Результате» → статус; проверяются по порядку. */
+    private const RESULT_KEYWORDS = [
+        'analysis' => ['разбор'],
+        'in_work'  => ['в работе', 'в ремонте', 'ожидает'],
+        'conveyor' => ['испытани', 'сборк', 'настройк', 'отремонтир', 'устранен', 'исправ', 'подтвержд', 'передан', 'отдан', 'отправлен', 'заменен', 'замена'],
+    ];
+
+    /** Статус по тексту «Результата» или null — не распознан. */
+    public static function statusByResult(?string $result): ?string
+    {
+        $text = mb_strtolower(trim((string) $result));
+        if ($text === '') return null;
+        foreach (self::RESULT_KEYWORDS as $status => $words) {
+            foreach ($words as $w) if (str_contains($text, $w)) return $status;
+        }
+
+        return null;
+    }
 
     /** @var array<int, array> план: [rule, research?, pgp?, fuselage, from, to, link?, note?] */
     private array $plan = [];
@@ -46,6 +65,7 @@ class CleanupBoards extends Command
         $research = $this->boardResearch();
         $this->planReturned($research, $checks);
         $this->planByResult();
+        $this->planImported();
         $this->planStale($months);
 
         if (! $this->plan) {
@@ -147,10 +167,24 @@ class CleanupBoards extends Command
         $skip = $this->planned();
         ResearchRecord::query()->where('repair_status', 'new')->whereNotNull('result')->orderBy('id')->get()
             ->each(function ($r) use ($skip) {
-                $to = self::RESULT_STATUS[mb_strtolower(trim((string) $r->result))] ?? null;
+                $to = self::statusByResult($r->result);
                 if (! $to || isset($skip[$r->id])) return;
-                $this->plan[] = ['rule' => 'По результату «' . trim($r->result) . '»', 'research' => $r, 'pgp' => null,
+                $this->plan[] = ['rule' => 'По результату -> ' . mb_strtolower(ResearchRecord::STATUSES[$to]['label']), 'research' => $r, 'pgp' => null,
                     'fuselage' => $r->fuselage_no ?: $r->module_serial, 'from' => 'new', 'to' => $to, 'link' => null];
+            });
+    }
+
+    /** Правило 2б: загружено из таблицы (без автора, не из ПГП), результат пустой или не распознан. */
+    private function planImported(): void
+    {
+        $skip = $this->planned();
+        ResearchRecord::query()->where('repair_status', 'new')->whereNull('created_by')->whereNull('pgp_record_id')->orderBy('id')->get()
+            ->each(function ($r) use ($skip) {
+                if (isset($skip[$r->id])) return;
+                $empty = trim((string) $r->result) === '';
+                $this->plan[] = ['rule' => 'Загружено из таблицы, результат ' . ($empty ? 'пустой' : 'не распознан'), 'research' => $r, 'pgp' => null,
+                    'fuselage' => $r->fuselage_no ?: $r->module_serial, 'from' => 'new', 'to' => 'analysis', 'link' => null,
+                    'note' => 'Отправлено в разбор при чистке базы ' . now()->format('d.m.Y') . ' (загружено из таблицы, результат ' . ($empty ? 'не указан' : 'не распознан') . ')'];
             });
     }
 
@@ -187,6 +221,16 @@ class CleanupBoards extends Command
                 $p['link'] ? "№{$p['link']->id} ({$p['link']->status}, " . $p['link']->record_date?->format('d.m.Y') . ')' : '—',
             ])->all());
         if (count($this->plan) > 40) $this->line('… и ещё ' . (count($this->plan) - 40));
+
+        // Как разобран текст «Результата» — проверить, что ключевые слова сработали верно
+        $byText = collect($this->plan)->filter(fn ($p) => trim((string) $p['research']->result) !== '' && $p['from'] !== $p['to'])
+            ->groupBy(fn ($p) => mb_strimwidth(trim($p['research']->result), 0, 60, '…') . '|' . $p['to'])
+            ->map(fn ($g, $k) => [explode('|', $k)[0], $label(explode('|', $k)[1]), $g->count()])
+            ->sortByDesc(fn ($row) => $row[2])->values();
+        if ($byText->isNotEmpty()) {
+            $this->line('Результат -> статус (' . $byText->count() . ' разных текстов' . ($byText->count() > 60 ? ', первые 60' : '') . '):');
+            $this->table(['Результат', 'Статус', 'Записей'], $byText->take(60)->all());
+        }
     }
 
     private function apply(): int
