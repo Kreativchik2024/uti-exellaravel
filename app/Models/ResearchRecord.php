@@ -143,7 +143,7 @@ class ResearchRecord extends Model
     }
 
     /**
-     * Все исследования той же детали (включая это): совпадает № фюзеляжа, моторамы или кронштейна.
+     * Все исследования той же детали (включая это): совпадает № фюзеляжа, моторамы, кронштейна или S/N модуля.
      * Деталь может возвращаться несколько раз — история собирается по всем её исследованиям.
      */
     public function samePartHistory()
@@ -152,13 +152,15 @@ class ResearchRecord extends Model
             'fuselage_no'    => trim((string) $this->fuselage_no),
             'frame_serial'   => trim((string) $this->frame_serial),
             'bracket_serial' => trim((string) $this->bracket_serial),
+            'module_serial'  => trim((string) $this->module_serial),
         ], fn ($v) => $v !== '');
 
         $query = static::query()->with(['comments.user']);
         if (! $keys) return $query->whereKey($this->id)->get();
 
         return $query->where(function ($w) use ($keys) {
-            foreach ($keys as $col => $val) $w->orWhere($col, $val);
+            // без учёта регистра и пробелов по краям: « mn-1 » = «MN-1»
+            foreach ($keys as $col => $val) $w->orWhereRaw("LOWER(TRIM(`$col`)) = ?", [mb_strtolower($val)]);
         })->orderBy('record_date')->orderBy('id')->get();
     }
 }

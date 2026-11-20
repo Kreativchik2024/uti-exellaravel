@@ -571,8 +571,12 @@ class RecordController extends Controller
         $repairPicker = $sheet === 'research' ? app(\App\Services\RepairCatalog::class)->pickerData($record) : null;
         // ПГП: история борта по этапам (проверки, исследования, статусы, комментарии, пометки ОТК)
         $boardHistory = $sheet === 'pgp' ? app(\App\Services\BoardHistory::class)->for($record) : null;
+        // Модуль по S/N в обе стороны: исследование → где делали (кто шил); запись вкладки → исследования модуля
+        $trail = app(\App\Services\ModuleTrail::class);
+        $moduleMade = $sheet === 'research' ? $trail->madeFor($record) : collect();
+        $moduleResearch = $trail->researchFor($sheet, $record);
 
-        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups', 'isTimeLocked', 'history', 'historyLabels', 'isRepaired', 'partHistory', 'boardHistory', 'repairPicker'));
+        return view('records.show', compact('sheet', 'cfg', 'record', 'lookups', 'isTimeLocked', 'history', 'historyLabels', 'isRepaired', 'partHistory', 'boardHistory', 'repairPicker', 'moduleMade', 'moduleResearch'));
     }
 
     public function create(Request $r, string $sheet)

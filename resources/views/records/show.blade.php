@@ -266,6 +266,36 @@
                         </section>
                     @endif
                 @endif
+                {{-- Исследование модуля: где его делали по S/N — вкладка, дата, кто шил / собирал (App\Services\ModuleTrail) --}}
+                @if($sheet === 'research' && ($moduleMade ?? collect())->isNotEmpty())
+                    <section class="ui-card p-4 space-y-2 text-sm">
+                        <h3 class="font-semibold" style="color: var(--ui-text)">Где делали модуль</h3>
+                        @foreach($moduleMade as $m)
+                            <div class="rounded-lg px-3 py-2" style="background: var(--ui-surface-2); border: 1px solid var(--ui-border)">
+                                <a href="{{ route('records.show', [$m['sheet'], $m['record']->id]) }}" class="underline font-semibold">{{ $m['title'] }} №{{ $m['record']->id }}</a>
+                                <span style="color: var(--ui-muted)">· {{ $m['record']->record_date?->format('d.m.Y') }}</span>
+                                <div style="color: var(--ui-text-2)">{{ $m['workers'] !== '' ? $m['workers'] : 'исполнитель не указан' }}</div>
+                                <div class="text-xs" style="color: var(--ui-muted)">{{ $m['field'] }}: <span class="font-mono">{{ $m['serial'] }}</span></div>
+                            </div>
+                        @endforeach
+                    </section>
+                @endif
+                {{-- Запись вкладки: исследования (ремонты) этого модуля по S/N --}}
+                @if(($moduleResearch ?? collect())->isNotEmpty())
+                    <section class="ui-card p-4 space-y-2 text-sm">
+                        <h3 class="font-semibold" style="color: var(--ui-text)">Исследования модуля</h3>
+                        @foreach($moduleResearch as $mr)
+                            <div class="rounded-lg px-3 py-2" style="background: var(--ui-surface-2); border: 1px solid var(--ui-border)">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <span><a href="{{ route('records.show', ['research', $mr->id]) }}" class="underline font-semibold">Исследование №{{ $mr->id }}</a>
+                                        <span style="color: var(--ui-muted)">· {{ $mr->record_date?->format('d.m.Y') }}</span></span>
+                                    <x-research-status :value="$mr->repair_status" />
+                                </div>
+                                @if($mr->reported_defect)<div class="mt-1" style="color: var(--ui-text-2)">{{ \Illuminate\Support\Str::limit($mr->reported_defect, 140) }}</div>@endif
+                            </div>
+                        @endforeach
+                    </section>
+                @endif
                 {{-- Исследование борта: первая проверка и повторная проверка после ремонта (цепочка документов) --}}
                 @if($sheet === 'research' && ($record->pgp_record_id || $record->recheck))
                     <section class="ui-card p-4 space-y-1.5 text-sm">
