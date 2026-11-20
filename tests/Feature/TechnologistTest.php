@@ -168,6 +168,11 @@ class TechnologistTest extends TestCase
             $this->assertStringNotContainsString("/records/pgp/{$other->id}\"", $list);
         }
 
+        // Отдельный блок «Сводка по представителям ОТК» — только мастеру и админу; технологу — нет
+        $this->assertStringContainsString('Сводка по представителям ОТК', $html);
+        $this->assertStringContainsString('Сводка по представителям ОТК', $this->asUser($this->worker('admin'))->get("/stats?{$period}")->getContent());
+        $this->assertStringNotContainsString('Борта по представителям ОТК', $this->asUser($this->worker('technologist'))->get("/stats?{$period}&mode=all")->assertOk()->getContent());
+
         // Исполнителю разрез по технологам не показывается и не открывается
         $exec = $this->worker();
         $this->assertStringNotContainsString('Борта по представителям ОТК', $this->asUser($exec)->get("/stats?{$period}&mode=all")->assertOk()->getContent());

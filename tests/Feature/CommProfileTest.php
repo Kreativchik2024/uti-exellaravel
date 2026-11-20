@@ -50,6 +50,12 @@ class CommProfileTest extends TestCase
         $p = $this->station('comm-profile')->json('params');
         $this->assertSame([1660, 10, false, true], [$p['rf_freq_mhz'], $p['cal_atten'], $p['dhcp_server'], $p['msconf_global']]);
 
+        // История изменений: что поменяли, было → стало
+        $page = $this->asUser($admin)->get('/comm-profile')->assertOk();
+        $page->assertSee('История изменений')->assertSee('Значения прошивки модулей связи: изменено 2')->assertSee('RF Frequency, МГц');
+        $log = \App\Models\AuditLog::where('area', 'comm_profile')->latest('id')->firstOrFail();
+        $this->assertSame(['rf_freq_mhz' => ['1650', '1660'], 'cal_atten' => ['9', '10']], $log->changes);
+
         $this->asUser($admin)->post('/comm-profile/params', array_merge($form, ['net_prefix' => '192.168']))
             ->assertSessionHasErrors('net_prefix');
     }
@@ -74,6 +80,7 @@ class CommProfileTest extends TestCase
 
         $this->asUser($admin)->delete('/comm-profile/msconf/Other.msconf');
         $this->assertNull($this->station('comm-profile')->json('msconf'));
+        $this->asUser($admin)->get('/comm-profile')->assertSee('Загружен бэкап MeshSameParams.msconf')->assertSee('Рабочий бэкап: Other.msconf')->assertSee('Удалён бэкап Other.msconf');
         $this->station('comm-profile/msconf')->assertNotFound();
     }
 

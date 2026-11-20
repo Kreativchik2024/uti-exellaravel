@@ -96,5 +96,29 @@
             <p class="text-xs" style="color: var(--ui-muted)">Мощность антенн считается от калибровки: при Maximum 5000 мВт и RF Attenuation 9 итоговые 10 мВт = аттенюация 36 (= TX1/TX2 в RF Measurement), проверка 5 Вт = 9.</p>
             <button class="ui-btn ui-btn--primary">Сохранить</button>
         </form>
+
+        {{-- История изменений профиля (журнал действий, раздел «Профиль модулей связи») --}}
+        <section class="ui-card overflow-hidden">
+            <div class="px-4 pt-4 font-semibold">История изменений</div>
+            <div class="px-1 pb-2">
+                @forelse($history as $log)
+                    <div class="ui-audit ui-audit--compact">
+                        <div class="ui-audit__head">
+                            <span class="ui-audit__badge ui-audit__badge--{{ $log->action }}">{{ $log->actionLabel() }}</span>
+                            <span class="text-sm">{{ $log->summary }}</span>
+                        </div>
+                        <div class="ui-audit__meta">
+                            <span>{{ $log->created_at->format('d.m.Y H:i') }}</span>
+                            <span>{{ $log->user_name }}</span>
+                        </div>
+                        @if($log->action === 'updated')
+                            @include('audit._changes', ['log' => $log, 'labels' => $labels])
+                        @endif
+                    </div>
+                @empty
+                    <p class="px-3 py-3 text-sm" style="color: var(--ui-muted)">Изменений пока не было.</p>
+                @endforelse
+            </div>
+        </section>
     </div>
 </x-app-layout>

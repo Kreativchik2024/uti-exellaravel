@@ -215,4 +215,10 @@ class StatsController extends Controller
     {
         return $u && ($u->isAdmin() || $u->isMaster() || $u->isTechnologist());
     }
+
+    /** Отдельный блок «Сводка по представителям ОТК» на странице статистики — только мастер и администратор. */
+    public static function canSeeTechnologistSummary(?User $u): bool
+    {
+        return $u && ($u->isAdmin() || $u->isMaster());
+    }
 }

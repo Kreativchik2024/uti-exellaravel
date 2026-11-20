@@ -51,6 +51,24 @@ class CommProfile
         ],
     ];
 
+    /** Журнал действий: «было → стало» по параметрам, загрузка / выбор / удаление бэкапов. */
+    private function log(string $action, string $summary, array $changes = []): void
+    {
+        \App\Models\AuditLog::write('comm_profile', $action, $summary,
+            ['subject_type' => 'comm_profile', 'changes' => $changes ?: null, 'section_id' => null]);
+    }
+
+    /** Подписи полей для истории изменений. */
+    public static function labels(): array
+    {
+        return array_map(fn ($p) => $p['label'], self::flatParams()) + ['active' => 'Рабочий бэкап', 'msconf' => 'Файл .msconf'];
+    }
+
+    private static function show(mixed $v): string
+    {
+        return is_bool($v) ? ($v ? 'да' : 'нет') : (string) $v;
+    }
+
     private function disk()
     {
         return Storage::disk('local');
@@ -85,6 +103,7 @@ class CommProfile
     public function saveParams(array $input, ?string $by): void
     {
         $s = $this->settings();
+        $before = $s['params'];
         foreach (self::flatParams() as $k => $p) {
             $v = $input[$k] ?? null;
             $s['params'][$k] = match ($p['type']) {
@@ -95,6 +114,12 @@ class CommProfile
             };
         }
         $this->save($s, $by);
+
+        $changes = [];
+        foreach ($s['params'] as $k => $v) {
+            if (self::show($before[$k] ?? null) !== self::show($v)) $changes[$k] = [self::show($before[$k] ?? null), self::show($v)];
+        }
+        if ($changes) $this->log('updated', 'Значения прошивки модулей связи: изменено ' . count($changes), $changes);
     }
 
     /** @return array<int, array{name: string, size: int, mtime: int, version: string, mesh: string, active: bool}> */
@@ -124,10 +149,12 @@ class CommProfile
         $name = app(CommLicenses::class)->batchName(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.msconf';
         $file->storeAs(self::DIR . '/msconf', $name, 'local');
         $s = $this->settings();
+        $was = $s['active'];
         if ($makeActive || !$s['active']) {
             $s['active'] = $name;
             $this->save($s, $by);
         }
+        $this->log('created', "Загружен бэкап {$name}" . ($s['active'] === $name && $was !== $name ? ' — рабочий' : ''), ['msconf' => [null, $name]]);
 
         return $name;
     }
@@ -136,8 +163,10 @@ class CommProfile
     {
         abort_unless($this->disk()->exists(self::DIR . '/msconf/' . basename($name)), 404);
         $s = $this->settings();
+        $was = $s['active'];
         $s['active'] = basename($name);
         $this->save($s, $by);
+        if ($was !== $s['active']) $this->log('updated', "Рабочий бэкап: {$s['active']}", ['active' => [$was, $s['active']]]);
     }
 
     public function deleteMsconf(string $name, ?string $by): void
@@ -148,6 +177,7 @@ class CommProfile
             $s['active'] = null;
             $this->save($s, $by);
         }
+        $this->log('deleted', 'Удалён бэкап ' . basename($name), ['msconf' => [basename($name), null]]);
     }
 
     public function msconfPath(?string $name = null): ?string

@@ -18,6 +18,8 @@ class CommProfileController extends Controller
             'groups'   => CommProfile::PARAMS,
             'settings' => $this->profile->settings(),
             'msconfs'  => $this->profile->msconfs(),
+            'history'  => \App\Models\AuditLog::where('area', 'comm_profile')->orderByDesc('id')->limit(30)->get(),
+            'labels'   => ['comm_profile' => CommProfile::labels()],
         ]);
     }
 

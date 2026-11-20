@@ -30,6 +30,7 @@ class AuditLog extends Model
         'system'    => 'Обслуживание',
         'fault_codes' => 'Коды неисправностей',
         'field_prefills' => 'Заготовки полей',
+        'comm_profile' => 'Профиль модулей связи',
     ];
 
     public const ACTIONS = [

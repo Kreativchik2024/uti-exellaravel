@@ -190,45 +190,6 @@
                     </div>
                 @endif
 
-                {{-- Борта ПГП по технологам (кто принял), по убыванию — только мастеру, технологу и админу --}}
-                @if(!empty($boardTechs) && ($boardTechs['techs'] || $boardTechs['none']['total']))
-                    @php
-                        $techUrl = fn ($kind, $tech) => route('stats.records', $statFilters + array_filter(['sheet' => 'pgp', 'kind' => $kind, 'board' => '_all', 'tech' => $tech]));
-                        $techCards = [];
-                        foreach ($boardTechs['techs'] as $name => $t) $techCards[] = $t + ['code' => $name];
-                        if ($boardTechs['none']['total'] > 0) $techCards[] = ['label' => 'Технолог не указан', 'code' => '_none'] + $boardTechs['none'];
-                        $techTotal = array_sum(array_column($techCards, 'total'));
-                    @endphp
-                    <div class="board-types">
-                        <div class="board-types__head">
-                            <span class="board-types__title">Борта по представителям ОТК</span>
-                            <span class="board-types__hint">{{ $periodLabel }} · кто принял, по количеству · ✓ сдано / ✕ не сдано</span>
-                        </div>
-                        <div class="sheet-grid">
-                            @foreach($techCards as $card)
-                                @php
-                                    $bt = $card['total']; $btOk = $card['delivered']; $btBad = $bt - $btOk;
-                                    $btPct = $bt > 0 ? round($btBad / $bt * 100, 1) : 0;
-                                    $btShare = $techTotal > 0 ? round($bt / $techTotal * 100) : 0;
-                                @endphp
-                                <div class="sheet-card">
-                                    <div class="sheet-card__title" title="{{ $card['label'] }}">
-                                        {{ $card['label'] }} <span class="sheet-card__muted">· {{ $btShare }}%</span>
-                                    </div>
-                                    <div class="sheet-card__total"><a href="{{ $techUrl('all', $card['code']) }}" class="sheet-card__link" title="Открыть список бортов">{{ number_format($bt, 0, ',', ' ') }}</a><span class="sheet-card__unit">шт.</span></div>
-                                    <div class="sheet-card__bar" role="img" aria-label="Сдано {{ $btOk }}, не сдано {{ $btBad }}">
-                                        <span class="sheet-card__bar-good" style="width: {{ 100 - $btPct }}%"></span>
-                                        <span class="sheet-card__bar-bad"  style="width: {{ $btPct }}%"></span>
-                                    </div>
-                                    <div class="sheet-card__split">
-                                        @if($btOk)<a href="{{ $techUrl('good', $card['code']) }}" class="sheet-card__good sheet-card__link" title="Открыть сданные">✓ {{ number_format($btOk, 0, ',', ' ') }}</a>@else<span class="sheet-card__good">✓ 0</span>@endif
-                                        @if($btBad)<a href="{{ $techUrl('defect', $card['code']) }}" class="sheet-card__bad sheet-card__link" title="Открыть несданные">✕ {{ number_format($btBad, 0, ',', ' ') }}</a>@else<span class="sheet-card__bad">✕ 0</span>@endif
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
 
                 {{-- По вкладкам: выпуск / исправные / брак (общего итога нет — устройства разные) --}}
                 <div class="sheet-grid">
@@ -277,6 +238,51 @@
                 </div>
             </div>
         </div>
+
+        {{-- Сводка по представителям ОТК (технологам): кто принял борта — отдельный блок, только мастеру и администратору --}}
+        @if(\App\Http\Controllers\StatsController::canSeeTechnologistSummary(auth()->user()) && !empty($boardTechs) && ($boardTechs['techs'] || $boardTechs['none']['total']))
+        <div class="ui-card p-5">
+            <div class="stat-card-head mb-3">
+                <h3 class="font-semibold text-lg text-gray-800">Сводка по представителям ОТК <span class="text-sm font-normal text-gray-400">({{ $periodLabel }})</span></h3>
+            </div>
+                @php
+                    $techUrl = fn ($kind, $tech) => route('stats.records', $statFilters + array_filter(['sheet' => 'pgp', 'kind' => $kind, 'board' => '_all', 'tech' => $tech]));
+                    $techCards = [];
+                    foreach ($boardTechs['techs'] as $name => $t) $techCards[] = $t + ['code' => $name];
+                    if ($boardTechs['none']['total'] > 0) $techCards[] = ['label' => 'Технолог не указан', 'code' => '_none'] + $boardTechs['none'];
+                    $techTotal = array_sum(array_column($techCards, 'total'));
+                @endphp
+                <div class="board-types">
+                    <div class="board-types__head">
+                        <span class="board-types__title">Борта по представителям ОТК</span>
+                        <span class="board-types__hint">{{ $periodLabel }} · кто принял, по количеству · ✓ сдано / ✕ не сдано</span>
+                    </div>
+                    <div class="sheet-grid">
+                        @foreach($techCards as $card)
+                            @php
+                                $bt = $card['total']; $btOk = $card['delivered']; $btBad = $bt - $btOk;
+                                $btPct = $bt > 0 ? round($btBad / $bt * 100, 1) : 0;
+                                $btShare = $techTotal > 0 ? round($bt / $techTotal * 100) : 0;
+                            @endphp
+                            <div class="sheet-card">
+                                <div class="sheet-card__title" title="{{ $card['label'] }}">
+                                    {{ $card['label'] }} <span class="sheet-card__muted">· {{ $btShare }}%</span>
+                                </div>
+                                <div class="sheet-card__total"><a href="{{ $techUrl('all', $card['code']) }}" class="sheet-card__link" title="Открыть список бортов">{{ number_format($bt, 0, ',', ' ') }}</a><span class="sheet-card__unit">шт.</span></div>
+                                <div class="sheet-card__bar" role="img" aria-label="Сдано {{ $btOk }}, не сдано {{ $btBad }}">
+                                    <span class="sheet-card__bar-good" style="width: {{ 100 - $btPct }}%"></span>
+                                    <span class="sheet-card__bar-bad"  style="width: {{ $btPct }}%"></span>
+                                </div>
+                                <div class="sheet-card__split">
+                                    @if($btOk)<a href="{{ $techUrl('good', $card['code']) }}" class="sheet-card__good sheet-card__link" title="Открыть сданные">✓ {{ number_format($btOk, 0, ',', ' ') }}</a>@else<span class="sheet-card__good">✓ 0</span>@endif
+                                    @if($btBad)<a href="{{ $techUrl('defect', $card['code']) }}" class="sheet-card__bad sheet-card__link" title="Открыть несданные">✕ {{ number_format($btBad, 0, ',', ' ') }}</a>@else<span class="sheet-card__bad">✕ 0</span>@endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+        </div>
+        @endif
 
         {{-- ЗОНА 2: детализация по постам --}}
         <div class="ui-card p-5">
