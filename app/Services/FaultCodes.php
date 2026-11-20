@@ -133,13 +133,29 @@ class FaultCodes
     /** Несколько кодов через «;»: каждый разбирается как resolve(), результат — снова одной строкой. */
     public function resolveMany(string $sheet, ?string $value, ?int $userId = null): ?string
     {
-        return self::join(array_filter(array_map(fn ($part) => $this->resolve($sheet, $part, $userId), self::split($value))));
+        // «G.8.1, W.1.2» или «G.8.1 W.1.2» — если каждая часть известный код, это несколько кодов, а не описание
+        $parts = [];
+        foreach (self::split($value) as $part) {
+            $tokens = preg_split('/[\s,]+/u', $part, -1, PREG_SPLIT_NO_EMPTY);
+            $parts = array_merge($parts, count($tokens) > 1 && collect($tokens)->every(fn ($t) => $this->exists($sheet, $t)) ? $tokens : [$part]);
+        }
+
+        return self::join(array_filter(array_map(fn ($part) => $this->resolve($sheet, $part, $userId), $parts)));
     }
 
     /**
      * Что сохранить в поле «Код неисправности»: код как есть, код похожей неисправности
      * или новый код, если вписано описание новой неисправности.
      */
+    /** Есть ли такой код в справочнике (без учёта регистра). */
+    public function exists(string $sheet, string $code): bool
+    {
+        $code = mb_strtolower(trim($code));
+
+        return $code !== '' && ($this->codesForSheet($sheet)->contains(fn ($c) => mb_strtolower($c->code) === $code)
+            || FaultCode::query()->whereRaw('LOWER(code) = ?', [$code])->exists());
+    }
+
     public function resolve(string $sheet, ?string $value, ?int $userId = null): ?string
     {
         $value = trim((string) $value);

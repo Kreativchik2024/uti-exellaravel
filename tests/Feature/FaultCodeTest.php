@@ -94,6 +94,17 @@ class FaultCodeTest extends TestCase
         $rows = collect($this->asUser($this->worker('master'))->getJson('/stats/zone6')->assertOk()->json())->keyBy('code');
         $this->assertSame(1, $rows['E07']['count'] ?? null);
         $this->assertSame(1, $rows['E09']['count'] ?? null);
+
+        // Вписали через запятую или пробел — известные коды разбираются по отдельности, нового кода не появляется
+        $codes = FaultCode::count();
+        $this->asUser($user)->post('/records/cross1', array_merge($this->validRecord('cross1', $this->nameOf($user)), ['fault_code' => 'E07, e09']))
+            ->assertSessionHasNoErrors();
+        $this->assertSame('E07; E09', \App\Models\Cross1Record::latest('id')->first()->fault_code);
+        $this->travel(2)->minutes();   // та же запись чаще раза в минуту считается повторной отправкой
+        $this->asUser($user)->post('/records/cross1', array_merge($this->validRecord('cross1', $this->nameOf($user)), ['fault_code' => 'E07 E09']))
+            ->assertSessionHasNoErrors();
+        $this->assertSame('E07; E09', \App\Models\Cross1Record::latest('id')->first()->fault_code);
+        $this->assertSame($codes, FaultCode::count());
     }
 
     public function test_only_admin_manages_codes(): void

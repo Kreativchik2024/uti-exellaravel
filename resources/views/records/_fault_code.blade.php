@@ -26,7 +26,7 @@
     </div>
 
     <input type="text" x-ref="input" x-model="value" autocomplete="off"
-           @focus="open = true; search()" @input="open = true; search()"
+           @focus="open = true; search()" @input="absorb(true); open = true; search()" @blur="absorb(false)"
            @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)"
            @keydown.backspace="if (open && browsing() && trail.length) { $event.preventDefault(); up(); } else if (value === '' && codes.length) { $event.preventDefault(); codes.pop(); }"
            @keydown.enter="if (open && list().length) { $event.preventDefault(); pick(list()[active]); }"
@@ -129,6 +129,24 @@ document.addEventListener('alpine:init', () => {
         isText(c) { return /\s/.test(c) && !this.find(c); },
         find(c) { return this.local.find(x => x.code.toLowerCase() === String(c).trim().toLowerCase()); },
         describe(c) { const k = this.find(c); return k ? k.description : ''; },
+        // Вписали несколько кодов в поле — разложить по карточкам: «A; B» всегда, «A, B» / «A B» — если это известные коды.
+        // typing — во время ввода ждём разделителя в конце, чтобы не разбирать недописанное
+        absorb(typing) {
+            const v = String(this.value);
+            if (typing && !/[;,\s]$/.test(v)) return;
+            let parts = this.splitCodes(v);
+            if (parts.length === 1) {
+                const t = parts[0].split(/[\s,]+/).filter(Boolean);
+                if (t.length > 1 && t.every(x => this.find(x))) parts = t;
+                else if (!(v.includes(';') || (t.length === 1 && this.find(t[0]) && /[,\s]$/.test(v)))) return;
+            }
+            for (const p of parts) {
+                const k = this.find(p);
+                const c = k ? k.code : p;
+                if (!this.codes.some(x => x.toLowerCase() === c.toLowerCase())) this.codes.push(c);
+            }
+            this.value = ''; this.remote = null; this.newItem = null;
+        },
         init() {
             this.codes = this.splitCodes(initial);
             // Причина неисправности (ПГП): по её тексту подсказываем код
