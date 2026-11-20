@@ -26,14 +26,15 @@ class CleanupBoards extends Command
     protected $signature = 'boards:cleanup
         {--apply : Внести изменения (без него — только отчёт)}
         {--months=3 : Через сколько месяцев «Не обработан» уходит в разбор}
-        {--force : Не спрашивать подтверждение}';
+        {--force : Не спрашивать подтверждение}
+        {--all : Показать в отчёте все строки, а не первые}';
 
     protected $description = 'Навести порядок в необработанных бортах: закрыть отремонтированные, связать проверки, разобрать давние';
 
     /** Ключевые слова в «Результате» → статус; проверяются по порядку. */
     private const RESULT_KEYWORDS = [
-        'analysis' => ['разбор'],
-        'in_work'  => ['в работе', 'в ремонте', 'ожидает'],
+        'analysis' => ['разбор', 'исследован', 'иследован'],
+        'in_work'  => ['в работе', 'в ремонте'],
         'conveyor' => ['испытани', 'сборк', 'настройк', 'отремонтир', 'устранен', 'исправ', 'подтвержд', 'передан', 'отдан', 'отправлен', 'заменен', 'замена'],
     ];
 
@@ -212,7 +213,7 @@ class CleanupBoards extends Command
         $this->table(['Правило', 'Количество'], collect($this->plan)->countBy('rule')->map(fn ($n, $k) => [$k, $n])->values()->all());
 
         $this->table(['Правило', 'Исследование', 'ПГП', 'Фюзеляж', 'Статус', 'Повторная проверка'],
-            collect($this->plan)->take(40)->map(fn ($p) => [
+            collect($this->plan)->take($this->option('all') ? PHP_INT_MAX : 40)->map(fn ($p) => [
                 $p['rule'],
                 '№' . $p['research']->id,
                 $p['pgp'] ? '№' . $p['pgp']->id : '—',
@@ -220,16 +221,16 @@ class CleanupBoards extends Command
                 $p['from'] === $p['to'] ? 'без изменений' : $label($p['from']) . ' -> ' . $label($p['to']),
                 $p['link'] ? "№{$p['link']->id} ({$p['link']->status}, " . $p['link']->record_date?->format('d.m.Y') . ')' : '—',
             ])->all());
-        if (count($this->plan) > 40) $this->line('… и ещё ' . (count($this->plan) - 40));
+        if (! $this->option('all') && count($this->plan) > 40) $this->line('… и ещё ' . (count($this->plan) - 40));
 
         // Как разобран текст «Результата» — проверить, что ключевые слова сработали верно
-        $byText = collect($this->plan)->filter(fn ($p) => trim((string) $p['research']->result) !== '' && $p['from'] !== $p['to'])
+        $byText = collect($this->plan)->filter(fn ($p) => trim((string) $p['research']->result) !== '' && (str_starts_with($p['rule'], 'По результату') || str_starts_with($p['rule'], 'Загружено')))
             ->groupBy(fn ($p) => mb_strimwidth(trim($p['research']->result), 0, 60, '…') . '|' . $p['to'])
             ->map(fn ($g, $k) => [explode('|', $k)[0], $label(explode('|', $k)[1]), $g->count()])
             ->sortByDesc(fn ($row) => $row[2])->values();
         if ($byText->isNotEmpty()) {
-            $this->line('Результат -> статус (' . $byText->count() . ' разных текстов' . ($byText->count() > 60 ? ', первые 60' : '') . '):');
-            $this->table(['Результат', 'Статус', 'Записей'], $byText->take(60)->all());
+            $this->line('Результат -> статус (' . $byText->count() . ' разных текстов' . (! $this->option('all') && $byText->count() > 60 ? ', первые 60 — все: --all' : '') . '):');
+            $this->table(['Результат', 'Статус', 'Записей'], $byText->take($this->option('all') ? PHP_INT_MAX : 60)->all());
         }
     }
 

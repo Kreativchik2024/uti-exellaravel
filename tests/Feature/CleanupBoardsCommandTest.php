@@ -49,6 +49,8 @@ class CleanupBoardsCommandTest extends TestCase
         $r3 = $this->research(['fuselage_no' => 'F-4', 'result' => 'в работе']);
         $r6 = $this->research(['result' => 'Моторама передана в сборку и дальнейшее испытание']);
         $r7 = $this->research(['result' => 'Рама в разбор']);
+        $r10 = $this->research(['result' => 'Моторама отдана на сборку, борт собран ожидает испытания']);
+        $r11 = $this->research(['result' => 'Мотораму на иследование']);
         // 2б. Загружено из таблицы: без автора; пустой результат → в разбор
         $r8 = $this->research(['created_by' => null, 'result' => '']);
         $r9 = $this->research(['created_by' => null, 'result' => 'Борт передан на испытания.']);
@@ -58,7 +60,7 @@ class CleanupBoardsCommandTest extends TestCase
 
         $this->artisan('boards:cleanup')->assertSuccessful();
         $this->assertSame('new', $r1->fresh()->repair_status, 'без --apply ничего не меняется');
-        $this->assertSame(9, ResearchRecord::count(), 'и исследования не заводятся');
+        $this->assertSame(11, ResearchRecord::count(), 'и исследования не заводятся');
 
         $this->artisan('boards:cleanup', ['--apply' => true, '--force' => true])->assertSuccessful();
 
@@ -68,12 +70,14 @@ class CleanupBoardsCommandTest extends TestCase
 
         $this->assertSame(0, ResearchRecord::where('pgp_record_id', $old->id)->count(), 'новых исследований команда не заводит');
         $this->assertNull($old2->fresh()->after_research_id);
-        $this->assertSame(9, ResearchRecord::count());
+        $this->assertSame(11, ResearchRecord::count());
 
         $this->assertSame('conveyor', $r2->fresh()->repair_status);
         $this->assertSame('in_work', $r3->fresh()->repair_status);
         $this->assertSame('conveyor', $r6->fresh()->repair_status);
         $this->assertSame('analysis', $r7->fresh()->repair_status);
+        $this->assertSame('conveyor', $r10->fresh()->repair_status);
+        $this->assertSame('analysis', $r11->fresh()->repair_status);
         $this->assertSame('analysis', $r8->fresh()->repair_status);
         $this->assertStringContainsString('загружено из таблицы', $r8->fresh()->analysis_actions);
         $this->assertSame('conveyor', $r9->fresh()->repair_status);
