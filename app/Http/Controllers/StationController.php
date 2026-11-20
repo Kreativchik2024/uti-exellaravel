@@ -186,6 +186,23 @@ class StationController extends Controller
         return $this->saved($data, 'comm_module', $record->id);
     }
 
+    /** MANET Flasher: список файлов лицензий модулей связи (партия/файл, размер, время, sha256). */
+    public function commLicenses(\App\Services\CommLicenses $lic): JsonResponse
+    {
+        return response()->json(['ok' => true, 'files' => $lic->listing()]);
+    }
+
+    /** MANET Flasher: скачать файл лицензии из списка commLicenses(). */
+    public function commLicenseFile(Request $r, \App\Services\CommLicenses $lic)
+    {
+        $path = $lic->fileFor((string) $r->query('path', ''));
+        if (!$path) {
+            return response()->json(['ok' => false, 'error' => 'Нет такого файла лицензии.'], 404);
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->download($path, basename($path));
+    }
+
     /** Считыватель: кронштейн с камерой собран. */
     public function cameraBracket(Request $r): JsonResponse
     {

@@ -120,6 +120,10 @@
                                 <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                 Коды неисправностей
                             </a>
+                            <a href="{{ route('comm-licenses.index') }}" class="ui-menu__item {{ request()->routeIs('comm-licenses.*') ? 'ui-menu__item--active' : '' }}">
+                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                                Лицензии модулей связи
+                            </a>
                             @php $repairPending = app(\App\Services\RepairCatalog::class)->pendingCount(); @endphp
                             <a href="{{ route('repair-items.index') }}" class="ui-menu__item {{ request()->routeIs('repair-items.*') ? 'ui-menu__item--active' : '' }}">
                                 <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877m0 0l2.496-3.03M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63"/></svg>
@@ -354,6 +358,7 @@
                 <a href="{{ route('users.index') }}" class="ui-menu__item {{ request()->routeIs('users.*') ? 'ui-menu__item--active' : '' }}">Пользователи</a>
                 <a href="{{ route('employees.index') }}" class="ui-menu__item {{ request()->routeIs('employees.*') ? 'ui-menu__item--active' : '' }}">Сотрудники</a>
                 <a href="{{ route('fault-codes.index') }}" class="ui-menu__item {{ request()->routeIs('fault-codes.*') ? 'ui-menu__item--active' : '' }}">Коды неисправностей</a>
+                <a href="{{ route('comm-licenses.index') }}" class="ui-menu__item {{ request()->routeIs('comm-licenses.*') ? 'ui-menu__item--active' : '' }}">Лицензии модулей связи</a>
                 <a href="{{ route('repair-items.index') }}" class="ui-menu__item {{ request()->routeIs('repair-items.*') ? 'ui-menu__item--active' : '' }}">Узлы ремонта и замены</a>
                 <a href="{{ route('field-prefills.index') }}" class="ui-menu__item {{ request()->routeIs('field-prefills.*') ? 'ui-menu__item--active' : '' }}">Заготовки полей</a>
                 <a href="{{ route('audit.index') }}" class="ui-menu__item {{ request()->routeIs('audit.*') ? 'ui-menu__item--active' : '' }}">Журнал действий</a>

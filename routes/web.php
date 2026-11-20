@@ -123,6 +123,11 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::patch('/fault-code-groups/{group}',       [\App\Http\Controllers\FaultCodeController::class, 'updateGroup'])->name('fault-codes.groups.update');
     Route::delete('/fault-code-groups/{group}',      [\App\Http\Controllers\FaultCodeController::class, 'destroyGroup'])->name('fault-codes.groups.destroy');
     Route::delete('/fault-codes/{faultCode}', [\App\Http\Controllers\FaultCodeController::class, 'destroy'])->name('fault-codes.destroy');
+    // Лицензии модулей связи (партии .dat + .xlsx) — их скачивает MANET Flasher
+    Route::get('/comm-licenses',                          [\App\Http\Controllers\CommLicenseController::class, 'index'])->name('comm-licenses.index');
+    Route::post('/comm-licenses',                         [\App\Http\Controllers\CommLicenseController::class, 'store'])->name('comm-licenses.store');
+    Route::get('/comm-licenses/{batch}/{file}',           [\App\Http\Controllers\CommLicenseController::class, 'download'])->name('comm-licenses.download');
+    Route::delete('/comm-licenses/{batch}',               [\App\Http\Controllers\CommLicenseController::class, 'destroy'])->name('comm-licenses.destroy');
     Route::get('/system', [\App\Http\Controllers\SystemController::class, 'index'])->name('system.index');
     Route::get('/system/status', [\App\Http\Controllers\SystemController::class, 'status'])->name('system.status');
     Route::get('/system/metrics', [\App\Http\Controllers\SystemController::class, 'metrics'])->middleware('throttle:60,1')->name('system.metrics');
