@@ -5,26 +5,26 @@ namespace App\Services;
 use App\Models\Employee;
 
 /**
- * Технологи — сотрудники с ролью ОТК (роль задаётся в карточке сотрудника, учётная запись не обязательна).
- * Имя — короткое ФИО сотрудника.
- * names() — активные (для выпадающего списка), allNames() — все, в т.ч. отключённые (чтобы старые записи
- * с ушедшим технологом можно было сохранить без смены технолога).
+ * Представители ОТК для поля ПГП «Представитель ОТК» (колонка technologist) — сотрудники с ролью «Представитель ОТК»
+ * (роль задаётся в карточке сотрудника, учётная запись не нужна: прав на сайте у них нет). Имя — короткое ФИО.
+ * names() — активные (для выпадающего списка), allNames() — все, в т.ч. отключённые и прежние технологи
+ * (до разделения ролей в это поле ставили технологов) — чтобы старые записи можно было пересохранить.
  */
 class Technologists
 {
     public function names(): array
     {
-        return $this->list(true);
+        return $this->list(['otk'], true);
     }
 
     public function allNames(): array
     {
-        return $this->list(false);
+        return $this->list(['otk', 'technologist'], false);
     }
 
-    private function list(bool $activeOnly): array
+    private function list(array $roles, bool $activeOnly): array
     {
-        return Employee::query()->where('role', 'otk')
+        return Employee::query()->whereIn('role', $roles)
             ->when($activeOnly, fn ($q) => $q->where('is_active', true))
             ->pluck('short_name')
             ->map(fn ($n) => trim((string) $n))

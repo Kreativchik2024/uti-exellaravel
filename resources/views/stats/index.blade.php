@@ -184,7 +184,7 @@
                     </div>
                 @endif
 
-                {{-- Борта ПГП по технологам (кто принял), по убыванию — только мастеру, ОТК и админу --}}
+                {{-- Борта ПГП по технологам (кто принял), по убыванию — только мастеру, технологу и админу --}}
                 @if(!empty($boardTechs) && ($boardTechs['techs'] || $boardTechs['none']['total']))
                     @php
                         $techUrl = fn ($kind, $tech) => route('stats.records', $statFilters + array_filter(['sheet' => 'pgp', 'kind' => $kind, 'board' => '_all', 'tech' => $tech]));
@@ -195,7 +195,7 @@
                     @endphp
                     <div class="board-types">
                         <div class="board-types__head">
-                            <span class="board-types__title">Борта по технологам</span>
+                            <span class="board-types__title">Борта по представителям ОТК</span>
                             <span class="board-types__hint">{{ $periodLabel }} · кто принял, по количеству · ✓ сдано / ✕ не сдано</span>
                         </div>
                         <div class="sheet-grid">
@@ -662,11 +662,11 @@
         </div>
         @endif
 
-        {{-- ЗОНА 8: технологи — только мастер, технолог (ОТК) и администратор --}}
+        {{-- ЗОНА 8: технологи — только мастер, технолог и администратор --}}
         @if(\App\Http\Controllers\StatsController::canSeeTechnologistStats(auth()->user()) && isset(app(\App\Services\SectionContext::class)->sheets()['pgp']))
         <div class="ui-card p-5">
             <div class="stat-card-head mb-3">
-                <h3 class="font-semibold text-lg text-gray-800">8. Технологи: принятые борта</h3>
+                <h3 class="font-semibold text-lg text-gray-800">8. Представители ОТК: принятые борта</h3>
                 <div class="flex gap-2">
                     <button x-show="!expanded8" @click="toggleZone8()" class="ui-btn ui-btn--ghost ui-btn--sm">Показать</button>
                     <button x-show="expanded8" @click="toggleZone8()" class="ui-btn ui-btn--ghost ui-btn--sm">Скрыть</button>
@@ -688,7 +688,7 @@
                             <thead class="bg-gray-50 text-gray-600">
                                 <tr>
                                     <th class="p-3 text-left w-12">#</th>
-                                    <th class="p-3 text-left">Технолог</th>
+                                    <th class="p-3 text-left">Представитель ОТК</th>
                                     <th class="p-3 text-right">Принято бортов</th>
                                     <th class="p-3 text-right">Сдано</th>
                                     <th class="p-3 text-right">Не сдано</th>

@@ -62,16 +62,16 @@ class BoardTypesTest extends TestCase
         $base = $this->validRecord('pgp', $this->nameOf($user));
 
         // В номере есть «УМН» — тип подставился сам
-        $this->asUser($user)->post('/records/pgp', array_merge($base, ['board_number' => 'УМН-101', 'board_type' => '']))
+        $this->asUser($user)->post('/records/pgp', array_merge($base, ['fuselage_number' => 'F-УМН-101', 'board_number' => 'УМН-101', 'board_type' => '']))
             ->assertSessionHasNoErrors();
         $this->assertSame('УМН', PgpRecord::where('board_number', 'УМН-101')->value('board_type'));
 
         // Номер без признака типа и тип не выбран — ошибка
-        $this->asUser($user)->post('/records/pgp', array_merge($base, ['board_number' => 'RA-1', 'board_type' => '']))
+        $this->asUser($user)->post('/records/pgp', array_merge($base, ['fuselage_number' => 'F-RA-1', 'board_number' => 'RA-1', 'board_type' => '']))
             ->assertSessionHasErrors('board_type');
 
         // Неизвестный тип — ошибка
-        $this->asUser($user)->post('/records/pgp', array_merge($base, ['board_number' => 'RA-2', 'board_type' => 'XXX']))
+        $this->asUser($user)->post('/records/pgp', array_merge($base, ['fuselage_number' => 'F-RA-2', 'board_number' => 'RA-2', 'board_type' => 'XXX']))
             ->assertSessionHasErrors('board_type');
     }
 

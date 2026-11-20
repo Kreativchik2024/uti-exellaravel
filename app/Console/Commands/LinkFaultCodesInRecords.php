@@ -32,7 +32,9 @@ class LinkFaultCodesInRecords extends Command
             DB::table($table)->whereNotNull('fault_code')->where('fault_code', '<>', '')
                 ->select('fault_code', DB::raw('COUNT(*) AS cnt'))->groupBy('fault_code')->get()
                 ->each(function ($row) use (&$raws) {
-                    $raws[$row->fault_code] = ($raws[$row->fault_code] ?? 0) + (int) $row->cnt;
+                    foreach (\App\Services\FaultCodes::split($row->fault_code) as $code) {
+                        $raws[$code] = ($raws[$code] ?? 0) + (int) $row->cnt;
+                    }
                 });
         }
 

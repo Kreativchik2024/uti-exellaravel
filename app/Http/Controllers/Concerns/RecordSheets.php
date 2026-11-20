@@ -12,7 +12,7 @@ trait RecordSheets
     {
         $cfg = app(SectionContext::class)->sheet($sheet);
 
-        // 'options_from' => 'technologists': список — активные технологи (ОТК), проверка — любой технолог,
+        // 'options_from' => 'technologists': список — активные технологи, проверка — любой технолог,
         // в т.ч. отключённый, или уже записанное значение (чтобы старую запись можно было пересохранить)
         foreach ($cfg['fields'] ?? [] as $name => $f) {
             if (($f['options_from'] ?? null) !== 'technologists') continue;

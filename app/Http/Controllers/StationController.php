@@ -95,7 +95,7 @@ class StationController extends Controller
             'record_date'   => ['nullable', 'date', 'before_or_equal:today'],
             'notes'         => ['nullable', 'string', 'max:2000'],
             // брак: оператор решил занести камеру с кодом неисправности (код / описание — как в форме сайта)
-            'fault_code'    => ['nullable', 'string', 'max:100'],
+            'fault_code'    => ['nullable', 'string', 'max:255'],
             'uid'           => ['nullable', 'string', 'max:64'],
         ] + self::WORKER_RULES);
 
@@ -107,7 +107,7 @@ class StationController extends Controller
         $fault = null;
         if (filled($data['fault_code'] ?? null)) {
             $this->pinSection('night_camera_assembly');
-            $fault = app(FaultCodes::class)->resolve('night_camera_assembly', $data['fault_code'], Auth::id());
+            $fault = app(FaultCodes::class)->resolveMany('night_camera_assembly', $data['fault_code'], Auth::id());
         }
 
         // Ту же камеру в тот же день — одна запись (повтор отправки, перезапуск прошивки). Если её
@@ -147,7 +147,7 @@ class StationController extends Controller
                                 'regex:/^(192\.168\.1\.)?(25[0-4]|2[0-4]\d|1\d\d|[1-9]\d?)$/'],
             'record_date'   => ['nullable', 'date', 'before_or_equal:today'],
             'notes'         => ['nullable', 'string', 'max:2000'],
-            'fault_code'    => ['nullable', 'string', 'max:100'],
+            'fault_code'    => ['nullable', 'string', 'max:255'],
             'uid'           => ['nullable', 'string', 'max:64'],
         ] + self::WORKER_RULES, [
             'ip_address.regex' => 'IP: последнее число должно быть от 1 до 254.',
@@ -164,7 +164,7 @@ class StationController extends Controller
         $fault = null;
         if (filled($data['fault_code'] ?? null)) {
             $this->pinSection('comm_module');
-            $fault = app(FaultCodes::class)->resolve('comm_module', $data['fault_code'], Auth::id());
+            $fault = app(FaultCodes::class)->resolveMany('comm_module', $data['fault_code'], Auth::id());
         }
 
         // Тот же модуль в тот же день — одна запись (повтор отправки, перепрошивка); новые IP / брак — обновляются
@@ -246,7 +246,7 @@ class StationController extends Controller
             'suspension_status'   => $status('suspension_status'),
             'notes'               => ['nullable', 'string', 'max:2000'],
             'comments'            => ['nullable', 'string', 'max:2000'],
-            'fault_code'          => ['nullable', 'string', 'max:100'],
+            'fault_code'          => ['nullable', 'string', 'max:255'],
             'record_date'         => ['nullable', 'date', 'before_or_equal:today'],
             'uid'                 => ['nullable', 'string', 'max:64'],
         ] + self::WORKER_RULES);
@@ -259,7 +259,7 @@ class StationController extends Controller
         // или новый код, если вписано описание новой
         if (filled($data['fault_code'] ?? null)) {
             $this->pinSection('camera_bracket');
-            $data['fault_code'] = app(FaultCodes::class)->resolve('camera_bracket', $data['fault_code'], Auth::id());
+            $data['fault_code'] = app(FaultCodes::class)->resolveMany('camera_bracket', $data['fault_code'], Auth::id());
         }
 
         $record = CameraBracketRecord::create(array_merge(

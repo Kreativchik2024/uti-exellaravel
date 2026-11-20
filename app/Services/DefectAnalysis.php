@@ -68,9 +68,12 @@ class DefectAnalysis
                 if (isset($fields['fault_code'])) {
                     $raw = trim((string) $row->fault_code);
                     if ($raw === '' || $raw === '-' || $raw === '—') $uncoded++;
-                    $k = $slug . '|' . $raw;
-                    $codeRows[$k] ??= ['code' => $raw, 'sheet' => $slug, 'sheet_title' => $cfg['title'], 'count' => 0];
-                    $codeRows[$k]['count']++;
+                    // Несколько кодов «A; B» — запись считается в каждом
+                    foreach (FaultCodes::split($raw) ?: [$raw] as $code) {
+                        $k = $slug . '|' . $code;
+                        $codeRows[$k] ??= ['code' => $code, 'sheet' => $slug, 'sheet_title' => $cfg['title'], 'count' => 0];
+                        $codeRows[$k]['count']++;
+                    }
                 }
                 foreach ($partFields as $f) {
                     $v = (string) $row->{$f};

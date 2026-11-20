@@ -99,7 +99,7 @@ class StatsController extends Controller
                 $s->boardTechnologists($from, $to, $targetUser, $worker !== '' ? $worker : null),
             ];
         });
-        // «Борта по технологам» — только мастеру, технологу (ОТК) и администратору
+        // «Борта по технологам» — только мастеру, технологу и администратору
         if (! self::canSeeTechnologistStats($r->user())) $boardTechs = null;
 
         $totals = $s->totals($perSheet);
@@ -135,7 +135,7 @@ class StatsController extends Controller
 
         // board — карточки «Борта по типам» (ПГП): код типа, '_none' или '_all'; там ✓/✕ — «сдан / не сдан»
         $board = $slug === 'pgp' && $r->filled('board') ? (string) $r->input('board') : null;
-        // tech — карточки «Борта по технологам» (ПГП): имя технолога или '_none'; видят мастер, ОТК, админ
+        // tech — карточки «Борта по технологам» (ПГП): имя технолога или '_none'; видят мастер, технолог, админ
         $tech = $slug === 'pgp' && $r->filled('tech') ? (string) $r->input('tech') : null;
         if ($tech !== null) {
             abort_unless(self::canSeeTechnologistStats($r->user()), 403);
@@ -208,9 +208,9 @@ class StatsController extends Controller
         return Excel::download(new StatsExport($this->periodLabel($from, $to), $section, $perSheet, $totals), $filename);
     }
 
-    /** Статистику по технологам видят только мастер, технолог (ОТК) и администратор. */
+    /** Статистику по технологам видят только мастер, технолог и администратор. */
     public static function canSeeTechnologistStats(?User $u): bool
     {
-        return $u && ($u->isAdmin() || $u->isMaster() || $u->isOtk());
+        return $u && ($u->isAdmin() || $u->isMaster() || $u->isTechnologist());
     }
 }

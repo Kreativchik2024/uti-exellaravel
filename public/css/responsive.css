@@ -84,41 +84,55 @@
 }
 .table-scroll table { min-width: 100%; }
 
-/* ---------- Записи: карточки на мобильных, таблица с 768px ---------- */
-.records-cards {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+/* ---------- Записи: одна таблица; на узком экране (< 768px) строки — карточками ---------- */
+.records-list__actions { display: none; }
+@media (max-width: 767.98px) {
+    .records-list.ui-card { background: transparent; border: 0; box-shadow: none; overflow: visible; }
+    .records-list .table-scroll { overflow: visible; }
+    .records-list table, .records-list tbody { display: block; }
+    .records-list thead { display: none; }
+    .records-list tbody tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px 14px;
+        margin-bottom: 12px;
+        padding: 1rem;
+        border-radius: 14px;
+        background: var(--ui-surface);
+        border: 1px solid var(--ui-border);
+    }
+    .records-list tbody td { display: block; padding: 0; border: 0 !important; min-width: 0; text-align: left; font-size: 14px; line-height: 1.35; }
+    .records-list tbody td::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 11px;
+        line-height: 1.2;
+        color: var(--ui-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin-bottom: 1px;
+    }
+    .records-list tbody td:not([data-label])::before { content: none; }
+    /* Шапка карточки: дата крупно слева, статус справа */
+    .records-list td[data-col="record_date"] { order: -2; font-size: 1rem; }
+    .records-list td[data-col="record_date"]::before,
+    .records-list td[data-col="status"]::before,
+    .records-list td[data-col="health_indicator"]::before { content: none; }
+    .records-list td[data-col="status"],
+    .records-list td[data-col="health_indicator"] { order: -1; justify-self: end; }
+    /* Длинное — во всю ширину; автор в карточке не нужен */
+    .records-list td[data-col="worker1"],
+    .records-list td[data-col="fault_code"],
+    .records-list td[data-col="_open"] { grid-column: 1 / -1; }
+    .records-list td[data-col="created_by"] { display: none; }
+    .records-list .records-list__arrow { display: none; }
+    .records-list .records-list__actions { display: flex; gap: .5rem; margin-top: .25rem; padding-top: .75rem; border-top: 1px solid var(--ui-border); }
+    .records-list td[data-col="_open"]:not(:has(.records-list__actions)) { display: none; }
+    /* Пустой список */
+    .records-list tbody td[colspan] { grid-column: 1 / -1; }
 }
-.records-table { display: none; }
-
-@media (min-width: 768px) {
-    .records-cards { display: none; }
-    .records-table { display: block; }
-}
-
-/* Карточка записи */
-.record-card dl {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px 14px;
-}
-.record-card dt {
-    font-size: 11px;
-    line-height: 1.2;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-.record-card dd {
-    font-size: 14px;
-    line-height: 1.35;
-    color: inherit;
-    word-break: break-word;
-}
-html.dark .record-card dt { color: #94a3b8; }
-@media (min-width: 480px) {
-    .record-card dl { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 480px) and (max-width: 767.98px) {
+    .records-list tbody tr { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 /* ---------- Тап-зоны не меньше 44px ---------- */

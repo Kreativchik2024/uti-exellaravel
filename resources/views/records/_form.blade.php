@@ -31,7 +31,7 @@
                 'board_number', 'ip_address', 'fuselage_number', 'frame_serial',
                 'fuselage_no', 'fuselage_serial',
                 'work_start', 'work_end',
-                'qty', 'flashed_with_day', 'seq',
+                'qty', 'flashed_with_day', 'seq', 'category',
             ],
         ],
         'equipment' => [
@@ -40,7 +40,7 @@
             'icon'     => 'chip',
             'fields'   => [
                 'cross3_number', 'bracket_serial', 'manet_number',
-                'serial_number', 'camera_serial', 'assembled_by', 'pc_version', 'ahrs', 'compass_version',
+                'serial_number', 'module_serial', 'camera_serial', 'assembled_by', 'pc_version', 'ahrs', 'compass_version',
                 'device_type', 'runs_count',
             ],
         ],
@@ -277,7 +277,7 @@
                     @endphp
 
                     <div class="{{ $isTimeLocked ? 'opacity-80' : '' }} {{ $type === 'textarea' && !empty($cfg['layout']) ? 'md:col-span-2' : '' }}"
-                         {!! $reqAttrs !!}>
+                         data-field="{{ $name }}" @if(!empty($f['for'])) data-for="{{ $f['for'] }}" @endif {!! $reqAttrs !!}>
                         <label class="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
                             {{ $label }}
                             @if(!$isTimeLocked && ($isReq || $reqWhenField))
@@ -460,7 +460,33 @@
 
     {{-- ПГП: что известно об этом борте — по введённым номерам моторамы, фюзеляжа, Кросс 3 и кронштейна (журнал по этапам) --}}
     @if($sheet === 'pgp')
-        <div class="mt-6" data-board-journal data-url="{{ route('records.boardJournal', $sheet) }}" aria-live="polite"></div>
+        <div class="mt-6" data-board-journal data-url="{{ route('records.boardJournal', $sheet) }}" @isset($record) data-except="{{ $record->id }}" @endisset aria-live="polite"></div>
+    @endif
+
+    {{-- Исследования: подкатегория по полю «Категория» — борт (вкладка ПГП) или любой другой модуль.
+         Поля борта ('for' => 'board') и модуля ('for' => 'module') показываются только для своей; заполненные не прячем --}}
+    @if($sheet === 'research')
+        <script>
+        (function () {
+            var board = @json(mb_strtolower((string) config('sheets.map.pgp.title')));
+            document.addEventListener('DOMContentLoaded', function () {
+                var input = document.querySelector('[name="category"]');
+                if (!input) return;
+                function apply() {
+                    var v = String(input.value || '').trim().toLowerCase();
+                    var kind = v === '' ? null : (v === board ? 'board' : 'module');
+                    document.querySelectorAll('[data-for]').forEach(function (el) {
+                        var field = el.querySelector('input:not([type=hidden]), textarea, select');
+                        var filled = field && String(field.value || '').trim() !== '';
+                        el.hidden = kind !== null && el.dataset.for !== kind && !filled;
+                    });
+                }
+                input.addEventListener('input', apply);
+                input.addEventListener('change', apply);
+                apply();
+            });
+        })();
+        </script>
     @endif
 
     {{-- Панель кнопок (на мобильных — в столбик, кнопки на всю ширину) --}}

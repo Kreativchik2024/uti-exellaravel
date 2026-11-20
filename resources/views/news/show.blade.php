@@ -51,7 +51,7 @@
                         <span class="news-card__avatar" style="width: 24px; height: 24px; font-size: .7rem">{{ mb_strtoupper(mb_substr($author, 0, 1)) }}</span>
                         {{ $author }}
                     </span>
-                    <time datetime="{{ $news->published_at?->toIso8601String() }}">{{ $news->published_at?->translatedFormat('j F Y, H:i') }}</time>
+                    @if($news->published_at)<time datetime="{{ $news->published_at->toIso8601String() }}">Опубликовано {{ $news->published_at->translatedFormat('j F Y, H:i') }}</time>@endif
                 </div>
 
                 @if($news->title)

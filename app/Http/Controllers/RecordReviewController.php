@@ -147,7 +147,7 @@ class RecordReviewController extends Controller
 
         $msg = count($picked) === 1 ? "{$actions[$first['action']]}: {$first['label']}" : 'Сохранено пунктов: ' . count($picked);
         if (collect($picked)->contains('pending', true)) $msg .= ' — свой вариант отправлен на проверку администратору';
-        if ($record->needsAct()) $msg .= '. Технологу (ОТК) нужно оформить акт';
+        if ($record->needsAct()) $msg .= '. Технологу нужно оформить акт';
         elseif ($record->repair_action === 'repair') $msg .= '. После «Отправлен на испытания» борт уйдёт технологу на приёмку';
 
         $this->rememberUndo($record, 'repair', $before, count($picked) === 1 ? "{$actions[$first['action']]}: {$first['label']}" : 'Сохранено пунктов: ' . count($picked));
@@ -156,7 +156,7 @@ class RecordReviewController extends Controller
     }
 
     /**
-     * Технолог (ОТК), мастер или админ отмечает проверку: при замене — «Акт оформлен»,
+     * Технолог, мастер или админ отмечает проверку: при замене — «Акт оформлен»,
      * при ремонте, отправленном в конвейер, — «Принято технологом». Исследование уходит из списка технолога.
      */
     public function researchAct(Request $r, string $sheet, int $id)
@@ -191,7 +191,7 @@ class RecordReviewController extends Controller
         return redirect()->to(route('records.show', [$sheet, $record->id]) . '#comments')->with('ok', 'Комментарий добавлен');
     }
 
-    /** Пометка технолога к записи ПГП: текст и отметка «обработан». Пишет только группа ОТК (маршрут role:otk). */
+    /** Пометка технолога к записи ПГП: текст и отметка «обработан». Пишет только группа «Технолог» (маршрут role:technologist). */
     public function tech(Request $r, string $sheet, int $id)
     {
         abort_unless($sheet === 'pgp', 404);

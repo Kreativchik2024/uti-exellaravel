@@ -87,7 +87,7 @@ class PgpRepairFlowTest extends TestCase
         $pgp = $this->postPgp(['status' => 'Не сдан']);
         $research = ResearchRecord::where('pgp_record_id', $pgp->id)->firstOrFail();
 
-        foreach (['executor', 'otk'] as $role) {
+        foreach (['executor', 'technologist'] as $role) {
             $this->asUser($this->worker($role))->patch("/records/research/{$research->id}/research-status", ['repair_status' => 'conveyor'])->assertForbidden();
         }
         $this->assertSame('new', $research->fresh()->repair_status);

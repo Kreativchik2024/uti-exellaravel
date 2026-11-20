@@ -48,16 +48,21 @@ class User extends Authenticatable
         'admin'    => 'Администратор',
         'master'   => 'Мастер',
         'executor' => 'Исполнитель',
-        'otk'      => 'ОТК',
+        'technologist' => 'Технолог',
         'repair'   => 'Ремонтник',
+        'otk'      => 'Представитель ОТК',
     ];
 
     public function isAdmin(): bool    { return $this->role === 'admin'; }
     public function isMaster(): bool   { return $this->role === 'master'; }
+    /** Технолог — пометки к ПГП, акты ремонта, журнал изменений борта (бывшие права ОТК). */
+    public function isTechnologist(): bool { return $this->role === 'technologist'; }
+    /** Представитель ОТК — только сотрудник в списке «Представитель ОТК» на ПГП: прав нет, на сайт не входит. */
     public function isOtk(): bool      { return $this->role === 'otk'; }
+    public function canLogin(): bool   { return ! $this->isOtk(); }
     public function isRepair(): bool   { return $this->role === 'repair'; }
-    /** Исполнитель, ОТК и ремонтник — рабочие сотрудники участка (пока с одинаковыми правами). */
-    public function isWorker(): bool   { return in_array($this->role, ['executor', 'otk', 'repair'], true); }
+    /** Исполнитель, технолог и ремонтник — рабочие сотрудники участка. */
+    public function isWorker(): bool   { return in_array($this->role, ['executor', 'technologist', 'repair'], true); }
 
     public function canManageContent(): bool { return $this->isAdmin() || $this->isMaster(); }
     public function canManageUsers(): bool   { return $this->isAdmin(); }

@@ -17,12 +17,7 @@ class RecordController extends Controller
 
     private function isRecordLocked($record): bool
     {
-        if (!$record || !$record->created_at) return false;
-        $user = auth()->user();
-        if ($user && $user->canManageContent()) return false;
-        // Борт вернулся после ремонта — ремонт идёт дольше суток, запись перепроверяют на ПГП позже
-        if ($record instanceof \App\Models\PgpRecord && $record->returnedFromRepair()) return false;
-        return $record->created_at->copy()->addHours(24)->isPast();
+        return \App\Support\RecordLock::isLocked($record);
     }
 
     private function canManageWorkersWithoutPin(): bool
@@ -475,7 +470,7 @@ class RecordController extends Controller
         ));
     }
 
-    public function index(Request $request, string $sheet)
+    public function index(Request $request, string $sheet, \App\Services\RecordListFilters $filters)
     {
         $cfg = $this->cfg($sheet);
         $query = $cfg['model']::query()->with('creator');
@@ -514,48 +509,8 @@ class RecordController extends Controller
             $listFilter = $lf + ['current' => $current, 'counts' => $counts, 'total' => array_sum($counts)];
         }
 
-        // Ссылка из меню профиля: необработанные рекламации ПГП (см. App\Services\PgpComplaints)
-        $techOpen = $sheet === 'pgp' && $request->query('tech') === 'open';
-        if ($techOpen) {
-            $query->whereIn('id', app(\App\Services\PgpComplaints::class)->openQuery()->select('id'));
-        }
-        // Ссылка из меню ремонтника: брак ПГП, ещё не отремонтированный (см. App\Services\PgpDefectResearch)
-        $repairOpen = $sheet === 'research' && $request->query('repair') === 'open';
-        if ($repairOpen) {
-            $query->whereNotNull('pgp_record_id')->where('is_repaired', false);
-            // Из меню ремонтника: только «Не обработан» или только «В работе»
-            $rs = $request->query('rs');
-            if (is_string($rs) && isset(\App\Models\ResearchRecord::STATUSES[$rs])) $query->where('repair_status', $rs);
-        }
-        // ПГП: борта после ремонта, чтобы не терялись в общем списке —
-        // returned=1 — вернулись и ждут перепроверки; repaired=1 — все, кто был в ремонте (в т.ч. уже сданные)
-        $returnedOpen = $sheet === 'pgp' && $request->query('returned') === '1';
-        if ($returnedOpen) {
-            $query->whereIn('id', app(\App\Services\PgpDefectResearch::class)->returnedFromRepair()?->select('id') ?? [0]);
-        }
-        $repairedOpen = $sheet === 'pgp' && $request->query('repaired') === '1';
-        if ($repairedOpen) {
-            $query->whereHas('researches');
-        }
-        $repairTabs = null;
-        if ($sheet === 'pgp') {
-            $repairTabs = [
-                'returned' => app(\App\Services\PgpDefectResearch::class)->returnedFromRepairCount(),
-                'repaired' => $cfg['model']::query()->whereHas('researches')->count(),
-            ];
-        }
-        // Ссылка из меню технолога (ОТК): исследования, где была замена и нужен акт
-        $actNeeded = $sheet === 'research' && $request->query('act') === 'needed';
-        $actKind = null;
-        $actTabs = null;
-        if ($actNeeded) {
-            $svc = app(\App\Services\PgpDefectResearch::class);
-            // Вкладки технолога: все / нужен акт / ждёт приёмки
-            $actKind = in_array($request->query('kind'), ['act', 'accept'], true) ? $request->query('kind') : null;
-            $src = $actKind ? $svc->actsNeededOfKind($actKind) : $svc->actsNeeded();
-            $query->whereIn('id', $src?->select('id') ?? [0]);
-            $actTabs = $svc->actsNeededCounts();
-        }
+        // ПГП и исследования: рекламации, борта после ремонта, списки ремонтника и технолога, подкатегории
+        $special = $filters->apply($sheet, $cfg, $query, $request);
 
         if (array_key_exists('record_date', $cfg['fields'])) {
             $query->orderByDesc('record_date')->orderByDesc('id');
@@ -581,21 +536,10 @@ class RecordController extends Controller
             }
         }
 
-        // Метки бортов ПГП после ремонта: 'returned' — вернулся, ждёт перепроверки; 'after' — сдан после ремонта
-        $repairMarks = [];
-        if ($sheet === 'pgp' && $records->count()) {
-            $byPgp = \App\Models\ResearchRecord::whereIn('pgp_record_id', $records->pluck('id'))
-                ->get(['pgp_record_id', 'repair_status'])->groupBy('pgp_record_id');
-            foreach ($records as $rec) {
-                $rs = $byPgp[$rec->id] ?? null;
-                if (! $rs) continue;
-                if ($rec->status === 'Сдан') $repairMarks[$rec->id] = 'after';
-                elseif ($rs->contains('repair_status', 'conveyor')) $repairMarks[$rec->id] = 'returned';
-                else $repairMarks[$rec->id] = 'in_repair';
-            }
-        }
+        // Пометки бортов ПГП о ремонте (вернулся / сдан после ремонта / в ремонте)
+        $repairMarks = $filters->repairMarks($sheet, $records->getCollection());
 
-        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter', 'techOpen', 'repairOpen', 'actNeeded', 'returnedOpen', 'repairedOpen', 'repairTabs', 'repairMarks', 'actKind', 'actTabs'));
+        return view('records.index', compact('sheet', 'cfg', 'records', 'q', 'listColumns', 'listFilter', 'repairMarks') + $special);
     }
 
     public function show(string $sheet, int $id)
@@ -671,6 +615,31 @@ class RecordController extends Controller
         }
     }
 
+    /** Ввод формы до проверки: IP по маске, пустые заготовки, автоопределение (тип борта по номеру…). */
+    private function prepareInput(array $cfg, Request $r): void
+    {
+        $this->applyIpSuffix($cfg, $r);
+        \App\Services\FieldPrefills::clean($cfg, $r);   // осталась только заготовка — поле пустое
+        $this->applyAutodetect($cfg, $r);
+    }
+
+    /** Проверка полей вкладки (правила из config/sheets.php + снимки по номеру). */
+    private function validateRecord(array $cfg, Request $r): array
+    {
+        $rules = collect($cfg['fields'])->mapWithKeys(fn ($f, $k) => [$k => $f['rules']])->all();
+
+        return $r->validate($this->withSnapshotRules($cfg, $rules), $this->fieldMessages($cfg), $this->attributeNames($cfg));
+    }
+
+    /** Перед записью: снимки по номерам и код неисправности (словами — код похожей или новый). */
+    private function finalizeData(string $sheet, array $cfg, array &$data): void
+    {
+        $this->applyLookupSnapshots($cfg, $data);
+        if (array_key_exists('fault_code', $data)) {
+            $data['fault_code'] = app(\App\Services\FaultCodes::class)->resolveMany($sheet, $data['fault_code'], auth()->id());
+        }
+    }
+
     public function store(Request $r, string $sheet)
     {
         $cfg = $this->cfg($sheet);
@@ -685,13 +654,20 @@ class RecordController extends Controller
             }
         }
 
-        $this->applyIpSuffix($cfg, $r);
-        \App\Services\FieldPrefills::clean($cfg, $r);   // осталась только заготовка — поле пустое
-        $this->applyAutodetect($cfg, $r);
-        $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
-        $rules = $this->withSnapshotRules($cfg, $rules);
+        $this->prepareInput($cfg, $r);
 
-        $data = $r->validate($rules, $this->fieldMessages($cfg), $this->attributeNames($cfg));
+        // ПГП: борт с таким фюзеляжем уже есть — новую запись не заводим, открываем его запись
+        // (вернулся после ремонта — на правку, с тем, что успели ввести; в ремонте или сдан — карточку).
+        // До проверки полей: кнопка «Открыть запись борта» отправляет и недозаполненную форму.
+        if ($sheet === 'pgp' && ($found = app(\App\Services\PgpBoardLookup::class)->forUser($r->input('fuselage_number')))) {
+            $redirect = redirect()->to($found['url'])->with('ok', 'Дубль не создан: борт с фюзеляжем ' . trim((string) $r->input('fuselage_number')) . ' уже есть. ' . $found['text']);
+            if (! $found['editable']) return $redirect;
+            $input = array_filter($r->except(['_token', '_method', '_submit_token', 'open_existing']), fn ($v) => is_array($v) ? array_filter($v, 'filled') : filled($v));
+
+            return $redirect->withInput($input);
+        }
+
+        $data = $this->validateRecord($cfg, $r);
 
         $exempt = array_filter(
             array_intersect_key($defaults, array_flip(self::WORKER_FIELDS)),
@@ -700,11 +676,7 @@ class RecordController extends Controller
         $this->validateWorkers($data, $exempt);
 
         $data['created_by'] = auth()->id();
-        $this->applyLookupSnapshots($cfg, $data);
-        if (array_key_exists('fault_code', $data)) {
-            // Вписали неисправность словами — подставляется код похожей или создаётся новый
-            $data['fault_code'] = app(\App\Services\FaultCodes::class)->resolve($sheet, $data['fault_code'], auth()->id());
-        }
+        $this->finalizeData($sheet, $cfg, $data);
 
         // --- Защита от дублей ---
         // 1) Та же форма отправлена второй раз (двойной клик, «Назад» + отправить): номер формы уже использован
@@ -789,23 +761,14 @@ class RecordController extends Controller
 
         $this->normalizeBooleans($cfg, $r);
 
-        $this->applyIpSuffix($cfg, $r);
-        \App\Services\FieldPrefills::clean($cfg, $r);   // осталась только заготовка — поле пустое
-        $this->applyAutodetect($cfg, $r);
-        $rules = collect($cfg['fields'])->mapWithKeys(fn($f, $k) => [$k => $f['rules']])->all();
-        $rules = $this->withSnapshotRules($cfg, $rules);
-
-        $data = $r->validate($rules, $this->fieldMessages($cfg), $this->attributeNames($cfg));
+        $this->prepareInput($cfg, $r);
+        $data = $this->validateRecord($cfg, $r);
 
         $existing = $this->recordWorkerValues($record, $cfg);
         $this->validateWorkers($data, $existing);
 
         $data['updated_by'] = auth()->id();
-        $this->applyLookupSnapshots($cfg, $data);
-        if (array_key_exists('fault_code', $data)) {
-            // Вписали неисправность словами — подставляется код похожей или создаётся новый
-            $data['fault_code'] = app(\App\Services\FaultCodes::class)->resolve($sheet, $data['fault_code'], auth()->id());
-        }
+        $this->finalizeData($sheet, $cfg, $data);
 
         // Борт вернулся после ремонта и сдан — в статистике он считается днём фактической сдачи,
         // а не днём, когда уходил в ремонт (прежняя дата остаётся в журнале изменений)
@@ -842,35 +805,6 @@ class RecordController extends Controller
         if ($sheet !== 'pgp') return null;
 
         return app(\App\Services\PgpDefectResearch::class)->syncFor($record);
-    }
-
-    /**
-     * Форма ПГП: «Что известно об этом борте» — журнал по этапам по введённым номерам
-     * (моторама, фюзеляж, Кросс 3, кронштейн). Модуль связи не учитывается — он переходит с номером борта на другой борт.
-     * Отдаёт готовый HTML блока или пусто.
-     */
-    public function boardJournal(Request $r, string $sheet)
-    {
-        abort_unless($sheet === 'pgp', 404);
-        $this->cfg($sheet);   // доступ к вкладке на участке
-
-        $numbers = $r->validate([
-            'frame_serial'    => ['nullable', 'string', 'max:120'],
-            'fuselage_number' => ['nullable', 'string', 'max:120'],
-            'cross3_number'   => ['nullable', 'string', 'max:120'],
-            'bracket_serial'  => ['nullable', 'string', 'max:120'],
-        ]);
-        $numbers = array_filter(array_map(fn ($v) => trim((string) $v), $numbers), fn ($v) => $v !== '');
-        if (! $numbers) return response('');
-
-        $journal = app(\App\Services\BoardHistory::class)->forNumbers($numbers);
-
-        return response()->view('records._board_journal', [
-            'boardHistory' => $journal,
-            'title'        => 'Что известно об этом борте',
-            'sectionId'    => 'board-journal-draft',
-            'draft'        => true,
-        ]);
     }
 
     public function destroy(string $sheet, int $id)

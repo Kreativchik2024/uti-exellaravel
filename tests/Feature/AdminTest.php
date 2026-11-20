@@ -88,16 +88,32 @@ class AdminTest extends TestCase
         $this->assertTrue($admin->fresh()->is_active);
     }
 
-    public function test_otk_role_is_assignable_and_has_worker_rights(): void
+    public function test_technologist_role_is_assignable_and_has_worker_rights(): void
     {
         $user = User::factory()->create(['role' => 'executor']);
+        $this->employeeCard($this->admin(), $user, 'technologist')->assertSessionHasNoErrors();
+
+        $user = $user->fresh();
+        $this->assertSame('technologist', $user->role);
+        $this->assertTrue($user->isTechnologist());
+        $this->assertTrue($user->isWorker());
+        $this->assertFalse($user->canManageContent());
+    }
+
+    public function test_otk_representative_has_no_rights_and_cannot_log_in(): void
+    {
+        $user = User::factory()->create(['role' => 'executor', 'is_active' => true]);
         $this->employeeCard($this->admin(), $user, 'otk')->assertSessionHasNoErrors();
 
         $user = $user->fresh();
-        $this->assertSame('otk', $user->role);
         $this->assertTrue($user->isOtk());
-        $this->assertTrue($user->isWorker());
-        $this->assertFalse($user->canManageContent());
+        $this->assertFalse($user->isWorker());
+        $this->assertFalse($user->isTechnologist());
+        $this->assertFalse($user->canLogin());
+
+        // Уже вошедшего выкидывает при следующем запросе
+        $this->actingAs($user)->get(route('dashboard'))->assertRedirect(route('login'));
+        $this->assertGuest();
     }
 
     public function test_invalid_role_is_rejected(): void

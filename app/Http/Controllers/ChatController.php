@@ -278,6 +278,12 @@ class ChatController extends Controller
 
     // ---------------------------------------------------------------- actions
 
+    /** Разметка панели чата: не грузится с каждой страницей, а подтягивается при первом открытии. */
+    public function panel()
+    {
+        return response()->view('partials.chat-panel');
+    }
+
     /** Лёгкий опрос для значка на кнопке. */
     public function summary(Request $r): JsonResponse
     {

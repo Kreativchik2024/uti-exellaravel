@@ -155,8 +155,8 @@ class TechnologistTest extends TestCase
         $master = $this->worker('master');
 
         $html = $this->asUser($master)->get("/stats?{$period}")->assertOk()->getContent();
-        $this->assertStringContainsString('Борта по технологам', $html);
-        $block = mb_substr($html, mb_strpos($html, 'Борта по технологам'));
+        $this->assertStringContainsString('Борта по представителям ОТК', $html);
+        $block = mb_substr($html, mb_strpos($html, 'Борта по представителям ОТК'));
         $this->assertLessThan(mb_strpos($block, 'Петрова А.А.'), mb_strpos($block, 'Сидоров С.С.'), 'больше бортов — выше');
 
         // Клик по «✕ не сдано» у технолога — только его несданные борта
@@ -170,7 +170,7 @@ class TechnologistTest extends TestCase
 
         // Исполнителю разрез по технологам не показывается и не открывается
         $exec = $this->worker();
-        $this->assertStringNotContainsString('Борта по технологам', $this->asUser($exec)->get("/stats?{$period}&mode=all")->assertOk()->getContent());
+        $this->assertStringNotContainsString('Борта по представителям ОТК', $this->asUser($exec)->get("/stats?{$period}&mode=all")->assertOk()->getContent());
         $this->asUser($exec)->get('/stats/records?' . $period . '&sheet=pgp&tech=' . urlencode('Сидоров С.С.'))->assertForbidden();
     }
 
@@ -179,7 +179,7 @@ class TechnologistTest extends TestCase
         $ok   = $this->pgp(['technologist' => 'Сидоров С.С.']);
         $bad  = $this->pgp(['technologist' => 'Сидоров С.С.', 'status' => 'Не сдан']);
         $other = $this->pgp(['technologist' => 'Петрова А.А.']);
-        $otk = $this->worker('otk');
+        $otk = $this->worker('technologist');
 
         $html = $this->asUser($otk)->get('/stats')->assertOk()->getContent();
         $this->assertStringContainsString('zone8Url(row.name, \'all\')', $html);
@@ -204,13 +204,13 @@ class TechnologistTest extends TestCase
         foreach (['executor', 'repair'] as $role) {
             $u = $this->worker($role);
             $this->asUser($u)->getJson('/stats/zone8')->assertForbidden();
-            $this->assertStringNotContainsString('8. Технологи', $this->asUser($u)->get('/stats')->getContent());
+            $this->assertStringNotContainsString('8. Представители ОТК', $this->asUser($u)->get('/stats')->getContent());
         }
 
-        foreach (['master', 'otk', 'admin'] as $role) {
+        foreach (['master', 'technologist', 'admin'] as $role) {
             $u = $this->worker($role);
             $this->asUser($u)->getJson('/stats/zone8')->assertOk();
-            $this->assertStringContainsString('8. Технологи', $this->asUser($u)->get('/stats')->assertOk()->getContent());
+            $this->assertStringContainsString('8. Представители ОТК', $this->asUser($u)->get('/stats')->assertOk()->getContent());
         }
     }
 }

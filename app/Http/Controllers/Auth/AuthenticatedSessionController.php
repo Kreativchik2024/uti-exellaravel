@@ -25,13 +25,15 @@ class AuthenticatedSessionController extends Controller
 
         $request->authenticate();
 
-        if (! auth()->user()->is_active) {
+        if (! auth()->user()->is_active || ! auth()->user()->canLogin()) {
+            $noLogin = auth()->user()->is_active;
             auth()->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
             return back()->withErrors([
-                'email' => 'Аккаунт ожидает подтверждения администратором.',
+                'email' => $noLogin ? 'Представитель ОТК не входит на сайт — обратитесь к администратору.'
+                                    : 'Аккаунт ожидает подтверждения администратором.',
             ])->onlyInput('email');
         }
 

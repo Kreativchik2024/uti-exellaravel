@@ -14,7 +14,22 @@
         $initials = collect(preg_split('/\s+/u', trim($user->name)))
             ->filter()->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode('');
         $roleLabel = \App\Models\User::ROLES[$user->role] ?? '';
-        $isAdminArea = request()->routeIs('users.*') || request()->routeIs('employees.*') || request()->routeIs('firmware.categories.*') || request()->routeIs('sections.*') || request()->routeIs('audit.*') || request()->routeIs('system.*') || request()->routeIs('fault-codes.*');
+        // Меню администратора — один список для десктопа (с иконками) и мобильного меню
+        $adminLinks = $user->isAdmin() ? [
+            ['route' => 'sections.index',           'active' => 'sections.*',           'label' => 'Участки',                'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'],
+            ['route' => 'users.index',              'active' => 'users.*',              'label' => 'Пользователи',           'icon' => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197'],
+            ['route' => 'employees.index',          'active' => 'employees.*',          'label' => 'Сотрудники',             'icon' => 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2'],
+            ['route' => 'firmware.categories.index', 'active' => 'firmware.categories.*', 'label' => 'Категории прошивок',   'icon' => 'M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z'],
+            ['route' => 'fault-codes.index',        'active' => 'fault-codes.*',        'label' => 'Коды неисправностей',    'icon' => 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'],
+            ['route' => 'comm-licenses.index',      'active' => 'comm-licenses.*',      'label' => 'Лицензии модулей связи', 'icon' => 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z'],
+            ['route' => 'comm-profile.index',       'active' => 'comm-profile.*',       'label' => 'Профиль модулей связи',  'icon' => 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4'],
+            ['route' => 'repair-items.index',       'active' => 'repair-items.*',       'label' => 'Узлы ремонта и замены',  'icon' => 'M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877m0 0l2.496-3.03M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63',
+             'badge' => app(\App\Services\RepairCatalog::class)->pendingCount()],
+            ['route' => 'field-prefills.index',     'active' => 'field-prefills.*',     'label' => 'Заготовки полей',        'icon' => 'M4 7h16M4 12h10M4 17h6m9-3l-3 3m0 0l-3-3m3 3V10'],
+            ['route' => 'audit.index',              'active' => 'audit.*',              'label' => 'Журнал действий',        'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'],
+            ['route' => 'system.index',             'active' => 'system.*',             'label' => 'Состояние сервера',      'icon' => 'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01'],
+        ] : [];
+        $isAdminArea = request()->routeIs(...array_column($adminLinks, 'active'));
     @endphp
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -100,52 +115,13 @@
                         <div x-show="open" x-cloak
                              x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                              class="ui-menu absolute left-0 top-full mt-2 z-50 w-60">
-                            <a href="{{ route('sections.index') }}" class="ui-menu__item {{ request()->routeIs('sections.*') ? 'ui-menu__item--active' : '' }}">
-                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                                Участки
-                            </a>
-                            <a href="{{ route('users.index') }}" class="ui-menu__item {{ request()->routeIs('users.*') ? 'ui-menu__item--active' : '' }}">
-                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/></svg>
-                                Пользователи
-                            </a>
-                            <a href="{{ route('employees.index') }}" class="ui-menu__item {{ request()->routeIs('employees.*') ? 'ui-menu__item--active' : '' }}">
-                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/></svg>
-                                Сотрудники
-                            </a>
-                            <a href="{{ route('firmware.categories.index') }}" class="ui-menu__item {{ request()->routeIs('firmware.categories.*') ? 'ui-menu__item--active' : '' }}">
-                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
-                                Категории прошивок
-                            </a>
-                            <a href="{{ route('fault-codes.index') }}" class="ui-menu__item {{ request()->routeIs('fault-codes.*') ? 'ui-menu__item--active' : '' }}">
-                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                                Коды неисправностей
-                            </a>
-                            <a href="{{ route('comm-licenses.index') }}" class="ui-menu__item {{ request()->routeIs('comm-licenses.*') ? 'ui-menu__item--active' : '' }}">
-                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                                Лицензии модулей связи
-                            </a>
-                            <a href="{{ route('comm-profile.index') }}" class="ui-menu__item {{ request()->routeIs('comm-profile.*') ? 'ui-menu__item--active' : '' }}">
-                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-                                Профиль модулей связи
-                            </a>
-                            @php $repairPending = app(\App\Services\RepairCatalog::class)->pendingCount(); @endphp
-                            <a href="{{ route('repair-items.index') }}" class="ui-menu__item {{ request()->routeIs('repair-items.*') ? 'ui-menu__item--active' : '' }}">
-                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877m0 0l2.496-3.03M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63"/></svg>
-                                <span class="flex-1">Узлы ремонта и замены</span>
-                                @if($repairPending)<span class="text-xs font-semibold tabular-nums" style="color: var(--ui-bad)" title="Ждут проверки">{{ $repairPending }}</span>@endif
-                            </a>
-                            <a href="{{ route('field-prefills.index') }}" class="ui-menu__item {{ request()->routeIs('field-prefills.*') ? 'ui-menu__item--active' : '' }}">
-                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M4 12h10M4 17h6m9-3l-3 3m0 0l-3-3m3 3V10"/></svg>
-                                Заготовки полей
-                            </a>
-                            <a href="{{ route('audit.index') }}" class="ui-menu__item {{ request()->routeIs('audit.*') ? 'ui-menu__item--active' : '' }}">
-                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-                                Журнал действий
-                            </a>
-                            <a href="{{ route('system.index') }}" class="ui-menu__item {{ request()->routeIs('system.*') ? 'ui-menu__item--active' : '' }}">
-                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>
-                                Состояние сервера
-                            </a>
+                            @foreach($adminLinks as $link)
+                                <a href="{{ route($link['route']) }}" class="ui-menu__item {{ request()->routeIs($link['active']) ? 'ui-menu__item--active' : '' }}">
+                                    <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $link['icon'] }}"/></svg>
+                                    <span class="flex-1">{{ $link['label'] }}</span>
+                                    @if(!empty($link['badge']))<span class="text-xs font-semibold tabular-nums" style="color: var(--ui-bad)" title="Ждут проверки">{{ $link['badge'] }}</span>@endif
+                                </a>
+                            @endforeach
                         </div>
                     </div>
                 @endif
@@ -197,8 +173,8 @@
                             </a>
                         @endif
 
-                        {{-- Технолог (ОТК): замена — нужен акт; ремонт в конвейере — нужна приёмка --}}
-                        @if($user->isOtk() || $user->canManageContent())
+                        {{-- Технолог: замена — нужен акт; ремонт в конвейере — нужна приёмка --}}
+                        @if($user->isTechnologist() || $user->canManageContent())
                             @php $actSvc = app(\App\Services\PgpDefectResearch::class); $actCount = $actSvc->actsNeeded() ? $actSvc->actsNeededCount() : null; @endphp
                             @if($actCount !== null)
                                 <a href="{{ route('records.index', ['research', 'act' => 'needed']) }}" class="ui-menu__item justify-between">
@@ -358,17 +334,9 @@
 
             @if($user->isAdmin())
                 <div class="ui-menu__label pt-3">Администрирование</div>
-                <a href="{{ route('sections.index') }}" class="ui-menu__item {{ request()->routeIs('sections.*') ? 'ui-menu__item--active' : '' }}">Участки</a>
-                <a href="{{ route('users.index') }}" class="ui-menu__item {{ request()->routeIs('users.*') ? 'ui-menu__item--active' : '' }}">Пользователи</a>
-                <a href="{{ route('employees.index') }}" class="ui-menu__item {{ request()->routeIs('employees.*') ? 'ui-menu__item--active' : '' }}">Сотрудники</a>
-                <a href="{{ route('fault-codes.index') }}" class="ui-menu__item {{ request()->routeIs('fault-codes.*') ? 'ui-menu__item--active' : '' }}">Коды неисправностей</a>
-                <a href="{{ route('comm-licenses.index') }}" class="ui-menu__item {{ request()->routeIs('comm-licenses.*') ? 'ui-menu__item--active' : '' }}">Лицензии модулей связи</a>
-                <a href="{{ route('comm-profile.index') }}" class="ui-menu__item {{ request()->routeIs('comm-profile.*') ? 'ui-menu__item--active' : '' }}">Профиль модулей связи</a>
-                <a href="{{ route('repair-items.index') }}" class="ui-menu__item {{ request()->routeIs('repair-items.*') ? 'ui-menu__item--active' : '' }}">Узлы ремонта и замены</a>
-                <a href="{{ route('field-prefills.index') }}" class="ui-menu__item {{ request()->routeIs('field-prefills.*') ? 'ui-menu__item--active' : '' }}">Заготовки полей</a>
-                <a href="{{ route('audit.index') }}" class="ui-menu__item {{ request()->routeIs('audit.*') ? 'ui-menu__item--active' : '' }}">Журнал действий</a>
-                <a href="{{ route('system.index') }}" class="ui-menu__item {{ request()->routeIs('system.*') ? 'ui-menu__item--active' : '' }}">Состояние сервера</a>
-                <a href="{{ route('firmware.categories.index') }}" class="ui-menu__item {{ request()->routeIs('firmware.categories.*') ? 'ui-menu__item--active' : '' }}">Категории прошивок</a>
+                @foreach($adminLinks as $link)
+                    <a href="{{ route($link['route']) }}" class="ui-menu__item {{ request()->routeIs($link['active']) ? 'ui-menu__item--active' : '' }}">{{ $link['label'] }}</a>
+                @endforeach
             @endif
 
             @if(!empty($activePins))

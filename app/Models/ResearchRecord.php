@@ -19,7 +19,7 @@ class ResearchRecord extends Model
         'Отправлен в конвейер' => 'Отправлен на испытания',
     ];
 
-    /** Что сделал ремонтник с узлом. При замене технологу (ОТК) нужен акт. */
+    /** Что сделал ремонтник с узлом. При замене технологу нужен акт. */
     public const REPAIR_ACTIONS = [
         'repair'      => 'Ремонт (без использования комплектующих)',
         'replacement' => 'Замена (с использованием комплектующих)',
@@ -35,7 +35,7 @@ class ResearchRecord extends Model
     }
 
     /**
-     * Ждёт технолога (ОТК): замена — нужен акт; ремонт, отправленный в конвейер, — нужна приёмка.
+     * Ждёт технолога: замена — нужен акт; ремонт, отправленный в конвейер, — нужна приёмка.
      * Отметка технолога одна (act_done_at): «Акт оформлен» или «Принято технологом».
      * Исследования без указанного ремонта/замены (старые) сюда не попадают.
      */
@@ -104,7 +104,7 @@ class ResearchRecord extends Model
     }
 
     protected $fillable = [
-        'record_date', 'seq', 'category', 'repair_status',
+        'record_date', 'seq', 'category', 'module_serial', 'repair_status',
         'worker1', 'worker2', 'worker3', 'worker4', 'worker5',
         'fuselage_no', 'fuselage_serial', 'frame_serial', 'bracket_serial',
         'reported_defect', 'rejected_by', 'analysis_actions', 'found_defect',

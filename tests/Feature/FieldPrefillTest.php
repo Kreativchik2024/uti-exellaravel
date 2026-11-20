@@ -16,7 +16,7 @@ class FieldPrefillTest extends TestCase
 
     public function test_only_admin_manages_prefills(): void
     {
-        foreach (['executor', 'master', 'otk', 'repair'] as $role) {
+        foreach (['executor', 'master', 'technologist', 'repair'] as $role) {
             $this->asUser($this->worker($role))->get('/field-prefills')->assertForbidden();
             $this->asUser($this->worker($role))->put('/field-prefills/pgp', ['prefill' => ['board_number' => 'X-']])->assertForbidden();
         }
@@ -41,7 +41,7 @@ class FieldPrefillTest extends TestCase
         $data = $this->validRecord('pgp', $this->nameOf($exec));
         // Свободный ввод: и с заготовкой, и без неё, и что угодно
         foreach (['УМН-0421', 'МН-77', 'что угодно'] as $v) {
-            $this->asUser($exec)->post('/records/pgp', ['board_number' => $v] + $data)->assertSessionHasNoErrors();
+            $this->asUser($exec)->post('/records/pgp', ['board_number' => $v, 'fuselage_number' => 'F-' . $v] + $data)->assertSessionHasNoErrors();
             $this->assertSame(1, PgpRecord::where('board_number', $v)->count());
         }
 

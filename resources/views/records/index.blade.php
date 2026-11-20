@@ -90,6 +90,25 @@
             </nav>
         @endif
 
+        {{-- Исследования: подкатегории — борта и любые другие модули (по полю «Категория») --}}
+        @if($researchTabs ?? null)
+            <nav class="flex flex-wrap items-center gap-2" aria-label="Подкатегории исследований">
+                <span class="text-sm font-medium mr-1" style="color: var(--ui-muted)">Что исследуем:</span>
+                @php $allOn = ($researchCat ?? null) === null; @endphp
+                <a href="{{ route('records.index', array_filter([$sheet, 'q' => $q ?: null])) }}"
+                   class="ui-btn ui-btn--sm {{ $allOn ? 'ui-btn--primary' : 'ui-btn--ghost' }}" @if($allOn) aria-current="page" @endif>Все</a>
+                @foreach($researchTabs as $key => $tab)
+                    @php $on = ($researchCat ?? null) === (string) $key; @endphp
+                    <a href="{{ route('records.index', array_filter([$sheet, 'cat' => (string) $key, 'q' => $q ?: null])) }}"
+                       class="ui-btn ui-btn--sm {{ $on ? 'ui-btn--primary' : 'ui-btn--ghost' }}" @if($on) aria-current="page" @endif>
+                        {{ $tab['label'] }}
+                        <span class="tabular-nums text-xs font-semibold px-1.5 rounded-full"
+                              style="background: {{ $on ? 'rgba(255,255,255,.22)' : 'var(--ui-surface-hover)' }}">{{ number_format($tab['count'], 0, ',', ' ') }}</span>
+                    </a>
+                @endforeach
+            </nav>
+        @endif
+
         {{-- ПГП: борта после ремонта — отдельные вкладки, чтобы не терялись в общем списке --}}
         @if($repairTabs)
             @php
@@ -115,7 +134,7 @@
             </nav>
         @endif
 
-        {{-- Технолог (ОТК): вкладки — все / нужен акт / ждёт приёмки --}}
+        {{-- Технолог: вкладки — все / нужен акт / ждёт приёмки --}}
         @if($actTabs ?? null)
             @php
                 $aTabs = [
@@ -145,96 +164,24 @@
             </div>
         @endif
 
-        {{-- Карточки записей: мобильные (< 768px) --}}
-        <div class="records-cards">
-            @forelse($records as $record)
-                @php
-                    $skipOnCard = ['record_date', 'post_number', 'status', 'created_by', 'worker1', 'health_indicator', 'fault_code'];
-                    $cardFields = array_values(array_filter($listColumns, fn ($col) => !in_array($col, $skipOnCard, true)));
-                @endphp
-
-                <article class="record-card ui-card p-4">
-                    <a href="{{ route('records.show', [$sheet, $record->id]) }}" class="block">
-                        <div class="flex items-start justify-between gap-2 mb-2">
-                            <div class="min-w-0">
-                                <div class="text-base font-semibold" style="color: var(--ui-text)">
-                                    {{ $record->record_date ? \Carbon\Carbon::parse($record->record_date)->format('d.m.Y') : '—' }}
-                                </div>
-                                @if(array_key_exists('post_number', $cfg['fields']) && $record->post_number)
-                                    <div class="text-xs mt-0.5" style="color: var(--ui-muted)">Пост №{{ $record->post_number }}</div>
-                                @endif
-                            </div>
-                            <div class="flex flex-col items-end gap-1 flex-shrink-0">
-                                @if(($record->status ?? null) || isset($repairMarks[$record->id]))
-                                    @include('records._pgp_status', ['mark' => $repairMarks[$record->id] ?? null])
-                                @endif
-                                @if(($record->health ?? null) === 'green')
-                                    <x-status-pill value="Работает" />
-                                @elseif(($record->health ?? null) === 'yellow')
-                                    <x-status-pill value="Внимание" />
-                                @endif
-                            </div>
-                        </div>
-
-                        @if(!empty($cardFields))
-                            <dl>
-                                @foreach($cardFields as $col)
-                                    @php
-                                        $colValue = $record->$col ?? null;
-                                        if ($col === 'is_repaired' || ($cfg['fields'][$col]['type'] ?? '') === 'checkbox' || !empty($cfg['fields'][$col]['bool'])) $colValue = $colValue ? 'Да' : 'Нет';
-                                        if ($col === 'repair_status') $colValue = \App\Models\ResearchRecord::STATUSES[$colValue ?: 'new']['label'] ?? $colValue;
-                                    @endphp
-                                    <div class="min-w-0">
-                                        <dt>{{ $cfg['fields'][$col]['label'] ?? $col }}</dt>
-                                        <dd>{{ $colValue !== null && $colValue !== '' ? $colValue : '—' }}</dd>
-                                    </div>
-                                @endforeach
-                            </dl>
-                        @endif
-
-                        @if($record->fault_code)
-                            <div class="mt-2 text-xs" style="color: var(--ui-muted)">
-                                Код неиспр.: <x-fault-code :code="$record->fault_code" class="!px-0 !py-0 !bg-transparent font-semibold" style="color: var(--ui-text)" />
-                            </div>
-                        @endif
-                        @if($record->workers_list)
-                            <div class="mt-1.5 text-xs" style="color: var(--ui-muted)">
-                                Исполнители: <span style="color: var(--ui-text-2)">{{ $record->workers_list }}</span>
-                            </div>
-                        @endif
-                    </a>
-
-                    @can('update', $record)
-                        <div class="mt-3 pt-3 flex gap-2 border-t" style="border-color: var(--ui-border)">
-                            <a href="{{ route('records.show', [$sheet, $record->id]) }}" class="ui-btn ui-btn--ghost flex-1">Открыть</a>
-                            <a href="{{ route('records.edit', [$sheet, $record->id]) }}" class="ui-btn ui-btn--ghost flex-1">Изменить</a>
-                        </div>
-                    @endcan
-                </article>
-            @empty
-                <div class="ui-card p-8 text-center">
-                    <p class="text-sm font-medium" style="color: var(--ui-muted)">{{ $q ? 'Ничего не найдено' : 'Записей пока нет' }}</p>
-                    <a href="{{ route('records.create', $sheet) }}" class="inline-block text-sm font-semibold mt-2" style="color: var(--ui-accent-text)">Добавить запись</a>
-                </div>
-            @endforelse
-        </div>
-
-        {{-- Таблица (md+) --}}
-        <div class="records-table ui-card overflow-hidden">
+        {{-- Одна разметка: таблица, а на узком экране (< 768px) строки — карточками (public/css/responsive.css → .records-list).
+             Раньше рядом рисовались отдельные карточки — каждая запись дважды. --}}
+        @php
+            $colLabels = [];
+            foreach ($listColumns as $col) {
+                $colLabels[$col] = match ($col) {
+                    'worker1' => 'Исполнители', 'created_by' => 'Автор', 'health_indicator' => 'Проверка', 'fault_code' => 'Код неиспр.',
+                    default => $cfg['fields'][$col]['label'] ?? $col,
+                };
+            }
+        @endphp
+        <div class="records-list ui-card overflow-hidden">
             <div class="overflow-x-auto table-scroll">
                 <table class="ui-table">
                     <thead>
                         <tr>
                             @foreach($listColumns as $col)
-                                <th scope="col">
-                                    @switch($col)
-                                        @case('worker1') Исполнители @break
-                                        @case('created_by') Автор @break
-                                        @case('health_indicator') Проверка @break
-                                        @case('fault_code') Код неиспр. @break
-                                        @default {{ $cfg['fields'][$col]['label'] ?? $col }}
-                                    @endswitch
-                                </th>
+                                <th scope="col">{{ $colLabels[$col] }}</th>
                             @endforeach
                             <th class="w-10"><span class="sr-only">Открыть</span></th>
                         </tr>
@@ -243,7 +190,7 @@
                     @forelse($records as $record)
                         <tr onclick="window.location='{{ route('records.show', [$sheet, $record->id]) }}'" class="group cursor-pointer">
                             @foreach($listColumns as $col)
-                                <td>
+                                <td data-label="{{ $colLabels[$col] }}" data-col="{{ $col }}">
                                     @if($col === 'created_by')
                                         <span class="ui-table__muted">{{ $record->creator?->name ?? '—' }}</span>
                                     @elseif($col === 'worker1')
@@ -279,8 +226,16 @@
                                     @endif
                                 </td>
                             @endforeach
-                            <td class="text-right">
-                                <svg class="w-4 h-4 ml-auto transition-transform group-hover:translate-x-0.5" style="color: var(--ui-faint)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            <td class="text-right" data-col="_open">
+                                <a href="{{ route('records.show', [$sheet, $record->id]) }}" class="records-list__arrow inline-flex" aria-label="Открыть запись" onclick="event.stopPropagation()">
+                                    <svg class="w-4 h-4 ml-auto transition-transform group-hover:translate-x-0.5" style="color: var(--ui-faint)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </a>
+                                @can('update', $record)
+                                    <div class="records-list__actions" onclick="event.stopPropagation()">
+                                        <a href="{{ route('records.show', [$sheet, $record->id]) }}" class="ui-btn ui-btn--ghost flex-1">Открыть</a>
+                                        <a href="{{ route('records.edit', [$sheet, $record->id]) }}" class="ui-btn ui-btn--ghost flex-1">Изменить</a>
+                                    </div>
+                                @endcan
                             </td>
                         </tr>
                     @empty

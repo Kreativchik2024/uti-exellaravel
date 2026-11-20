@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (query === last) return;
             last = query;
             if (!query) { box.innerHTML = ''; return; }
-            fetch(box.dataset.url + '?' + query, { headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+            fetch(box.dataset.url + '?' + query + (box.dataset.except ? '&except=' + encodeURIComponent(box.dataset.except) : ''), { headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
                 .then(function (r) { return r.ok ? r.text() : ''; })
                 .then(function (html) { if (params.toString() === last) box.innerHTML = html; })
                 .catch(function () {});

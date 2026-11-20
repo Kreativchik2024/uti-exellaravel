@@ -77,6 +77,8 @@ trait SiteHelpers
                 $name === 'worker1'                => $worker1,
                 $name === 'technologist'           => $this->technologistName(),
                 $name === 'post_number'            => 3,
+                // свой фюзеляж у каждой записи: тот же номер на ПГП — это тот же борт (без дубля, см. PgpBoardLookup)
+                $name === 'fuselage_number'        => 'Тест fuselage_number ' . (++$this->employeeSeq),
                 $name === 'peripheral_number'      => 2,
                 ($f['type'] ?? '') === 'date'      => now()->toDateString(),
                 ($f['type'] ?? '') === 'time'      => '08:30',

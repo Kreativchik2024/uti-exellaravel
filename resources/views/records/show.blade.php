@@ -6,8 +6,8 @@
         $groupDefinitions = !empty($cfg['layout'])
             ? collect($cfg['layout'])->mapWithKeys(fn ($d, $i) => ['layout_' . $i => $d])->all()
             : [
-                'main'      => ['title' => 'Основное', 'fields' => ['record_date', 'post_number', 'peripheral_number', 'board_number', 'ip_address', 'fuselage_number', 'frame_serial', 'fuselage_no', 'fuselage_serial', 'work_start', 'work_end', 'qty', 'seq']],
-                'equipment' => ['title' => 'Оборудование', 'fields' => ['cross3_number', 'bracket_serial', 'manet_number', 'serial_number', 'pc_version', 'ahrs', 'compass_version', 'device_type', 'runs_count']],
+                'main'      => ['title' => 'Основное', 'fields' => ['record_date', 'post_number', 'peripheral_number', 'board_number', 'ip_address', 'fuselage_number', 'frame_serial', 'fuselage_no', 'fuselage_serial', 'work_start', 'work_end', 'qty', 'seq', 'category']],
+                'equipment' => ['title' => 'Оборудование', 'fields' => ['cross3_number', 'bracket_serial', 'manet_number', 'serial_number', 'module_serial', 'pc_version', 'ahrs', 'compass_version', 'device_type', 'runs_count']],
                 'status'    => ['title' => 'Статус и дефекты', 'fields' => ['status', 'camera_status', 'night_camera_status', 'speed_sensor_status', 'suspension_status', 'is_working', 'is_repaired', 'stand_test', 'barometer_status', 'defect', 'defect_reason', 'fault_code', 'reported_defect', 'found_defect', 'rejected_by', 'analysis_actions', 'result', 'actions_taken', 'work_done']],
                 'notes'     => ['title' => 'Примечания', 'fields' => ['notes', 'comments']],
             ];
@@ -127,9 +127,15 @@
                                         @elseif($type === 'textarea')
                                             <div class="rec-text">{{ $display }}</div>
                                         @elseif($name === 'fault_code')
-                                            <span class="font-mono text-sm font-semibold px-1.5 py-0.5 rounded-md" style="background: var(--ui-surface-hover)">{{ $display }}</span>
-                                            @php $faultDesc = \App\Models\FaultCode::mapFor(app(\App\Services\SectionContext::class)->current())[$display] ?? null; @endphp
-                                            @if($faultDesc)<span class="ml-1.5 text-sm" style="color: var(--ui-text-2)">{{ $faultDesc }}</span>@endif
+                                            @php $faultMap = \App\Models\FaultCode::mapFor(app(\App\Services\SectionContext::class)->current()); @endphp
+                                            <span class="flex flex-col gap-1">
+                                                @foreach(\App\Services\FaultCodes::split($display) as $fc)
+                                                    <span>
+                                                        <span class="font-mono text-sm font-semibold px-1.5 py-0.5 rounded-md" style="background: var(--ui-surface-hover)">{{ $fc }}</span>
+                                                        @if($faultMap[$fc] ?? null)<span class="ml-1.5 text-sm" style="color: var(--ui-text-2)">{{ $faultMap[$fc] }}</span>@endif
+                                                    </span>
+                                                @endforeach
+                                            </span>
                                         @else
                                             <span class="{{ in_array($name, ['ip_address', 'serial_number', 'manet_number', 'cross3_number', 'bracket_serial', 'frame_serial', 'fuselage_number']) ? 'font-mono' : '' }}">{{ $display }}</span>
                                         @endif
@@ -271,7 +277,7 @@
                             @endif
                         </div>
                         <div class="px-4 pb-4 space-y-3">
-                            @if(auth()->user()->isOtk())
+                            @if(auth()->user()->isTechnologist())
                                 <form method="POST" action="{{ route('records.tech', [$sheet, $record->id]) }}" class="space-y-3">
                                     @csrf @method('PATCH')
                                     <textarea name="tech_note" rows="3" maxlength="2000" placeholder="Что сделано или что нужно учесть"

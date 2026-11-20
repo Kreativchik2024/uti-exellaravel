@@ -35,7 +35,7 @@ class PgpTechReviewTest extends TestCase
         }
         $this->assertNull($rec->fresh()->tech_note);
 
-        $this->asUser($this->worker('otk'))->patch($url, ['tech_note' => 'Перепаять разъём'])->assertRedirect();
+        $this->asUser($this->worker('technologist'))->patch($url, ['tech_note' => 'Перепаять разъём'])->assertRedirect();
         $this->assertSame('Перепаять разъём', $rec->fresh()->tech_note);
         $this->assertFalse($rec->fresh()->tech_processed);
     }
@@ -43,7 +43,7 @@ class PgpTechReviewTest extends TestCase
     public function test_otk_toggles_processed_flag(): void
     {
         $rec = $this->defect();
-        $otk = $this->worker('otk');
+        $otk = $this->worker('technologist');
 
         $this->asUser($otk)->patch("/records/pgp/{$rec->id}/tech", ['tech_processed' => 1])->assertRedirect();
         $this->assertTrue($rec->fresh()->tech_processed);
@@ -56,7 +56,7 @@ class PgpTechReviewTest extends TestCase
     {
         $rec = $this->defect();
 
-        $otkHtml = $this->asUser($this->worker('otk'))->get("/records/pgp/{$rec->id}")->assertOk()->getContent();
+        $otkHtml = $this->asUser($this->worker('technologist'))->get("/records/pgp/{$rec->id}")->assertOk()->getContent();
         $this->assertStringContainsString('name="tech_note"', $otkHtml);
         $this->assertStringContainsString('name="tech_processed"', $otkHtml);
         $this->assertStringContainsString('type="reset"', $otkHtml);
@@ -76,7 +76,7 @@ class PgpTechReviewTest extends TestCase
         $this->actingAs($master);   // счётчик считается для текущего участка пользователя
         $this->assertSame(1, app(PgpComplaints::class)->openCount());
 
-        $this->asUser($this->worker('otk'))->patch("/records/pgp/{$open->id}/tech", ['tech_processed' => 1]);
+        $this->asUser($this->worker('technologist'))->patch("/records/pgp/{$open->id}/tech", ['tech_processed' => 1]);
         $this->assertSame(0, app(PgpComplaints::class)->openCount());
     }
 

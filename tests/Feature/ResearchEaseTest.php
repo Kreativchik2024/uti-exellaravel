@@ -46,7 +46,7 @@ class ResearchEaseTest extends TestCase
 
         $this->asUser($master)->patch("/records/research/{$r->id}/research-status", ['repair_status' => 'conveyor']);
         $html = $this->asUser($master)->get("/records/research/{$r->id}")->getContent();
-        $this->assertStringContainsString('технолог (ОТК) принимает ремонт', $html);
+        $this->assertStringContainsString('технолог принимает ремонт', $html);
     }
 
     public function test_technologist_tabs_split_acts_and_acceptance(): void
@@ -54,7 +54,7 @@ class ResearchEaseTest extends TestCase
         $a = $this->research(['repair_action' => 'replacement', 'repair_item' => 'A']);
         $b = $this->research(['repair_action' => 'repair', 'repair_item' => 'B', 'repair_status' => 'conveyor']);
         $this->research(['repair_action' => 'repair', 'repair_item' => 'C', 'repair_status' => 'conveyor']);
-        $otk = $this->worker('otk');
+        $otk = $this->worker('technologist');
 
         $html = $this->asUser($otk)->get('/records/research?act=needed')->assertOk()->getContent();
         $this->assertStringContainsString('Нужен акт', $html);

@@ -5,16 +5,33 @@
     В списке — одни коды; описание, разъяснение и раздел выделенного кода — рядом в отдельном окошке
     (если описание есть). Выбранный код — карточка с расшифровкой.
     Новой неисправности при сохранении присваивается код автоматически (App\Services\FaultCodes::resolve).
+    Кодов может быть несколько: выбранные — карточками над полем (× — убрать), в поле — следующий.
+    На сервер уходят одной строкой через «; » (скрытое поле fault_code, разбор — FaultCodes::resolveMany).
 --}}
 <div class="relative" x-data="faultCode(@js($options), @js((string) $value), @js(route('records.faultCodes', $sheet)))"
      @click.outside="open = false" @keydown.escape="open = false">
-    <input type="text" name="fault_code" x-model="value" autocomplete="off"
+    <input type="hidden" name="fault_code" :value="joined()" @if($isTimeLocked) disabled @endif>
+
+    {{-- Уже выбранные коды --}}
+    <div x-show="codes.length" x-cloak class="ui-fc-chips">
+        <template x-for="(c, i) in codes" :key="'chip' + i + c">
+            <div class="ui-fc-chip">
+                <span class="ui-fc-chip__code" x-text="isText(c) ? 'Новая' : c"></span>
+                <span class="ui-fc-chip__desc" x-text="isText(c) ? '«' + c + '» — код подберётся при сохранении' : (describe(c) || '')"></span>
+                @unless($isTimeLocked)
+                    <button type="button" class="ui-fc-chip__del" title="Убрать код" aria-label="Убрать код" @click="codes.splice(i, 1)">×</button>
+                @endunless
+            </div>
+        </template>
+    </div>
+
+    <input type="text" x-ref="input" x-model="value" autocomplete="off"
            @focus="open = true; search()" @input="open = true; search()"
            @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)"
-           @keydown.backspace="if (open && browsing() && trail.length) { $event.preventDefault(); up(); }"
+           @keydown.backspace="if (open && browsing() && trail.length) { $event.preventDefault(); up(); } else if (value === '' && codes.length) { $event.preventDefault(); codes.pop(); }"
            @keydown.enter="if (open && list().length) { $event.preventDefault(); pick(list()[active]); }"
-           @if($isReq) required @endif @if($isTimeLocked) disabled @endif
-           placeholder="Код или опишите неисправность словами"
+           @if($isReq) :required="!codes.length" @endif @if($isTimeLocked) disabled @endif
+           :placeholder="codes.length ? 'Добавить ещё код' : 'Код или опишите неисправность словами'"
            :class="value && !/\s/.test(value) ? 'font-mono' : ''"
            class="{{ $baseInput }} @error('fault_code') !border-red-400 !ring-red-500/15 @enderror">
 
@@ -84,7 +101,7 @@
     {{-- Что будет при сохранении, если вписан текст, а не код --}}
     <p class="mt-1.5 text-xs ui-fc-note" x-show="!open && note()" x-html="note()"></p>
     {{-- Подсказка по тексту причины (если поле кода ещё пустое) --}}
-    <p x-show="hint && !value" x-cloak class="mt-1.5 text-xs" style="color: var(--ui-accent-text)">
+    <p x-show="hint && !value && !codes.length" x-cloak class="mt-1.5 text-xs" style="color: var(--ui-accent-text)">
         По описанию причины похоже на <b x-text="hint && hint.code"></b> — <span x-text="hint && hint.description"></span>
         <button type="button" class="underline font-semibold ml-1" @click="pick(hint)">подставить</button>
     </p>
@@ -94,16 +111,32 @@
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('faultCode', (options, initial, url) => ({
-        value: initial, open: false, active: 0, remote: null, newItem: null, hint: null, timer: null, pendingNew: null,
+        value: '', codes: [], open: false, active: 0, remote: null, newItem: null, hint: null, timer: null, pendingNew: null,
         trail: [],
         local: options.map(o => ({ key: 'c' + o.code, path: [], ...o })),
+        // «A; B» → ['A', 'B'] без пустых и повторов
+        splitCodes(s) {
+            const out = [];
+            for (const p of String(s || '').split(';').map(x => x.trim())) if (p && !out.some(x => x.toLowerCase() === p.toLowerCase())) out.push(p);
+            return out;
+        },
+        joined() {
+            const all = this.codes.slice();
+            const v = String(this.value).trim();
+            if (v && !all.some(x => x.toLowerCase() === v.toLowerCase())) all.push(v);
+            return all.join('; ');
+        },
+        isText(c) { return /\s/.test(c) && !this.find(c); },
+        find(c) { return this.local.find(x => x.code.toLowerCase() === String(c).trim().toLowerCase()); },
+        describe(c) { const k = this.find(c); return k ? k.description : ''; },
         init() {
+            this.codes = this.splitCodes(initial);
             // Причина неисправности (ПГП): по её тексту подсказываем код
             const reason = this.$el.closest('form')?.querySelector('[name="defect_reason"]');
             if (reason) {
                 let t = null;
                 reason.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => this.hintFrom(reason.value), 500); });
-                if (reason.value && !this.value) this.hintFrom(reason.value);
+                if (reason.value && !this.value && !this.codes.length) this.hintFrom(reason.value);
             }
             // Меню-лесенка привязано к окну браузера (fixed), а не к форме: карточка формы обрезает края
             // (overflow: hidden), из-за этого колонки и описание уходили за её границу. Пересчёт — при каждом шаге и прокрутке.
@@ -112,12 +145,13 @@ document.addEventListener('alpine:init', () => {
             this.$watch('trail', refit);
             this.$watch('active', refit);
             this.$watch('value', refit);
+            this.$watch('codes', refit);
             window.addEventListener('resize', refit);
             window.addEventListener('scroll', () => { if (this.open) this.fit(); }, true);
         },
         fit() {
             const pop = this.$refs.pop;
-            const input = this.$el.querySelector('input[name="fault_code"]');
+            const input = this.$refs.input;
             if (!pop || !input || !this.open || !pop.getClientRects().length) return;
             const r = input.getBoundingClientRect();
             const vw = document.documentElement.clientWidth, vh = window.innerHeight;
@@ -195,12 +229,15 @@ document.addEventListener('alpine:init', () => {
                 if (!this.trail.length) this.settle();
                 const l = this.level(this.trail);
                 // «Назад» не нужен: пройденные уровни видны ступеньками слева (Backspace — на уровень выше)
-                return [...l.groups, ...l.here];
+                const here = l.here.filter(x => !this.codes.some(c => c.toLowerCase() === String(x.code).toLowerCase()));
+                return [...l.groups, ...here];
             }
             const q = String(this.value).trim().toLowerCase();
             let items = this.remote !== null ? this.remote
                 : this.local.filter(x => !q || x.code.toLowerCase().startsWith(q) || (x.description || '').toLowerCase().includes(q)).slice(0, 30);
             if (this.known()) items = items.filter(x => x.code !== this.known().code || q !== x.code.toLowerCase());
+            // Уже выбранные коды второй раз не предлагаем
+            items = items.filter(x => !this.codes.some(c => c.toLowerCase() === String(x.code).toLowerCase()));
             return this.newItem ? [...items, this.newItem] : items;
         },
         search() {
@@ -218,7 +255,7 @@ document.addEventListener('alpine:init', () => {
             }, 220);
         },
         async hintFrom(text) {
-            if (String(text).trim().length < 4 || this.value) { this.hint = null; return; }
+            if (String(text).trim().length < 4 || this.value || this.codes.length) { this.hint = null; return; }
             try {
                 const d = await (await fetch(url + '?q=' + encodeURIComponent(text), { headers: { Accept: 'application/json' }, credentials: 'same-origin' })).json();
                 const best = d.items.find(x => x.score >= 0.5);
@@ -238,8 +275,11 @@ document.addEventListener('alpine:init', () => {
             if (!it) return;
             if (it.isGroup) { this.trail.push(it.name); this.settle(); this.active = 0; return; }
             if (it.isBack) { this.up(); return; }
-            this.value = it.isNew ? it.description : it.code;
-            this.pendingNew = it.isNew ? it : null;
+            // Выбранный код — в карточки над полем, поле очищается под следующий код
+            const c = it.isNew ? it.description : it.code;
+            if (!this.codes.some(x => x.toLowerCase() === String(c).toLowerCase())) this.codes.push(c);
+            this.value = '';
+            this.pendingNew = null;
             this.open = false; this.remote = null; this.newItem = null; this.hint = null;
             this.trail = [];
         },

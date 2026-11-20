@@ -203,20 +203,20 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::post('/records/{sheet}',          [RecordController::class, 'store'])->name('records.store');
     Route::get('/records/{sheet}/lookup',    [RecordController::class, 'lookup'])->name('records.lookup');
     // Форма ПГП: что известно о борте по введённым номерам (моторама, фюзеляж, периферия)
-    Route::get('/records/{sheet}/board-journal', [RecordController::class, 'boardJournal'])->middleware('throttle:120,1')->name('records.boardJournal');
+    Route::get('/records/{sheet}/board-journal', [\App\Http\Controllers\PgpBoardController::class, 'journal'])->middleware('throttle:120,1')->name('records.boardJournal');
     Route::get('/records/{sheet}/fault-codes', [RecordController::class, 'faultCodes'])->middleware('throttle:120,1')->name('records.faultCodes');
     Route::get('/records/{sheet}/{id}',      [RecordController::class, 'show'])->name('records.show');
     Route::get('/records/{sheet}/{id}/edit', [RecordController::class, 'edit'])->name('records.edit');
     Route::put('/records/{sheet}/{id}',      [RecordController::class, 'update'])->name('records.update');
-    // Пометка технолога ПГП — только группа ОТК
-    Route::patch('/records/{sheet}/{id}/tech', [RecordReviewController::class, 'tech'])->middleware('role:otk')->name('records.tech');
+    // Пометка технолога ПГП — только группа «Технолог»
+    Route::patch('/records/{sheet}/{id}/tech', [RecordReviewController::class, 'tech'])->middleware('role:technologist')->name('records.tech');
     // Исследования: статус кнопками — ремонтник (и мастер, админ); комментарии — все
     Route::patch('/records/{sheet}/{id}/research-status', [RecordReviewController::class, 'researchStatus'])->middleware('role:repair,master,admin')->name('records.researchStatus');
-    // Ремонт / замена и узел — ремонтник (мастер, админ); акт на замену — технолог ОТК (мастер, админ)
+    // Ремонт / замена и узел — ремонтник (мастер, админ); акт на замену — технолог (мастер, админ)
     Route::patch('/records/{sheet}/{id}/research-repair', [RecordReviewController::class, 'researchRepair'])->middleware('role:repair,master,admin')->name('records.researchRepair');
     // Отмена последнего сохранения ремонта или статуса (в течение пары минут, тем же пользователем)
     Route::post('/records/{sheet}/{id}/research-undo', [RecordReviewController::class, 'researchUndo'])->middleware('role:repair,master,admin')->name('records.researchUndo');
-    Route::patch('/records/{sheet}/{id}/research-act',[RecordReviewController::class, 'researchAct'])->middleware('role:otk,master,admin')->name('records.researchAct');
+    Route::patch('/records/{sheet}/{id}/research-act',[RecordReviewController::class, 'researchAct'])->middleware('role:technologist,master,admin')->name('records.researchAct');
     Route::post('/records/{sheet}/{id}/comments', [RecordReviewController::class, 'comment'])->middleware('throttle:30,1')->name('records.comment');
     Route::delete('/records/{sheet}/{id}',   [RecordController::class, 'destroy'])->name('records.destroy');
 });
@@ -237,8 +237,8 @@ Route::middleware(['auth', 'workers'])->group(function () {
     Route::get('/stats/zone5-chart',    [StatsZoneController::class, 'zone5Chart'])->name('stats.zone5Chart');
     Route::get('/stats/zone6',          [StatsZoneController::class, 'zone6'])->name('stats.zone6');
     Route::get('/stats/zone7',          [StatsZoneController::class, 'zone7'])->name('stats.zone7');
-    // Технологи: только мастер, технолог (ОТК) и администратор
-    Route::get('/stats/zone8',          [StatsZoneController::class, 'zone8'])->middleware('role:admin,master,otk')->name('stats.zone8');
+    // Технологи: только мастер, технолог и администратор
+    Route::get('/stats/zone8',          [StatsZoneController::class, 'zone8'])->middleware('role:admin,master,technologist')->name('stats.zone8');
 });
 
 // Игры (меню профиля) — отдельно от рабочей статистики; админ включает и выключает
@@ -270,6 +270,7 @@ Route::middleware(['auth', 'games'])->prefix('games')->name('games.')->group(fun
 
 // Чат: общий канал и личные сообщения (опрос с клиента)
 Route::middleware('auth')->prefix('chat')->name('chat.')->group(function () {
+    Route::get('/panel',         [ChatController::class, 'panel'])->name('panel');   // разметка панели — подгружается при первом открытии
     Route::get('/summary',       [ChatController::class, 'summary'])->name('summary');
     Route::get('/conversations', [ChatController::class, 'conversations'])->name('conversations');
     Route::get('/users',         [ChatController::class, 'users'])->name('users');

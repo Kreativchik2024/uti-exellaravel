@@ -8,7 +8,7 @@
     $sectionId ??= 'board-history';
     $draft     ??= false;
     $keyLabels = ['frame_serial' => 'моторама', 'fuselage_number' => 'фюзеляж', 'board_number' => 'борт'];
-    $canSeeChanges = auth()->user()->canManageContent() || auth()->user()->isOtk();
+    $canSeeChanges = auth()->user()->canManageContent() || auth()->user()->isTechnologist();
 @endphp
 <section id="{{ $sectionId }}" class="ui-card overflow-hidden">
     <div class="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 pb-1">
@@ -76,7 +76,7 @@
         @endforelse
     </ol>
 
-    {{-- Все изменения записей борта: кто, когда, что было и что стало (мастер, ОТК, админ) --}}
+    {{-- Все изменения записей борта: кто, когда, что было и что стало (мастер, технолог, админ) --}}
     @if($canSeeChanges && $boardHistory['changes'])
         <details class="bj-changes px-4 pb-4">
             <summary class="cursor-pointer text-sm font-semibold" style="color: var(--ui-accent-text)">

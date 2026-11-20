@@ -107,6 +107,35 @@ class FaultCodes
 
     // ================================================================ сохранение записи
 
+    /** Разделитель нескольких кодов в одном поле «Код неисправности». */
+    public const SEPARATOR = '; ';
+
+    /** Коды из значения поля: «A; B» → ['A', 'B'] (пустые и повторы убраны). */
+    public static function split(?string $value): array
+    {
+        $out = [];
+        foreach (preg_split('/\s*;\s*/u', trim((string) $value)) as $part) {
+            $part = trim($part);
+            if ($part !== '' && ! in_array(mb_strtolower($part), array_map('mb_strtolower', $out), true)) $out[] = $part;
+        }
+
+        return $out;
+    }
+
+    /** Коды → значение поля (null, если кодов нет). */
+    public static function join(array $codes): ?string
+    {
+        $codes = self::split(implode(';', $codes));
+
+        return $codes ? implode(self::SEPARATOR, $codes) : null;
+    }
+
+    /** Несколько кодов через «;»: каждый разбирается как resolve(), результат — снова одной строкой. */
+    public function resolveMany(string $sheet, ?string $value, ?int $userId = null): ?string
+    {
+        return self::join(array_filter(array_map(fn ($part) => $this->resolve($sheet, $part, $userId), self::split($value))));
+    }
+
     /**
      * Что сохранить в поле «Код неисправности»: код как есть, код похожей неисправности
      * или новый код, если вписано описание новой неисправности.
@@ -379,6 +408,17 @@ class FaultCodes
         foreach (config('sheets.map') as $cfg) {
             if (! empty($cfg['model']) && isset($cfg['fields']['fault_code'])) {
                 $changed += $cfg['model']::query()->withoutGlobalScopes()->where('fault_code', $from)->update(['fault_code' => $to]);
+                // Записи с несколькими кодами: «A; B» — заменить только нужный код в списке
+                $cfg['model']::query()->withoutGlobalScopes()->where('fault_code', 'like', '%;%')
+                    ->where('fault_code', 'like', '%' . str_replace(['%', '_'], ['\%', '\_'], $from) . '%')
+                    ->get(['id', 'fault_code'])->each(function ($rec) use ($from, $to, &$changed) {
+                        $codes = self::split($rec->fault_code);
+                        $lower = array_map('mb_strtolower', $codes);
+                        if (! in_array(mb_strtolower($from), $lower, true)) return;
+                        $new = self::join(array_map(fn ($c) => mb_strtolower($c) === mb_strtolower($from) ? $to : $c, $codes));
+                        $rec->newQuery()->withoutGlobalScopes()->whereKey($rec->getKey())->update(['fault_code' => $new]);
+                        $changed++;
+                    });
             }
         }
 

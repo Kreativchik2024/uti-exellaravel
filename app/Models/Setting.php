@@ -12,13 +12,12 @@ class Setting extends Model
     protected $keyType = 'string';
     protected $fillable = ['key', 'value'];
 
-    private static array $memo = [];
+    /** Все настройки — одним запросом на первый вызов (таблица маленькая; раньше — запрос на каждый ключ). */
+    private static ?array $memo = null;
 
     public static function get(string $key, mixed $default = null): mixed
     {
-        if (! array_key_exists($key, self::$memo)) {
-            self::$memo[$key] = static::query()->whereKey($key)->value('value');
-        }
+        self::$memo ??= static::query()->pluck('value', 'key')->all();
 
         return self::$memo[$key] ?? $default;
     }
@@ -26,7 +25,7 @@ class Setting extends Model
     public static function set(string $key, mixed $value): void
     {
         static::query()->updateOrCreate(['key' => $key], ['value' => $value]);
-        self::$memo[$key] = $value;
+        if (self::$memo !== null) self::$memo[$key] = $value;
     }
 
     public static function gamesEnabled(): bool
@@ -37,6 +36,6 @@ class Setting extends Model
     /** Для тестов: между запросами значения читаются заново. */
     public static function forgetMemo(): void
     {
-        self::$memo = [];
+        self::$memo = null;
     }
 }

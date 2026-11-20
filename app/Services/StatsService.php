@@ -174,6 +174,7 @@ class StatsService
         $result = [];
 
         $workerVariants = $this->workerVariants($worker);
+        $users = [];   // id автора => имя, на все вкладки
 
         foreach ($map as $slug => $cfg) {
             $q = $this->periodQuery($cfg, $from, $to, $user, $workerVariants);
@@ -197,7 +198,9 @@ class StatsService
             $total   = (int) $rows->sum('c');
             $defects = $rule ? (int) $rows->sum('d') : 0;
 
-            $users = User::whereIn('id', $rows->pluck('created_by')->filter())->pluck('name', 'id')->toArray();
+            // Имена авторов — общим запасом на все вкладки: догружаются только новые id
+            $missing = array_diff($rows->pluck('created_by')->filter()->unique()->all(), array_keys($users));
+            if ($missing) $users += User::whereIn('id', $missing)->pluck('name', 'id')->all();
 
             $perUser = [];
             foreach ($rows as $row) {

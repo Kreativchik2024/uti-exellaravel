@@ -22,7 +22,7 @@ document.addEventListener('alpine:init', () => {
             peerReadId: 0, generalReads: [], tmpSeq: 0,
             firstUnreadId: null, since: null, typingNames: [],
             replyTo: null, pendingFiles: [], actionsFor: null, flashId: null, bump: null,
-            lightbox: null, dragOver: false,
+            lightbox: null, dragOver: false, _panelLoading: null,
             timer: null, ticks: 0, stickToBottom: true,
 
             init() {
@@ -118,8 +118,9 @@ document.addEventListener('alpine:init', () => {
                     const note = new Notification(title, {
                         body: n.preview, icon: '/icons/icon-192.png', tag: 'uti-chat-' + n.id,
                     });
-                    note.onclick = () => {
+                    note.onclick = async () => {
                         window.focus();
+                        if (!(await this.ensurePanel())) return;
                         this.open = true;
                         if (n.group) this.openThread(0, n.group_name, false, n.group);
                         else this.openThread(n.peer, n.peer === 0 ? 'Общий чат' : n.name, false);
@@ -294,7 +295,35 @@ document.addEventListener('alpine:init', () => {
 
             // ---- навигация ----
             toggle() { this.open ? this.close() : this.openPanel(); },
-            openPanel() { this.open = true; this.view = 'list'; this.loadConversations(); },
+            async openPanel() {
+                if (!(await this.ensurePanel())) return;
+                this.open = true; this.view = 'list'; this.loadConversations();
+            },
+
+            /**
+             * Разметка панели не приходит с каждой страницей — подгружается при первом открытии (GET /chat/panel)
+             * и встаёт на место [data-chat-panel-host]. Alpine сам инициализирует вставленное внутри x-data виджета.
+             * @returns {Promise<boolean>} панель на месте
+             */
+            ensurePanel() {
+                if (rootEl && !rootEl.querySelector('[data-chat-panel-host]')) return Promise.resolve(true);
+                this._panelLoading ??= (async () => {
+                    try {
+                        const res = await fetch(this.urls.panel, { credentials: 'same-origin', headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' } });
+                        if (!res.ok) throw new Error('Ошибка ' + res.status);
+                        const html = await res.text();
+                        const host = rootEl.querySelector('[data-chat-panel-host]');
+                        if (host) host.outerHTML = html;
+                        await new Promise(r => setTimeout(r, 0));   // дать Alpine подхватить вставленное
+                        return true;
+                    } catch (e) {
+                        this._panelLoading = null;   // следующая попытка — заново
+                        alert('Не удалось открыть чат. Проверьте связь и попробуйте ещё раз.');
+                        return false;
+                    }
+                })();
+                return this._panelLoading;
+            },
             close() { this.open = false; this.actionsFor = null; this.refreshSummary(); },
             backToList() { this.view = 'list'; this.messages = []; this.replyTo = null; this.clearFiles(); this.loadConversations(); },
             startNew() {

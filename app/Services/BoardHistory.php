@@ -29,7 +29,7 @@ class BoardHistory
         'assembly' => '2. Сборка',
         'pgp'      => '3. ПГП',
         'repair'   => '4. Ремонт',
-        'otk'      => '5. ОТК',
+        'otk'      => '5. Технолог',
     ];
 
     /** Вкладки, которые относятся к сборке; остальная периферия — прошивка и настройка. */
@@ -93,7 +93,7 @@ class BoardHistory
 
         $events = [];
         foreach ($peripherals as [$slug, $cfg, $rec]) $events[] = $this->peripheralEvent($slug, $cfg, $rec);
-        foreach ($pgps as $p) $events[] = $this->pgpEvent($p);
+        foreach ($pgps as $p) array_push($events, ...$this->pgpEvents($p));
         foreach ($researches as $r) array_push($events, ...$this->researchEvents($r));
         array_push($events, ...$this->logEvents($pgps, $researches));
 
@@ -208,19 +208,55 @@ class BoardHistory
 
     // ================================================================ 3. ПГП
 
-    private function pgpEvent(PgpRecord $p): array
+    /**
+     * Проверки на ПГП по записи. Борт после ремонта сдаётся в той же записи (PgpBoardLookup) — поэтому
+     * каждая смена статуса из журнала действий — отдельная проверка: «Не сдан» → ремонт → «Сдан».
+     */
+    private function pgpEvents(PgpRecord $p): array
     {
-        $passed = $p->status === 'Сдан';
+        $statusLogs = AuditLog::query()->where('area', 'records')->where('action', 'updated')
+            ->where('subject_type', 'pgp')->where('subject_id', $p->id)->with('user')->orderBy('id')->get()
+            ->filter(fn ($log) => isset($log->changes['status']));
+        if ($statusLogs->isEmpty()) return [$this->pgpEvent($p)];
+
+        $first = $statusLogs->first()->changes['status'][0] ?? null;
+        $events = [$this->pgpEvent($p, $first ?: null, null)];
+        foreach ($statusLogs as $log) {
+            $to = (string) ($log->changes['status'][1] ?? '');
+            $events[] = $this->pgpEvent($p, $to, $log);
+        }
+
+        return $events;
+    }
+
+    /** Одна проверка: $status — статус на тот момент (null — текущий), $log — запись журнала о повторной проверке. */
+    private function pgpEvent(PgpRecord $p, ?string $status = null, ?AuditLog $log = null): array
+    {
+        $status ??= $p->status;
+        $passed = $status === 'Сдан';
         $text = array_filter([
             $passed ? null : (trim((string) $p->defect_reason) ?: null),
-            filled($p->fault_code) ? 'Код неисправности: ' . $p->fault_code : null,
-            filled($p->technologist) ? 'Технолог: ' . $p->technologist : null,
+            filled($p->fault_code) && ! $passed ? 'Код неисправности: ' . $p->fault_code : null,
+            filled($p->technologist) && $passed ? 'Представитель ОТК: ' . $p->technologist : null,
         ]);
+
+        if ($log) {
+            return [
+                'at'    => $log->created_at,
+                'stage' => 'pgp',
+                'title' => 'Повторная проверка на ПГП: ' . ($status ?: 'без статуса') . ' (' . $log->created_at->format('d.m.Y') . ')',
+                'text'  => $text ? implode(' · ', $text) : null,
+                'tone'  => $passed ? 'good' : 'bad',
+                'who'   => $this->workers($p),
+                'by'    => $log->user?->name ?? $log->user_name,
+                'url'   => route('records.show', ['pgp', $p->id]),
+            ];
+        }
 
         return [
             'at'    => $p->created_at,
             'stage' => 'pgp',
-            'title' => 'Проверка на ПГП: ' . ($p->status ?: 'без статуса') . ($p->record_date ? ' (' . $p->record_date->format('d.m.Y') . ')' : ''),
+            'title' => 'Проверка на ПГП: ' . ($status ?: 'без статуса') . ($p->record_date ? ' (' . $p->record_date->format('d.m.Y') . ')' : ''),
             'text'  => $text ? implode(' · ', $text) : null,
             'tone'  => $passed ? 'good' : 'bad',
             'who'   => $this->workers($p),
@@ -296,7 +332,7 @@ class BoardHistory
         $techLogs = AuditLog::query()->where('area', 'pgp')->where('action', 'tech')->where('subject_type', 'record')
             ->whereIn('subject_id', $pgps->pluck('id'))->with('user')->orderBy('id')->get();
         foreach ($techLogs as $log) {
-            $events[] = ['at' => $log->created_at, 'stage' => 'otk', 'rank' => 1, 'title' => 'Пометка ОТК',
+            $events[] = ['at' => $log->created_at, 'stage' => 'otk', 'rank' => 1, 'title' => 'Пометка технолога',
                 'text' => trim((string) preg_replace('/^.*?:\s*/u', '', (string) $log->summary)) ?: null,
                 'tone' => 'neutral', 'who' => $log->user?->name ?? $log->user_name, 'by' => null,
                 'url' => route('records.show', ['pgp', $log->subject_id])];

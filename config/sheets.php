@@ -10,7 +10,7 @@ $workers = [
 
 $faultCode = [
     // Выпадающий список из справочника (Админ → Коды неисправностей) + можно вписать свой
-    'fault_code' => ['label'=>'Код неисправности','type'=>'combo','rules'=>'nullable|string|max:100',
+    'fault_code' => ['label'=>'Код неисправности','type'=>'combo','rules'=>'nullable|string|max:255',
                      'placeholder'=>'Выберите из списка или введите свой'],
 ];
 
@@ -62,12 +62,12 @@ $map = [
                 'status'          => ['label'=>'Статус','type'=>'select','rules'=>'required|in:Сдан,Не сдан',
                                        'options'=>['Сдан','Не сдан']],
 
-                // Приёмка технологом: список — активные пользователи группы ОТК (подставляет RecordController::cfg)
-                // Обязателен, только если борт сдан: при «Не сдан» технолог борт не принимал
-                'technologist'    => ['label'=>'Технолог','type'=>'select','rules'=>'nullable|required_unless:status,Не сдан|string|max:120',
+                // Приёмка представителем ОТК: список — активные сотрудники с ролью «Представитель ОТК» (подставляет RecordController::cfg)
+                // Обязателен, только если борт сдан: при «Не сдан» ОТК борт не принимал
+                'technologist'    => ['label'=>'Представитель ОТК','type'=>'select','rules'=>'nullable|required_unless:status,Не сдан|string|max:120',
                                       'required_unless'=>['status'=>'Не сдан'],
                                       'options'=>[], 'options_from'=>'technologists',
-                                      'messages'=>['required_unless'=>'Выберите технолога, который принял борт.', 'in'=>'Выберите технолога из списка.']],
+                                      'messages'=>['required_unless'=>'Выберите представителя ОТК, который принял борт.', 'in'=>'Выберите представителя ОТК из списка.']],
                 // «Время ожидания технолога» (колонка wait_minutes) пока не используется: поле убрано из формы, данные в БД сохранены
 
                 // --- Появляются после выбора статуса; все необязательные (заполняются по возможности) ---
@@ -97,7 +97,7 @@ $map = [
                                       'rules'=>'nullable|string'],
                 // Выпадающий список ранее введённых кодов + можно вписать свой
                 'fault_code'      => ['label'=>'Код неисправности','type'=>'combo',
-                                      'rules'=>'nullable|string|max:100',
+                                      'rules'=>'nullable|string|max:255',
                                       'placeholder'=>'Выберите из списка или введите свой'],
                 'actions_taken'   => ['label'=>'Действия','type'=>'textarea','rules'=>'nullable|string'],
             ]),
@@ -245,10 +245,13 @@ $map = [
                 'category'    => ['label'=>'Категория (узел)','type'=>'combo','rules'=>'nullable|string|max:120',
                                   'placeholder'=>'Выберите узел или впишите свой', 'options'=>[]],
             ], $workers, [
-                'fuselage_no'     => ['label'=>'№ фюзеляжа','type'=>'text','rules'=>'nullable|string|max:64'],
-                'fuselage_serial' => ['label'=>'Фюзеляж с аппаратурой','type'=>'text','rules'=>'nullable|string|max:120'],
-                'frame_serial'    => ['label'=>'Моторама с аппаратурой','type'=>'text','rules'=>'nullable|string|max:120'],
-                'bracket_serial'  => ['label'=>'Кронштейн с камерами','type'=>'text','rules'=>'nullable|string|max:120'],
+                // Подкатегория «Борта» (категория — вкладка ПГП): номера борта; любой другой модуль — его серийный номер.
+                // 'for' => 'board' | 'module' — поле показывается в форме только для этой подкатегории (records/_form)
+                'fuselage_no'     => ['label'=>'№ фюзеляжа','type'=>'text','rules'=>'nullable|string|max:64','for'=>'board'],
+                'module_serial'   => ['label'=>'Серийный номер модуля','type'=>'text','rules'=>'nullable|string|max:120','for'=>'module'],
+                'fuselage_serial' => ['label'=>'Фюзеляж с аппаратурой','type'=>'text','rules'=>'nullable|string|max:120','for'=>'board'],
+                'frame_serial'    => ['label'=>'Моторама с аппаратурой','type'=>'text','rules'=>'nullable|string|max:120','for'=>'board'],
+                'bracket_serial'  => ['label'=>'Кронштейн с камерами','type'=>'text','rules'=>'nullable|string|max:120','for'=>'board'],
                 'reported_defect' => ['label'=>'Отказ заявленный','type'=>'textarea','rules'=>'nullable|string'],
                 'rejected_by'     => ['label'=>'Кто забраковал','type'=>'text','rules'=>'nullable|string|max:120'],
                 'analysis_actions'=> ['label'=>'Действия для анализа','type'=>'textarea','rules'=>'nullable|string'],
@@ -261,7 +264,7 @@ $map = [
                                       'rules'=>'nullable|in:' . implode(',', array_keys(\App\Models\ResearchRecord::STATUSES)),
                                       'options'=>\App\Models\ResearchRecord::statusOptions()],
             ], $faultCode),
-            'list_columns' => ['record_date','category','fuselage_no','frame_serial','bracket_serial','repair_status'],
+            'list_columns' => ['record_date','category','fuselage_no','module_serial','frame_serial','repair_status'],
         ],
 
         // =====================================================

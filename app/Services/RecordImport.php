@@ -138,7 +138,7 @@ class RecordImport
 
             $data = array_intersect_key($row['data'], $fillable);
             if (array_key_exists('fault_code', $data) && $data['fault_code'] !== null) {
-                $data['fault_code'] = app(FaultCodes::class)->resolve($this->slug, $data['fault_code'], $userId);
+                $data['fault_code'] = app(FaultCodes::class)->resolveMany($this->slug, $data['fault_code'], $userId);
             }
             $time = $data['work_end'] ?? $data['work_start'] ?? '12:00';
             $record = new $model($data + (isset($fillable['created_by']) ? ['created_by' => $userId] : []));

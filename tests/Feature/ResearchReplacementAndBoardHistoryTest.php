@@ -78,7 +78,7 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
         $this->repairPatch($repair, $research, ['repair_action' => 'replacement', 'repair_node' => 'g999999'])->assertSessionHasErrors('repair_node');
 
         // Исполнитель и ОТК ремонт не указывают
-        foreach (['executor', 'otk'] as $role) {
+        foreach (['executor', 'technologist'] as $role) {
             $this->repairPatch($this->worker($role), $research, ['repair_action' => 'repair', 'repair_node' => 'g' . $leaf->id])->assertForbidden();
         }
     }
@@ -208,7 +208,7 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
         $pgp = $this->postPgp(['status' => 'Не сдан']);
         $research = ResearchRecord::where('pgp_record_id', $pgp->id)->firstOrFail();
         $this->repairPatch($this->worker('repair'), $research, ['repair_action' => 'replacement', 'repair_node' => 'g' . $leaf->id]);
-        $otk = $this->worker('otk');
+        $otk = $this->worker('technologist');
 
         // В меню ОТК — строка со списком, в списке — это исследование
         $menu = $this->asUser($otk)->get(route('dashboard'))->assertOk()->getContent();
@@ -250,7 +250,7 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
         $this->assertSame('conveyor', $research->repair_status);
         $this->assertTrue($research->needsAct());
 
-        $otk = $this->worker('otk');
+        $otk = $this->worker('technologist');
         $this->actingAs($otk);
         $this->assertSame(1, app(\App\Services\PgpDefectResearch::class)->actsNeededCount());
         $this->assertStringContainsString("/records/research/{$research->id}\"", $this->asUser($otk)->get('/records/research?act=needed')->getContent());
@@ -271,12 +271,12 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
         $pgp = $this->postPgp(['status' => 'Не сдан']);
         $research = ResearchRecord::where('pgp_record_id', $pgp->id)->firstOrFail();
         $repair = $this->worker('repair');
-        $otk = $this->worker('otk');
+        $otk = $this->worker('technologist');
         $count = function () use ($otk) { $this->actingAs($otk); return app(\App\Services\PgpDefectResearch::class)->actsNeededCount(); };
 
         $this->repairPatch($repair, $research, ['repair_action' => 'repair', 'repair_node' => 'g' . $leaf->id])->assertSessionHasNoErrors();
         $this->assertSame(0, $count(), 'ремонт ещё не в конвейере — технологу рано');
-        $this->assertStringContainsString('уйдёт технологу (ОТК) на приёмку', $this->asUser($repair)->get("/records/research/{$research->id}")->getContent());
+        $this->assertStringContainsString('уйдёт технологу на приёмку', $this->asUser($repair)->get("/records/research/{$research->id}")->getContent());
         $this->asUser($otk)->patch("/records/research/{$research->id}/research-act")->assertStatus(422);
 
         $this->asUser($repair)->patch("/records/research/{$research->id}/research-status", ['repair_status' => 'conveyor']);
@@ -295,7 +295,7 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
     public function test_old_conveyor_research_without_repair_is_not_in_technologist_list(): void
     {
         $this->research(['repair_status' => 'conveyor']);   // старые записи: в конвейере, ремонт/замена не указаны
-        $this->actingAs($this->worker('otk'));
+        $this->actingAs($this->worker('technologist'));
 
         $this->assertSame(0, app(\App\Services\PgpDefectResearch::class)->actsNeededCount());
     }
@@ -338,7 +338,7 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
     {
         // «Акт оформлен», смена статуса и т.п. обновляют страницу — поле комментария хранит черновик в браузере
         $research = $this->research();
-        $html = $this->asUser($this->worker('otk'))->get("/records/research/{$research->id}")->assertOk()->getContent();
+        $html = $this->asUser($this->worker('technologist'))->get("/records/research/{$research->id}")->assertOk()->getContent();
 
         $this->assertStringContainsString('data-draft-key="research-comment-' . $research->id . '"', $html);
     }
@@ -413,11 +413,18 @@ class ResearchReplacementAndBoardHistoryTest extends TestCase
 
         // Борт вернулся на ПГП и сдан — текущий этап «Сдан на ПГП», история общая по номеру борта
         $this->travel(5)->minutes();
-        $again = $this->postPgp(['status' => 'Сдан']);
-        $this->assertSame($pgp->board_number, $again->board_number);
-        $html = $this->asUser($master)->get("/records/pgp/{$again->id}")->assertOk()->getContent();
+        // Повторная сдача с тем же фюзеляжем — не новая запись, а та же (PgpBoardLookup), её и сдаём
+        $exec = $this->exec;
+        $count = PgpRecord::count();
+        $this->asUser($exec)->post('/records/pgp', array_merge($this->validRecord('pgp', $this->nameOf($exec)), ['status' => 'Сдан', 'fuselage_number' => $pgp->fuselage_number]))
+            ->assertRedirect("/records/pgp/{$pgp->id}/edit");
+        $this->assertSame($count, PgpRecord::count());
+        $this->asUser($exec)->put("/records/pgp/{$pgp->id}", array_merge($this->validRecord('pgp', $this->nameOf($exec)), ['status' => 'Сдан', 'fuselage_number' => $pgp->fuselage_number]))
+            ->assertSessionHasNoErrors();
+        $html = $this->asUser($master)->get("/records/pgp/{$pgp->id}")->assertOk()->getContent();
         $this->assertStringContainsString('Сдан на ПГП', $html);
         $this->assertStringContainsString('Проверка на ПГП: Не сдан', $html);
         $this->assertStringContainsString('Меняем модуль связи', $html);
+        $this->assertStringContainsString('Повторная проверка на ПГП: Сдан', $html);
     }
 }

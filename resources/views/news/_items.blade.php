@@ -31,9 +31,11 @@
                         <span class="news-card__avatar">{{ mb_strtoupper(mb_substr($item->author?->name ?? '—', 0, 1)) }}</span>
                         {{ $item->author?->name ?? '—' }}
                     </span>
-                    <time datetime="{{ $item->published_at?->toIso8601String() }}" title="{{ $item->published_at?->format('d.m.Y H:i') }}">
-                        {{ $item->published_at?->diffForHumans() }}
-                    </time>
+                    @if($item->published_at)
+                        <time datetime="{{ $item->published_at->toIso8601String() }}" title="{{ $item->published_at->diffForHumans() }}">
+                            Опубликовано {{ $item->published_at->format('d.m.Y, H:i') }}
+                        </time>
+                    @endif
                 </header>
 
                 @if($item->title)

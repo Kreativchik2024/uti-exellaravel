@@ -72,6 +72,30 @@ class FaultCodeTest extends TestCase
         $this->asUser($user)->get("/records/pgp/{$rec->id}")->assertSee('Сбой калибровки');
     }
 
+    public function test_record_keeps_several_fault_codes_and_stats_count_each(): void
+    {
+        FaultCode::create(['code' => 'E07', 'description' => 'Сбой калибровки']);
+        FaultCode::create(['code' => 'E08', 'description' => 'Нет связи']);
+        $user = $this->worker();
+
+        $data = array_merge($this->validRecord('cross1', $this->nameOf($user)), ['fault_code' => 'e07 ;E08; E07']);
+        $this->asUser($user)->post('/records/cross1', $data)->assertSessionHasNoErrors();
+        $rec = \App\Models\Cross1Record::latest('id')->firstOrFail();
+        $this->assertSame('E07; E08', $rec->fault_code, 'регистр по справочнику, повтор убран');
+
+        $this->asUser($user)->get("/records/cross1/{$rec->id}")->assertSee('Сбой калибровки')->assertSee('Нет связи');
+
+        // Переименование кода в справочнике меняет его и внутри списка
+        $this->assertSame(1, app(\App\Services\FaultCodes::class)->replaceInRecords('E08', 'E09'));
+        $this->assertSame('E07; E09', $rec->fresh()->fault_code);
+
+        // Статистика: запись считается в каждом коде
+        FaultCode::create(['code' => 'E09', 'description' => 'Обрыв']);
+        $rows = collect($this->asUser($this->worker('master'))->getJson('/stats/zone6')->assertOk()->json())->keyBy('code');
+        $this->assertSame(1, $rows['E07']['count'] ?? null);
+        $this->assertSame(1, $rows['E09']['count'] ?? null);
+    }
+
     public function test_only_admin_manages_codes(): void
     {
         $this->asUser($this->worker())->get('/fault-codes')->assertForbidden();

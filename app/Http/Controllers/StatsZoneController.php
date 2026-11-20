@@ -381,16 +381,22 @@ class StatsZoneController extends Controller
                         FROM `$table` WHERE {$where} GROUP BY `fault_code`";
                 $res = DB::select($sql, $bindings);
 
+                // Запись с несколькими кодами («A; B») считается в каждом из них
+                $bySheet = [];
                 foreach ($res as $row) {
-                    $rows[] = [
-                        'code'         => $row->code,
-                        'sheet'        => $slug,
-                        'sheet_title'  => $cfg['title'] ?? $slug,
-                        'count'        => (int) $row->cnt,
-                        'first_date'   => substr((string) $row->first_date, 0, 10),
-                        'last_date'    => substr((string) $row->last_date, 0, 10),
-                    ];
+                    $first = substr((string) $row->first_date, 0, 10);
+                    $last  = substr((string) $row->last_date, 0, 10);
+                    foreach (\App\Services\FaultCodes::split($row->code) as $code) {
+                        $k = mb_strtolower($code);
+                        $cur = $bySheet[$k] ?? ['code' => $code, 'sheet' => $slug, 'sheet_title' => $cfg['title'] ?? $slug,
+                            'count' => 0, 'first_date' => $first, 'last_date' => $last];
+                        $cur['count'] += (int) $row->cnt;
+                        $cur['first_date'] = min($cur['first_date'], $first);
+                        $cur['last_date']  = max($cur['last_date'], $last);
+                        $bySheet[$k] = $cur;
+                    }
                 }
+                array_push($rows, ...array_values($bySheet));
             }
             return app(\App\Services\FaultCodeRating::class)->rate($rows);
         });

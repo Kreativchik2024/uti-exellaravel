@@ -1,8 +1,8 @@
 {{--
     Панель «Ремонт» исследования: один или несколько пунктов — что сделано (ремонт / замена) и какой узел.
     Узел — из дерева блоков справочника кодов неисправностей (блок → подблок → …), подтверждённый свой вариант
-    или новый свой вариант (уходит на проверку администратору). Есть хоть одна замена — технологу (ОТК) нужен акт.
-    Править: ремонтник, мастер, админ. Акт: ОТК, мастер, админ.
+    или новый свой вариант (уходит на проверку администратору). Есть хоть одна замена — технологу нужен акт.
+    Править: ремонтник, мастер, админ. Акт: технолог, мастер, админ.
     Облегчения: тип — кнопками, пункт — одной строкой, частые узлы — одним касанием, несколько узлов за раз,
     новый пункт берёт тип предыдущего и сразу открывает выбор узла, Enter в поиске — первый найденный.
 --}}
@@ -10,7 +10,7 @@
     $actions   = \App\Models\ResearchRecord::REPAIR_ACTIONS;
     $short     = array_map(fn ($v) => \Illuminate\Support\Str::before($v, ' ('), $actions);   // «Ремонт», «Замена»
     $canRepair = auth()->user()->isRepair() || auth()->user()->canManageContent();
-    $canAct    = auth()->user()->isOtk() || auth()->user()->canManageContent();
+    $canAct    = auth()->user()->isTechnologist() || auth()->user()->canManageContent();
     $saved = $record->repairItems()->with('repairItem')->get();
     // Пункты; у старых записей без пунктов — из сводки
     $rows = $saved->map(fn ($it) => [
@@ -66,7 +66,7 @@
                     </form>
                 @endif
             @elseif($record->needsTechnologist())
-                <p class="rp-next mt-2.5"><span class="rp-next__text"><b>Дальше:</b> {{ $hasReplacement ? 'технолог (ОТК) оформляет акт на замену' : 'технолог (ОТК) принимает ремонт' }}</span></p>
+                <p class="rp-next mt-2.5"><span class="rp-next__text"><b>Дальше:</b> {{ $hasReplacement ? 'технолог оформляет акт на замену' : 'технолог принимает ремонт' }}</span></p>
             @endif
         @endif
     </div>
@@ -228,7 +228,7 @@
             @error('items')<p class="text-xs" style="color: var(--ui-bad)">{{ $message }}</p>@enderror
 
             <p x-show="rows.some(r => r.action === 'replacement')" class="text-xs" style="color: var(--ui-text-2)">
-                Есть замена — технологу (ОТК) придёт задача оформить акт
+                Есть замена — технологу придёт задача оформить акт
             </p>
             <div class="flex gap-2">
                 <button type="submit" class="ui-btn flex-1" :disabled="!rows.every(r => r.ready)">Сохранить</button>
@@ -237,13 +237,13 @@
         </form>
     @endif
 
-    {{-- Технолог (ОТК): есть замена — акт; только ремонт, отправленный на испытания, — приёмка --}}
+    {{-- Технолог: есть замена — акт; только ремонт, отправленный на испытания, — приёмка --}}
     @if($techKind = $record->techCheckKind())
         @php
             $isAct = $techKind === 'act';
             $t = $isAct
-                ? ['title' => 'Акт на замену', 'done' => 'Оформлен', 'todo' => 'Нужен акт', 'button' => 'Акт оформлен', 'who' => 'Оформляет технолог (ОТК)']
-                : ['title' => 'Приёмка после ремонта', 'done' => 'Принято', 'todo' => 'Ждёт технолога', 'button' => 'Принято технологом', 'who' => 'Принимает технолог (ОТК)'];
+                ? ['title' => 'Акт на замену', 'done' => 'Оформлен', 'todo' => 'Нужен акт', 'button' => 'Акт оформлен', 'who' => 'Оформляет технолог']
+                : ['title' => 'Приёмка после ремонта', 'done' => 'Принято', 'todo' => 'Ждёт технолога', 'button' => 'Принято технологом', 'who' => 'Принимает технолог'];
         @endphp
         <div class="pt-3 space-y-2" style="border-top: 1px solid var(--ui-border)">
             <div class="flex items-center justify-between gap-2">
@@ -267,7 +267,7 @@
         </div>
     @elseif($record->repair_action === 'repair')
         <p class="pt-3 text-xs" style="border-top: 1px solid var(--ui-border); color: var(--ui-muted)">
-            После статуса «Отправлен на испытания» борт уйдёт технологу (ОТК) на приёмку
+            После статуса «Отправлен на испытания» борт уйдёт технологу на приёмку
         </p>
     @endif
 </section>
