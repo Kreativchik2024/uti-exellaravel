@@ -39,6 +39,24 @@
             <button class="ui-btn ui-btn--primary">Загрузить</button>
         </form>
 
+        <form method="POST" action="{{ route('comm-licenses.folder') }}" enctype="multipart/form-data" class="ui-card p-4 space-y-2"
+              onsubmit="var f=this.querySelector('[name=\'files[]\']'), box=this.querySelector('.paths'); box.innerHTML='';
+                        for (var i=0;i<f.files.length;i++){var h=document.createElement('input');h.type='hidden';h.name='paths[]';
+                        h.value=f.files[i].webkitRelativePath||f.files[i].name;box.appendChild(h);} return true;">
+            @csrf
+            <div class="font-semibold">Загрузить папку целиком</div>
+            <p class="text-xs" style="color: var(--ui-muted)">Выберите папку (например files): каждая подпапка, где есть .dat, станет партией; таблица .xlsx из той же подпапки — её серийники. Остальные файлы (pdf…) пропускаются.</p>
+            <div class="flex flex-wrap items-center gap-3">
+                <input type="file" name="files[]" webkitdirectory directory multiple class="text-sm" required>
+                <span class="paths"></span>
+                <button class="ui-btn ui-btn--primary ui-btn--sm">Загрузить папку</button>
+            </div>
+        </form>
+
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ route('comm-profile.index') }}" class="ui-btn ui-btn--ghost ui-btn--sm">Профиль модулей связи (параметры, .msconf) →</a>
+        </div>
+
         <form method="GET" action="{{ route('comm-licenses.index') }}" class="flex flex-wrap items-center gap-2">
             <input name="sn" value="{{ $sn }}" class="ui-input font-mono" style="width: 360px" placeholder="S/N модуля (32 знака) — в какой партии">
             <button class="ui-btn ui-btn--ghost">Найти</button>

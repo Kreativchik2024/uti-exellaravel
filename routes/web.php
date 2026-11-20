@@ -128,6 +128,14 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::post('/comm-licenses',                         [\App\Http\Controllers\CommLicenseController::class, 'store'])->name('comm-licenses.store');
     Route::get('/comm-licenses/{batch}/{file}',           [\App\Http\Controllers\CommLicenseController::class, 'download'])->name('comm-licenses.download');
     Route::delete('/comm-licenses/{batch}',               [\App\Http\Controllers\CommLicenseController::class, 'destroy'])->name('comm-licenses.destroy');
+    Route::post('/comm-licenses-folder',                  [\App\Http\Controllers\CommLicenseController::class, 'storeFolder'])->name('comm-licenses.folder');
+    // Профиль прошивки модулей связи: значения инструкции и бэкапы .msconf
+    Route::get('/comm-profile',                           [\App\Http\Controllers\CommProfileController::class, 'index'])->name('comm-profile.index');
+    Route::post('/comm-profile/params',                   [\App\Http\Controllers\CommProfileController::class, 'saveParams'])->name('comm-profile.params');
+    Route::post('/comm-profile/msconf',                   [\App\Http\Controllers\CommProfileController::class, 'uploadMsconf'])->name('comm-profile.msconf.upload');
+    Route::post('/comm-profile/msconf/{name}/activate',   [\App\Http\Controllers\CommProfileController::class, 'activate'])->name('comm-profile.msconf.activate');
+    Route::get('/comm-profile/msconf/{name}',             [\App\Http\Controllers\CommProfileController::class, 'download'])->name('comm-profile.msconf.download');
+    Route::delete('/comm-profile/msconf/{name}',          [\App\Http\Controllers\CommProfileController::class, 'destroy'])->name('comm-profile.msconf.destroy');
     Route::get('/system', [\App\Http\Controllers\SystemController::class, 'index'])->name('system.index');
     Route::get('/system/status', [\App\Http\Controllers\SystemController::class, 'status'])->name('system.status');
     Route::get('/system/metrics', [\App\Http\Controllers\SystemController::class, 'metrics'])->middleware('throttle:60,1')->name('system.metrics');

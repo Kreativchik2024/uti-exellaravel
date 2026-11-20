@@ -213,6 +213,23 @@ class StationController extends Controller
         return \Illuminate\Support\Facades\Storage::disk('local')->download($path, basename($path));
     }
 
+    /** MANET Flasher: профиль прошивки — значения инструкции и рабочий .msconf (имя, sha256). */
+    public function commProfile(\App\Services\CommProfile $profile): JsonResponse
+    {
+        return response()->json(['ok' => true] + $profile->forStation());
+    }
+
+    /** MANET Flasher: скачать рабочий .msconf. */
+    public function commProfileMsconf(\App\Services\CommProfile $profile)
+    {
+        $path = $profile->msconfPath();
+        if (!$path) {
+            return response()->json(['ok' => false, 'error' => 'Рабочий .msconf не выбран.'], 404);
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->download($path, basename($path));
+    }
+
     /** Считыватель: кронштейн с камерой собран. */
     public function cameraBracket(Request $r): JsonResponse
     {

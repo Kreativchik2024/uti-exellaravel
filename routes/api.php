@@ -16,4 +16,6 @@ Route::prefix('station')->middleware([StationKey::class, 'throttle:120,1'])->gro
     Route::post('/comm-module-flash', [StationController::class, 'commModuleFlash']);   // MANET Flasher
     Route::get('/comm-licenses',          [StationController::class, 'commLicenses']);       // список лицензий
     Route::get('/comm-licenses/download', [StationController::class, 'commLicenseFile']);    // ?path=партия/файл
+    Route::get('/comm-profile',           [StationController::class, 'commProfile']);        // параметры + рабочий .msconf
+    Route::get('/comm-profile/msconf',    [StationController::class, 'commProfileMsconf']); // скачать рабочий .msconf
 });

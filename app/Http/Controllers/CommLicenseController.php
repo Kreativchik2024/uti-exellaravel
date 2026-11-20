@@ -40,6 +40,42 @@ class CommLicenseController extends Controller
         return redirect()->route('comm-licenses.index')->with('status', "Партия «{$batch}» загружена");
     }
 
+    /**
+     * Папка целиком (files\1, files\2 … с подпапками): каждая подпапка с .dat — своя партия.
+     * Браузер присылает файлы + их относительные пути (webkitRelativePath) в paths[].
+     */
+    public function storeFolder(Request $r)
+    {
+        $r->validate([
+            'files'   => ['required', 'array', 'max:200'],
+            'files.*' => ['file', 'max:10240'],
+            'paths'   => ['required', 'array'],
+            'paths.*' => ['string', 'max:500'],
+        ]);
+        $groups = [];
+        foreach ($r->file('files') as $i => $file) {
+            $rel = str_replace('\\', '/', (string) ($r->input('paths')[$i] ?? $file->getClientOriginalName()));
+            $ext = strtolower(pathinfo($rel, PATHINFO_EXTENSION));
+            if (!in_array($ext, CommLicenses::EXTS, true)) continue;      // pdf и прочее — пропускаем
+            $dir = trim(dirname($rel), './') ?: '.';
+            $groups[$dir][$ext][] = $file;
+        }
+        $done = $skipped = [];
+        foreach ($groups as $dir => $g) {
+            $dats = $g['dat'] ?? [];
+            $xlsx = $g['xlsx'][0] ?? null;
+            if (!$dats) { $skipped[] = "$dir (нет .dat)"; continue; }
+            if (count($dats) > 1 || count($g['xlsx'] ?? []) > 1) { $skipped[] = "$dir (несколько .dat или .xlsx — загрузите по одной партии)"; continue; }
+            // имя партии — из таблицы поставки (… Box NO.F1#~F20#), иначе — имя папки
+            $name = $xlsx ? pathinfo($xlsx->getClientOriginalName(), PATHINFO_FILENAME) : basename($dir);
+            $done[] = $this->lic->store($name, $dats[0], $xlsx);
+        }
+        $msg = $done ? 'Загружено партий: ' . count($done) . ' (' . implode(', ', $done) . ')' : 'Партий не найдено';
+        if ($skipped) $msg .= '. Пропущено: ' . implode('; ', $skipped);
+
+        return redirect()->route('comm-licenses.index')->with('status', $msg);
+    }
+
     public function download(string $batch, string $file)
     {
         $path = $this->lic->fileFor($batch . '/' . $file);
