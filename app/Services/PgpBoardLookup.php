@@ -11,7 +11,8 @@ use App\Models\ResearchRecord;
  *   связанная с ремонтом (after_research_id) → «Сдан» (4) или снова «Не сдан» и новый ремонт.
  * Старую запись не переписываем:
  *  - returned  — вернулся после ремонта: новая запись станет повторной проверкой, данные борта подставляются;
- *  - repair    — ещё в ремонте: новую запись не заводим, ремонтнику нужно отправить борт на испытания;
+ *  - repair    — числится в ремонте (исследование не на испытаниях или не заведено): запись можно завести,
+ *                но с предупреждением; если исследование есть — она станет повторной проверкой к нему;
  *  - delivered — уже сдан: повторно не заводим.
  */
 class PgpBoardLookup
@@ -53,21 +54,23 @@ class PgpBoardLookup
         } else {
             $state = 'repair';
             $last = $rec->researches()->orderByDesc('id')->first();
+            $research = $rec->researches()->whereDoesntHave('recheck')->orderByDesc('id')->first();
             $where = $last
                 ? "исследование №{$last->id}: " . mb_strtolower(ResearchRecord::STATUSES[$last->repair_status ?: 'new']['label'] ?? (string) $last->repair_status)
-                : 'исследование не заведено — заведите его на карточке записи';
-            $text = "Борт не сдан и числится в ремонте (запись №{$rec->id} от {$date}, {$where}). "
-                  . 'Новая запись не создаётся — сначала ремонтник отправляет борт на испытания.';
+                : 'исследование не заведено';
+            $text = "Внимание: борт числится в ремонте (запись №{$rec->id} от {$date}, {$where}). Запись можно сохранить"
+                  . ($research ? " — она станет повторной проверкой после исследования №{$research->id}" : '')
+                  . '; данные борта подставлены.';
         }
 
         return [
             'record'   => $rec,
             'state'    => $state,
-            'blocked'  => $state !== 'returned',
+            'blocked'  => $state === 'delivered',
             'research' => $research,
             'text'     => $text,
             'url'      => route('records.show', ['pgp', $rec->id]),
-            'prefill'  => $state === 'returned' ? $this->prefill($rec) : [],
+            'prefill'  => $state !== 'delivered' ? $this->prefill($rec) : [],
         ];
     }
 

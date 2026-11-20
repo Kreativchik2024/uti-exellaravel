@@ -679,7 +679,7 @@ class RecordController extends Controller
 
         $data['created_by'] = auth()->id();
         // Повторная проверка после ремонта — новый документ цепочки, связанный с исследованием
-        if ($boardFound) $data['after_research_id'] = $boardFound['research']->id;
+        if ($boardFound && $boardFound['research']) $data['after_research_id'] = $boardFound['research']->id;
         $this->finalizeData($sheet, $cfg, $data);
 
         // --- Защита от дублей ---
@@ -712,7 +712,12 @@ class RecordController extends Controller
         if ($tokenKey) Cache::put($tokenKey, $record->id, now()->addHours(12));
 
         return redirect()->route('records.index', $sheet)
-            ->with('ok', $boardFound ? "Повторная проверка после ремонта (исследование №{$boardFound['research']->id}) записана" : 'Запись добавлена');
+            ->with('ok', match (true) {
+                $boardFound && $boardFound['research'] => "Повторная проверка после ремонта (исследование №{$boardFound['research']->id}) записана"
+                    . ($boardFound['state'] === 'repair' ? '. Борт числился в ремонте — проверьте статус исследования' : ''),
+                $boardFound !== null => "Запись добавлена. Борт числился в ремонте по записи №{$boardFound['record']->id} без исследования",
+                default => 'Запись добавлена',
+            });
     }
 
     public function edit(Request $r, string $sheet, int $id)

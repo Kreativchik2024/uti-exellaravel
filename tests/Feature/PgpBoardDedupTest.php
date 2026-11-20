@@ -11,7 +11,7 @@ use Tests\TestCase;
 /**
  * Цепочка документов борта: 1) проверка «Не сдан» → 2) исследование (ремонт) → 3) повторная проверка —
  * НОВАЯ запись ПГП, связанная с ремонтом → 4) «Сдан» (или снова в ремонт). Старая запись не переписывается.
- * Борт в ремонте или уже сданный по тому же фюзеляжу новой записью не заводится.
+ * Борт, числящийся в ремонте, заводится с предупреждением; уже сданный по тому же фюзеляжу — не заводится.
  */
 class PgpBoardDedupTest extends TestCase
 {
@@ -98,31 +98,45 @@ class PgpBoardDedupTest extends TestCase
         $this->asUser($author)->post("/records/pgp/{$recheck->id}/start-research")->assertRedirect();
         $this->assertSame(1, $recheck->researches()->count(), 'по повторной проверке — новый ремонт');
 
-        // Пока новый ремонт идёт — новой записи по борту нет
+        // Новый ремонт ещё идёт, а борт снова на ПГП — запись не блокируется: предупреждение и связь с ремонтом
+        $repair2 = $recheck->researches()->firstOrFail();
         $this->asUser($author)->post('/records/pgp', $this->delivery($author, 'F-100'))
-            ->assertSessionHasErrors('fuselage_number');
-        $this->assertStringContainsString('числится в ремонте', session('errors')->first('fuselage_number'));
+            ->assertSessionHasNoErrors()->assertSessionHas('ok', fn ($m) => str_contains($m, 'числился в ремонте'));
+        $this->assertSame($repair2->id, PgpRecord::latest('id')->first()->after_research_id);
     }
 
-    public function test_board_in_repair_or_delivered_is_not_entered_again(): void
+    public function test_board_in_repair_is_warned_and_delivered_is_blocked(): void
     {
         $author = $this->worker('executor', 'Автор А.А.');
-        [$pgp] = $this->defectBoard($author);
+        [$pgp, $research] = $this->defectBoard($author);
 
-        $this->asUser($author)->post('/records/pgp', $this->delivery($author, 'F-100'))->assertSessionHasErrors('fuselage_number');
-        $hint = $this->asUser($author)->get('/records/pgp/board-journal?fuselage_number=F-100')->getContent();
-        $this->assertStringContainsString('Новую запись по этому борту сейчас не завести', $hint);
-
-        $pgp->forceFill(['status' => 'Сдан', 'technologist' => $this->technologistName()])->save();
-        $this->asUser($author)->post('/records/pgp', $this->delivery($author, 'F-100'))
-            ->assertSessionHasErrors('fuselage_number');
-        $this->assertStringContainsString('уже сдан', session('errors')->first('fuselage_number'));
-        $this->assertSame(1, PgpRecord::count());
-
-        // Новый фюзеляж — обычная запись; на правке самой записи подсказки нет
-        $this->asUser($author)->post('/records/pgp', $this->delivery($author, 'F-200'))->assertSessionHasNoErrors();
-        $this->assertSame(2, PgpRecord::count());
+        // На правке самой записи подсказки нет
         $this->assertStringNotContainsString('Открыть запись', $this->asUser($author)->get("/records/pgp/board-journal?fuselage_number=F-100&except={$pgp->id}")->getContent());
+
+        // Исследование «Не обработан» — предупреждение, данные борта подставляются, запись сохраняется и связывается с ремонтом
+        $hint = $this->asUser($author)->get('/records/pgp/board-journal?fuselage_number=F-100')->getContent();
+        $this->assertStringContainsString('Борт числится в ремонте', $hint);
+        $this->assertStringContainsString('data-board-prefill', $hint);
+        $this->asUser($author)->post('/records/pgp', $this->delivery($author, 'F-100'))
+            ->assertSessionHasNoErrors()->assertSessionHas('ok', fn ($m) => str_contains($m, 'числился в ремонте'));
+        $this->assertSame(2, PgpRecord::count());
+        $this->assertSame($research->id, PgpRecord::latest('id')->first()->after_research_id);
+
+        // Теперь борт сдан — повторно не заводится
+        $this->asUser($author)->post('/records/pgp', $this->delivery($author, 'F-100'))->assertSessionHasErrors('fuselage_number');
+        $this->assertStringContainsString('уже сдан', session('errors')->first('fuselage_number'));
+        $this->assertSame(2, PgpRecord::count());
+
+        // «Не сдан» без исследования — тоже только предупреждение, связи нет
+        $old = new PgpRecord();
+        $old->forceFill(array_merge($this->validRecord('pgp', $this->nameOf($author)), ['status' => 'Не сдан', 'technologist' => null,
+            'fuselage_number' => 'F-300', 'created_by' => $author->id]))->save();
+        $this->asUser($author)->post('/records/pgp', $this->delivery($author, 'F-300'))
+            ->assertSessionHasNoErrors()->assertSessionHas('ok', fn ($m) => str_contains($m, 'без исследования'));
+        $this->assertNull(PgpRecord::latest('id')->first()->after_research_id);
+
+        // Новый фюзеляж — обычная запись
+        $this->asUser($author)->post('/records/pgp', $this->delivery($author, 'F-200'))->assertSessionHasNoErrors()->assertSessionHas('ok', 'Запись добавлена');
     }
 
     public function test_stats_show_delivered_after_repair_subcategory(): void
