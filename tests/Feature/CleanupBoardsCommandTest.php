@@ -91,4 +91,21 @@ class CleanupBoardsCommandTest extends TestCase
         // Повторный запуск — делать уже нечего
         $this->artisan('boards:cleanup')->expectsOutputToContain("нет")->assertSuccessful();
     }
+
+    /** Реальные тексты «Результата» с сервера → статус. */
+    public function test_result_keywords_on_real_texts(): void
+    {
+        $cases = [
+            'Борт передан на испытания' => 'conveyor', 'Моторама передана в сборку' => 'conveyor', 'Дефект не подтвердился.' => 'conveyor',
+            'Перепрошивка ПК, все в норме,отдал на регулировку' => 'conveyor', 'Компас заменён. Проблема устанена.' => 'conveyor',
+            'Проверена, все ок' => 'conveyor', 'Моторама собрана и ожидает технолога' => 'conveyor',
+            'Моторама отдана на сборку, борт собран ожидает испытания' => 'conveyor',
+            'Ожидает проверку' => 'in_work', 'Ожидает замены дата17 потом на проверку' => 'in_work', 'Кронштейн с камерами на ремонт.' => 'in_work',
+            'Рама в разбор' => 'analysis', 'Мотораму на иследование' => 'analysis', 'Отдан в настройку. Вернулся со сборки, не работает' => 'analysis',
+            'возврат' => null, 'Технологическая камера' => null, '' => null,
+        ];
+        foreach ($cases as $text => $want) {
+            $this->assertSame($want, \App\Console\Commands\CleanupBoards::statusByResult($text), $text);
+        }
+    }
 }
