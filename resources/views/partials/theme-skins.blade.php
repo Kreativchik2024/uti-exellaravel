@@ -4,7 +4,7 @@
      сменяются сами (public/js/skin-bg.js). Добавить картинку = положить файл в папку. --}}
 @php
     $skinPools = [];
-    foreach (['peaky', 'blueprint', 'minions', 'darkknight', 'pcb', 'terminal'] as $skin) {
+    foreach (['peaky', 'blueprint', 'minions', 'darkknight', 'pcb', 'terminal', 'bunker', 'cartoon', 'anime'] as $skin) {
         $files = array_filter(glob(public_path("img/themes/$skin/*")) ?: [], fn ($f) => preg_match('/\.(jpe?g|png|webp)$/i', $f));
         natsort($files);
         $skinPools[$skin] = array_values(array_map(
@@ -13,9 +13,12 @@
         ));
     }
 @endphp
-@foreach (['base', 'peaky', 'blueprint', 'minions', 'darkknight', 'pcb', 'terminal'] as $skin)
+@foreach (['base', 'peaky', 'blueprint', 'minions', 'darkknight', 'pcb', 'terminal', 'bunker', 'cartoon', 'anime'] as $skin)
 <link rel="stylesheet" href="{{ asset("css/themes/$skin.css") }}?v={{ filemtime(public_path("css/themes/$skin.css")) }}">
 @endforeach
 <script>window.UI_SKIN_POOLS = @json($skinPools);</script>
 <script src="{{ asset('js/skin-bg.js') }}?v={{ filemtime(public_path('js/skin-bg.js')) }}" defer></script>
 <script src="{{ asset('js/terminal-skin.js') }}?v={{ filemtime(public_path('js/terminal-skin.js')) }}" defer></script>
+@foreach (['bunker', 'cartoon', 'anime'] as $fx)
+<script src="{{ asset("js/$fx-skin.js") }}?v={{ filemtime(public_path("js/$fx-skin.js")) }}" defer></script>
+@endforeach

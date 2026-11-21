@@ -1,0 +1,303 @@
+/* ============================================================
+   Тема «Бункер» — ретрофутуризм атомной эпохи: учёт ведётся
+   с лампового терминала в подземном убежище. Зелёный люминофор,
+   экран в стальной раме с заклёпками, бегущая полоса развёртки,
+   заголовки «печатаются», внизу — командная строка с часами
+   и включаемыми звуками клавиш (по умолчанию выключены).
+
+   Только оформление: разметка и логика не меняются.
+   Живые мелочи — public/js/bunker-skin.js.
+   Общая часть — themes/base.css; здесь палитра, рама и детали.
+   ============================================================ */
+
+html[data-ui-theme="bunker"] {
+    --ui-bg:            #020a04;
+    --ui-surface:       rgba(4, 20, 9, 0.93);
+    --ui-surface-2:     rgba(6, 26, 12, 0.94);
+    --ui-surface-hover: rgba(60, 255, 110, 0.10);
+    --ui-border:        rgba(60, 255, 110, 0.24);
+    --ui-border-strong: rgba(60, 255, 110, 0.5);
+    --ui-text:          #8dffad;
+    --ui-text-2:        #5fe887;
+    --ui-muted:         #39b462;
+    --ui-faint:         #22743d;
+
+    --ui-accent:        #3cff6e;
+    --ui-accent-hover:  #7dffa0;
+    --ui-accent-soft:   rgba(60, 255, 110, 0.13);
+    --ui-accent-text:   #b6ffc9;
+    --ui-ring:          rgba(60, 255, 110, 0.35);
+
+    --ui-good:          #5cf2ff;
+    --ui-good-soft:     rgba(92, 242, 255, 0.12);
+    --ui-bad:           #ff5a3c;
+    --ui-bad-soft:      rgba(255, 90, 60, 0.15);
+
+    --ui-radius:        2px;
+    --ui-radius-sm:     2px;
+    --ui-shadow-sm:     none;
+    --ui-shadow:        none;
+    --ui-shadow-lg:     0 0 0 1px rgba(60, 255, 110, 0.35), 0 18px 40px -12px rgba(0, 0, 0, 0.95);
+
+    --sk-radius:      2px;
+    --sk-on-accent:   #021006;
+    --sk-btn:         #3cff6e;
+    --sk-btn-hover:   #7dffa0;
+    --sk-btn-edge:    transparent;
+    --sk-nav:         rgba(2, 12, 5, 0.96);
+    --sk-line:        rgba(60, 255, 110, 0.45);
+    --sk-card-edge:   transparent;
+    --sk-tile:        transparent;
+    --sk-tile-edge:   rgba(60, 255, 110, 0.6);
+    --sk-tile-icon:   #8dffad;
+    --sk-gray-200:    rgba(60, 255, 110, 0.15);
+    --sk-gray-300:    rgba(60, 255, 110, 0.23);
+    --sk-panel:       rgba(6, 26, 12, 0.8);
+    --sk-disabled:    rgba(10, 36, 18, 0.7);
+    --sk-popup:       #031207;
+    --sk-shade:       rgba(0, 0, 0, 0.72);
+    --sk-scroll:      #1f7a3c;
+    --sk-auth-brand:  #020a04;
+    --sk-veil:        transparent;
+    --sk-cursor:         image-set(url("../../img/cursors/bunker.png") 1x, url("../../img/cursors/bunker@2x.png") 2x) 1 1, auto;
+    --sk-cursor-pointer: image-set(url("../../img/cursors/bunker-pointer.png") 1x, url("../../img/cursors/bunker-pointer@2x.png") 2x) 11 1, pointer;
+
+    --bk-mono:  "Consolas", "Cascadia Mono", "Lucida Console", "DejaVu Sans Mono", "Courier New", ui-monospace, monospace;
+    --bk-frame: 16px;                 /* толщина рамки вокруг экрана */
+    --bk-bar:   32px;                 /* высота командной строки внизу */
+    --bk-metal: #23261f;
+}
+@media (max-width: 639.98px) { html[data-ui-theme="bunker"] { --bk-frame: 7px; } }
+
+/* ---------- Экран ---------- */
+html[data-ui-theme="bunker"] body,
+html[data-ui-theme="bunker"] body * { font-family: var(--bk-mono) !important; }
+html[data-ui-theme="bunker"] body {
+    color: var(--ui-text-2) !important;
+    text-shadow: 0 0 4px rgba(60, 255, 110, 0.45);
+    padding: var(--bk-frame) var(--bk-frame) calc(var(--bk-frame) + var(--bk-bar));
+    background-image:
+        url("../../img/bunker/atom.svg"),
+        radial-gradient(ellipse 110% 90% at 50% 45%, #06220d 0%, #020a04 62%, #000 100%);
+    background-repeat: no-repeat, no-repeat;
+    background-position: right 6% bottom 12%, 0 0;
+    background-size: min(46vw, 520px), auto;
+    background-attachment: fixed;
+    caret-color: var(--ui-accent);
+}
+html[data-ui-theme="bunker"] ::selection { background: #3cff6e; color: #021006; text-shadow: none; }
+
+/* Рама кинескопа: сталь вокруг, скругление экрана, тень по краям. Клики проходят насквозь */
+html[data-ui-theme="bunker"] body::before {
+    content: ""; position: fixed; z-index: 2147482500; pointer-events: none;
+    inset: var(--bk-frame) var(--bk-frame) calc(var(--bk-frame) + var(--bk-bar));
+    border-radius: 26px;
+    box-shadow:
+        0 0 0 2px #0b0d09,
+        0 0 0 3px #4a4f42,
+        0 0 0 200px var(--bk-metal),
+        inset 0 0 90px rgba(0, 0, 0, 0.85),
+        inset 0 0 0 2px rgba(0, 0, 0, 0.9);
+}
+/* строки развёртки + заклёпки по углам рамы */
+html[data-ui-theme="bunker"] body::after {
+    content: ""; position: fixed; inset: 0; z-index: 2147482600; pointer-events: none;
+    background:
+        radial-gradient(circle at calc(var(--bk-frame) / 2) calc(var(--bk-frame) / 2), #8d927f 0 2px, #2c2f27 3px, transparent 4px),
+        radial-gradient(circle at calc(100% - var(--bk-frame) / 2) calc(var(--bk-frame) / 2), #8d927f 0 2px, #2c2f27 3px, transparent 4px),
+        repeating-linear-gradient(180deg, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.2) 2px 3px);
+}
+@media (max-width: 639.98px) { html[data-ui-theme="bunker"] body::after { background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.2) 2px 3px); } }
+
+/* бегущая светлая полоса (элемент создаёт bunker-skin.js; двигается transform — дёшево) */
+.bk-roll, .bk-bar, .bk-boot { display: none; }
+html[data-ui-theme="bunker"] .bk-roll {
+    display: block; position: fixed; left: 0; right: 0; top: 0; height: 18vh; z-index: 2147482400; pointer-events: none;
+    background: linear-gradient(180deg, transparent, rgba(120, 255, 160, 0.05) 50%, transparent);
+    animation: bk-roll 9s linear infinite;
+}
+@keyframes bk-roll { from { transform: translateY(-20vh); } to { transform: translateY(120vh); } }
+
+/* полосы прокрутки */
+html[data-ui-theme="bunker"] ::-webkit-scrollbar { width: 10px; height: 10px; }
+html[data-ui-theme="bunker"] ::-webkit-scrollbar-track { background: #020a04; }
+html[data-ui-theme="bunker"] ::-webkit-scrollbar-thumb { background: #1f7a3c; border: 2px solid #020a04; }
+html[data-ui-theme="bunker"] ::-webkit-scrollbar-thumb:hover { background: #3cff6e; }
+
+/* ---------- Жёстко заданные цвета текста — в люминофор ---------- */
+html[data-ui-theme="bunker"] :is(.text-black, .text-gray-900, .text-gray-800, .text-slate-900, .text-slate-800) { color: var(--ui-text) !important; }
+html[data-ui-theme="bunker"] :is(.text-gray-700, .text-gray-600, .text-slate-700, .text-slate-600) { color: var(--ui-text-2) !important; }
+html[data-ui-theme="bunker"] :is(.text-gray-500, .text-gray-400, .text-slate-500, .text-slate-400) { color: var(--ui-muted) !important; }
+html[data-ui-theme="bunker"] :is(.text-gray-300, .text-slate-300) { color: var(--ui-faint) !important; }
+
+/* ---------- Почти без скруглений, тени — рамками ---------- */
+html[data-ui-theme="bunker"] :is(.rounded, .rounded-sm, .rounded-full, .ui-badge, .ui-avatar, .ui-navlink__count, .ui-menu, .ui-card,
+    .ui-chat__fab, .ui-chat__panel, .ui-undo, .ui-consent__card, .ui-consent__icon, .ui-idle__card, .ui-modal, [role="dialog"] > div) { border-radius: 2px !important; }
+html[data-ui-theme="bunker"] :is(.shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl) { box-shadow: 0 0 0 1px var(--ui-border) !important; }
+html[data-ui-theme="bunker"] .ui-consent__icon { background: transparent !important; color: var(--ui-accent) !important; box-shadow: inset 0 0 0 1px var(--ui-accent) !important; }
+
+/* ---------- Шапка: прилипает под рамкой ---------- */
+html[data-ui-theme="bunker"] .ui-nav {
+    top: var(--bk-frame);
+    background: var(--sk-nav); backdrop-filter: none; -webkit-backdrop-filter: none;
+    border-bottom: 2px solid var(--ui-border-strong); box-shadow: 0 6px 18px -8px rgba(60, 255, 110, 0.25);
+    border-radius: 24px 24px 0 0;
+}
+html[data-ui-theme="bunker"] .ui-brand__name { letter-spacing: .25em; color: var(--ui-text); text-shadow: 0 0 10px rgba(60, 255, 110, 0.8); }
+html[data-ui-theme="bunker"] .ui-brand__sub { text-transform: uppercase; letter-spacing: .1em; font-size: .6rem; }
+html[data-ui-theme="bunker"] .ui-brand__logo { filter: grayscale(1) sepia(1) saturate(5) hue-rotate(70deg) brightness(.9); }
+html[data-ui-theme="bunker"] .ui-navlink { text-transform: uppercase; letter-spacing: .05em; font-size: .78rem; color: var(--ui-muted); }
+html[data-ui-theme="bunker"] .ui-navlink:hover { color: var(--ui-text); background: var(--ui-accent-soft); }
+html[data-ui-theme="bunker"] .ui-navlink--active,
+html[data-ui-theme="bunker"] .ui-navlink--active:hover { background: var(--ui-accent) !important; color: #021006 !important; text-shadow: none; box-shadow: 0 0 14px rgba(60, 255, 110, 0.55) !important; }
+html[data-ui-theme="bunker"] .ui-navlink--active::before { content: "▸ "; }
+html[data-ui-theme="bunker"] .ui-iconbtn { color: var(--ui-text-2); }
+html[data-ui-theme="bunker"] .ui-iconbtn:hover { background: var(--ui-accent); color: #021006; }
+html[data-ui-theme="bunker"] .ui-navlink__count { background: var(--ui-text); color: #021006; text-shadow: none; }
+html[data-ui-theme="bunker"] .ui-avatar { background: transparent; color: var(--ui-accent); box-shadow: inset 0 0 0 1px var(--ui-accent); }
+@media (max-width: 1279.98px) { html[data-ui-theme="bunker"] .ui-navlink { letter-spacing: 0; padding: 0 .5rem; font-size: .74rem; } }
+@media (max-width: 1023.98px) { html[data-ui-theme="bunker"] .ui-navlink { padding: 0 .3rem; font-size: .68rem; } }
+
+/* ---------- Заголовки «печатаются» при открытии страницы ---------- */
+html[data-ui-theme="bunker"] .ui-page-header h1,
+html[data-ui-theme="bunker"] .ui-page-header h2,
+html[data-ui-theme="bunker"] .auth__headline {
+    text-transform: uppercase; letter-spacing: .08em !important; font-weight: 700 !important;
+    color: var(--ui-text) !important;
+    text-shadow: 0 0 6px rgba(60, 255, 110, 0.7), 0 0 20px rgba(60, 255, 110, 0.3);
+}
+html[data-ui-theme="bunker"] .ui-page-header h1,
+html[data-ui-theme="bunker"] .ui-page-header h2 { animation: bk-type 1s steps(26, end) backwards; }   /* backwards: после анимации обрезки нет */
+@keyframes bk-type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+html[data-ui-theme="bunker"] .ui-page-header h1::after,
+html[data-ui-theme="bunker"] .ui-page-header h2::after {
+    content: ""; display: inline-block; width: .55em; height: 1em; margin-left: .3em; vertical-align: -.12em;
+    background: var(--ui-accent); box-shadow: 0 0 8px rgba(60, 255, 110, 0.8);
+    animation: bk-blink 1s steps(1) infinite;
+}
+@keyframes bk-blink { 50% { opacity: 0; } }
+html[data-ui-theme="bunker"] h3 { text-transform: uppercase; letter-spacing: .05em; }
+
+/* ---------- Карточки: уголки-скобы и полоса-заголовок сверху ---------- */
+html[data-ui-theme="bunker"] .ui-card {
+    --bk-c: var(--ui-accent);
+    border: 1px solid var(--ui-border);
+    background-color: var(--ui-surface);
+    background-image:
+        linear-gradient(var(--bk-c), var(--bk-c)), linear-gradient(var(--bk-c), var(--bk-c)),
+        linear-gradient(var(--bk-c), var(--bk-c)), linear-gradient(var(--bk-c), var(--bk-c)),
+        linear-gradient(var(--bk-c), var(--bk-c)), linear-gradient(var(--bk-c), var(--bk-c)),
+        linear-gradient(var(--bk-c), var(--bk-c)), linear-gradient(var(--bk-c), var(--bk-c));
+    background-repeat: no-repeat;
+    background-size: 16px 2px, 2px 16px, 16px 2px, 2px 16px, 16px 2px, 2px 16px, 16px 2px, 2px 16px;
+    background-position: 0 0, 0 0, 100% 0, 100% 0, 0 100%, 0 100%, 100% 100%, 100% 100%;
+}
+html[data-ui-theme="bunker"] .ui-card--hover:hover { border-color: var(--ui-border-strong); box-shadow: 0 0 22px -6px rgba(60, 255, 110, 0.45) !important; }
+
+/* ---------- Кнопки: «> КОМАНДА» ---------- */
+html[data-ui-theme="bunker"] .ui-btn { letter-spacing: .06em; font-weight: 700; }
+html[data-ui-theme="bunker"] .ui-btn::before { content: ">"; opacity: .6; margin-right: -.1rem; }
+html[data-ui-theme="bunker"] .ui-btn--primary { text-shadow: none; box-shadow: none; }
+html[data-ui-theme="bunker"] .ui-btn--primary:hover { box-shadow: 0 0 16px rgba(60, 255, 110, 0.6); }
+html[data-ui-theme="bunker"] .ui-btn--ghost { background: transparent; border: 1px solid var(--ui-border-strong); color: var(--ui-text); }
+html[data-ui-theme="bunker"] .ui-btn--ghost:hover { background: var(--ui-accent); color: #021006; border-color: var(--ui-accent); text-shadow: none; }
+html[data-ui-theme="bunker"] .ui-btn:active { transform: none; filter: brightness(1.4); }
+@media (max-width: 639.98px) {
+    html[data-ui-theme="bunker"] .ui-btn { letter-spacing: 0; padding: 0 .65rem; }
+    html[data-ui-theme="bunker"] .ui-btn::before { content: none; }
+}
+
+/* ---------- Плитки-иконки, бейджи ---------- */
+html[data-ui-theme="bunker"] .ui-icon-tile { box-shadow: inset 0 0 0 1px var(--sk-tile-edge), 0 0 12px -2px rgba(60, 255, 110, 0.35); }
+html[data-ui-theme="bunker"] .ui-icon-tile svg { filter: drop-shadow(0 0 3px rgba(60, 255, 110, 0.7)); }
+html[data-ui-theme="bunker"] .ui-badge { border: 1px solid currentColor; text-transform: uppercase; }
+
+/* ---------- Меню ---------- */
+html[data-ui-theme="bunker"] .ui-menu { border: 1px solid var(--ui-border-strong); box-shadow: 0 0 0 4px rgba(2, 10, 4, 0.9), 0 0 0 5px var(--ui-border), 0 20px 40px -10px #000 !important; }
+html[data-ui-theme="bunker"] .ui-menu__label { color: var(--ui-muted); letter-spacing: .14em; }
+html[data-ui-theme="bunker"] .ui-menu__item:hover,
+html[data-ui-theme="bunker"] .ui-segment__item:hover { background: var(--ui-accent) !important; color: #021006 !important; text-shadow: none; }
+html[data-ui-theme="bunker"] .ui-menu__item:hover * { color: inherit !important; }
+html[data-ui-theme="bunker"] .ui-menu__item--active { background: var(--ui-accent-soft); color: var(--ui-text); }
+html[data-ui-theme="bunker"] .ui-menu__item--active::before { content: "▸"; color: var(--ui-accent); margin-right: -.3rem; }
+html[data-ui-theme="bunker"] .ui-menu__sep { background: none; border-top: 1px dashed var(--ui-border); }
+html[data-ui-theme="bunker"] .ui-segment__item--active,
+html[data-ui-theme="bunker"] .ui-segment__item--active:hover { background: var(--ui-accent) !important; color: #021006 !important; text-shadow: none; box-shadow: none; }
+
+/* ---------- Таблицы ---------- */
+html[data-ui-theme="bunker"] .ui-table thead th { color: var(--ui-accent-text); text-transform: uppercase; letter-spacing: .08em; border-bottom: 1px solid var(--ui-border-strong); }
+html[data-ui-theme="bunker"] .ui-table tbody td { border-bottom: 1px dotted var(--ui-border); }
+html[data-ui-theme="bunker"] .ui-table tbody tr:hover { background: var(--ui-accent-soft); }
+
+/* ---------- Поля ввода ---------- */
+html[data-ui-theme="bunker"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="submit"]):not([type="button"]), select, textarea) {
+    background-color: rgba(0, 0, 0, 0.75) !important; color: var(--ui-text) !important; border-color: var(--ui-border-strong) !important;
+}
+html[data-ui-theme="bunker"] :is(input, select, textarea):disabled:is(input, select, textarea):disabled { background-color: var(--sk-disabled) !important; color: var(--ui-faint) !important; }
+html[data-ui-theme="bunker"] :is(input, textarea)::placeholder { color: var(--ui-faint) !important; opacity: 1; }
+html[data-ui-theme="bunker"] :is(input, select, textarea):focus { box-shadow: 0 0 0 1px var(--ui-accent), 0 0 14px rgba(60, 255, 110, 0.35) !important; }
+html[data-ui-theme="bunker"] :is(input[type="checkbox"], input[type="radio"], input[type="range"], progress) { accent-color: var(--ui-accent); }
+
+/* ---------- Плавающие элементы — выше командной строки и внутри рамки ---------- */
+html[data-ui-theme="bunker"] .ui-chat__fab { right: calc(var(--bk-frame) + 18px) !important; bottom: calc(var(--bk-frame) + var(--bk-bar) + 18px) !important;
+    box-shadow: 0 0 0 2px #020a04, 0 0 0 3px var(--ui-accent), 0 0 18px rgba(60, 255, 110, 0.5); }
+html[data-ui-theme="bunker"] .ui-undo { bottom: calc(var(--bk-frame) + var(--bk-bar) + 14px) !important; background: #031207 !important; border: 1px solid var(--ui-border-strong); color: var(--ui-text); }
+
+/* ---------- Командная строка внизу (создаёт bunker-skin.js) ---------- */
+html[data-ui-theme="bunker"] .bk-bar {
+    display: flex; align-items: center; gap: 1.1rem; position: fixed; z-index: 2147482700;
+    left: calc(var(--bk-frame) + 20px); right: calc(var(--bk-frame) + 20px); bottom: var(--bk-frame); height: var(--bk-bar);
+    color: #b8c2a6; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden;
+    text-shadow: none; pointer-events: none;
+}
+html[data-ui-theme="bunker"] .bk-bar b { color: #e6ecd8; font-weight: 700; }
+html[data-ui-theme="bunker"] .bk-bar .bk-led { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: .35rem; vertical-align: 0;
+    background: #3cff6e; box-shadow: 0 0 6px #3cff6e; }
+html[data-ui-theme="bunker"] .bk-bar .bk-led--off { background: #ff5a3c; box-shadow: 0 0 6px #ff5a3c; }
+html[data-ui-theme="bunker"] .bk-bar .bk-spacer { flex: 1; }
+html[data-ui-theme="bunker"] .bk-bar button {
+    pointer-events: auto; font: inherit; letter-spacing: inherit; text-transform: inherit;
+    color: #e6ecd8; background: #3a3e33; border: 1px solid #5d6352; padding: 1px 8px; border-radius: 3px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 2px 0 #11130e;
+}
+html[data-ui-theme="bunker"] .bk-bar button:hover { background: #474c3f; }
+html[data-ui-theme="bunker"] .bk-bar button:active { transform: translateY(1px); box-shadow: none; }
+html[data-ui-theme="bunker"] .bk-bar button[aria-pressed="true"] { color: #021006; background: #3cff6e; border-color: #3cff6e; box-shadow: 0 0 8px rgba(60, 255, 110, 0.6); }
+@media (max-width: 639.98px) {
+    html[data-ui-theme="bunker"] .bk-bar { font-size: .62rem; gap: .6rem; left: calc(var(--bk-frame) + 6px); right: calc(var(--bk-frame) + 6px); }
+    html[data-ui-theme="bunker"] .bk-bar .bk-hide-sm { display: none; }
+}
+
+/* ---------- «Прогрев кинескопа» при входе ---------- */
+html[data-ui-theme="bunker"] .bk-boot {
+    display: block; position: fixed; inset: 0; z-index: 2147482450;
+    background: radial-gradient(ellipse at 50% 45%, #06220d, #010502 75%); color: var(--ui-text);
+    padding: 9vh 9vw; font-size: 16px; line-height: 1.75; white-space: pre-wrap; letter-spacing: .05em;
+    text-shadow: 0 0 6px rgba(60, 255, 110, 0.7);
+    animation: bk-warm 1.1s ease-out both;
+}
+html[data-ui-theme="bunker"] .bk-boot.is-out { animation: bk-off .4s ease-in forwards; }
+html[data-ui-theme="bunker"] .bk-boot__logo { width: 92px; height: 92px; margin-bottom: 18px; background: url("../../img/bunker/atom-logo.svg") center / contain no-repeat; filter: drop-shadow(0 0 8px rgba(60, 255, 110, 0.8)); animation: bk-spin 6s linear infinite; }
+html[data-ui-theme="bunker"] .bk-boot__hint { position: absolute; right: 9vw; bottom: 9vh; color: var(--ui-faint); font-size: 12px; }
+html[data-ui-theme="bunker"] .bk-boot .bk-ok { color: var(--ui-good); }
+html[data-ui-theme="bunker"] .bk-boot .bk-bad { color: var(--ui-bad); }
+@keyframes bk-warm { 0% { opacity: 0; filter: blur(6px) brightness(.2); } 60% { opacity: 1; filter: blur(1px) brightness(1.6); } 100% { filter: none; } }
+@keyframes bk-off  { to { opacity: 0; transform: scale(1.02); } }
+@keyframes bk-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Вход ---------- */
+html[data-ui-theme="bunker"] .auth__brand { border-right: 2px solid var(--ui-border-strong); }
+html[data-ui-theme="bunker"] .auth__card { border: 1px solid var(--ui-border-strong); box-shadow: 0 0 0 4px #020a04, 0 0 0 5px var(--ui-border), 0 0 40px -10px rgba(60, 255, 110, 0.35); }
+html[data-ui-theme="bunker"] .auth__card::before {
+    content: "> ИДЕНТИФИКАЦИЯ ОПЕРАТОРА"; display: block; margin: -1.75rem -1.75rem 1.5rem; padding: .4rem 1rem;
+    border-bottom: 1px solid var(--ui-border-strong); color: var(--ui-text); letter-spacing: .12em; font-size: .75rem; font-weight: 700;
+}
+
+/* ---------- Без анимаций для тех, кто их отключил ---------- */
+@media (prefers-reduced-motion: reduce) {
+    html[data-ui-theme="bunker"] .bk-roll { display: none; }
+    html[data-ui-theme="bunker"] .ui-page-header h1,
+    html[data-ui-theme="bunker"] .ui-page-header h2,
+    html[data-ui-theme="bunker"] .ui-page-header h1::after,
+    html[data-ui-theme="bunker"] .ui-page-header h2::after { animation: none; }
+}

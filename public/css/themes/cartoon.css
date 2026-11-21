@@ -1,0 +1,243 @@
+/* ============================================================
+   Тема «Мультик» — сайт как страница комикса: толстые чёрные
+   контуры, жёсткие смещённые тени, сочные цвета, кнопки
+   «вдавливаются», заголовок — наклейка, меню — облачко-реплика,
+   шапка с волнистым краем, на фоне — небо с каракулями.
+   По щелчку на кнопках выскакивает «БАЦ!» (public/js/cartoon-skin.js).
+   СВЕТЛАЯ тема (класс .dark не ставится).
+
+   Шрифты (OFL, лежат локально): Pangolin — заголовки, Nunito — текст.
+   Только оформление: разметка и логика не меняются.
+   Общая часть — themes/base.css; здесь палитра и детали.
+   ============================================================ */
+
+@font-face { font-family: 'Pangolin'; font-style: normal; font-weight: 400; font-display: swap;
+    src: url("../../fonts/themes/pangolin-400-cyrillic.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Pangolin'; font-style: normal; font-weight: 400; font-display: swap;
+    src: url("../../fonts/themes/pangolin-400-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Nunito'; font-style: normal; font-weight: 200 1000; font-display: swap;
+    src: url("../../fonts/themes/nunito-cyrillic.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Nunito'; font-style: normal; font-weight: 200 1000; font-display: swap;
+    src: url("../../fonts/themes/nunito-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+html[data-ui-theme="cartoon"] {
+    color-scheme: light;
+
+    --ui-bg:            #7fd0ff;
+    --ui-surface:       #ffffff;
+    --ui-surface-2:     #fffbea;
+    --ui-surface-hover: #fff1b8;
+    --ui-border:        rgba(26, 26, 26, 0.22);
+    --ui-border-strong: #1a1a1a;
+    --ui-text:          #1a1a1a;
+    --ui-text-2:        #2e2e3a;
+    --ui-muted:         #5b5b70;
+    --ui-faint:         #8b8ba0;
+
+    --ui-accent:        #ffd23f;
+    --ui-accent-hover:  #ffdf6b;
+    --ui-accent-soft:   rgba(255, 79, 154, 0.13);
+    --ui-accent-text:   #d81b6a;
+    --ui-ring:          rgba(255, 79, 154, 0.35);
+
+    --ui-good:          #14995a;
+    --ui-good-soft:     rgba(20, 153, 90, 0.13);
+    --ui-bad:           #e3262f;
+    --ui-bad-soft:      rgba(227, 38, 47, 0.12);
+
+    --ui-radius:        18px;
+    --ui-radius-sm:     12px;
+    --ui-shadow-sm:     3px 3px 0 #1a1a1a;
+    --ui-shadow:        5px 5px 0 #1a1a1a;
+    --ui-shadow-lg:     7px 7px 0 #1a1a1a;
+
+    --sk-radius:      14px;
+    --sk-on-accent:   #1a1a1a;
+    --sk-btn:         #ffd23f;
+    --sk-btn-hover:   #ffdf6b;
+    --sk-btn-edge:    transparent;
+    --sk-nav:         #ffffff;
+    --sk-line:        #1a1a1a;
+    --sk-card-edge:   transparent;
+    --sk-tile:        #ff4f9a;
+    --sk-tile-edge:   #1a1a1a;
+    --sk-tile-icon:   #ffffff;
+    --sk-gray-200:    #ffe9a6;
+    --sk-gray-300:    #ffdc70;
+    --sk-panel:       #fffbea;
+    --sk-disabled:    #eeeef3;
+    --sk-popup:       #ffffff;
+    --sk-shade:       rgba(20, 40, 80, 0.4);
+    --sk-scroll:      #ff4f9a;
+    --sk-auth-brand:  #ffd23f;
+    --sk-veil:        transparent;
+    --sk-cursor:         image-set(url("../../img/cursors/cartoon.png") 1x, url("../../img/cursors/cartoon@2x.png") 2x) 5 4, auto;
+    --sk-cursor-pointer: image-set(url("../../img/cursors/cartoon-pointer.png") 1x, url("../../img/cursors/cartoon-pointer@2x.png") 2x) 16 16, pointer;
+
+    --ct-ink:   #1a1a1a;
+    --ct-pink:  #ff4f9a;
+    --ct-mint:  #5ee6b0;
+    --ct-sky:   #7fd0ff;
+    --ct-font:  "Nunito", "Segoe UI", system-ui, sans-serif;
+    --ct-title: "Pangolin", "Comic Sans MS", "Nunito", cursive;
+}
+
+/* ---------- Страница: небо с каракулями ---------- */
+html[data-ui-theme="cartoon"] body {
+    font-family: var(--ct-font) !important;
+    color: var(--ui-text) !important;
+    background-image: url("../../img/cartoon/doodles.svg"), linear-gradient(180deg, #8fd8ff 0%, #b9e8ff 100%);
+    background-size: 420px 420px, auto;
+    background-attachment: fixed;
+}
+html[data-ui-theme="cartoon"] :is(input, select, textarea, button) { font-family: inherit; }
+html[data-ui-theme="cartoon"] ::selection { background: var(--ct-pink); color: #fff; }
+html[data-ui-theme="cartoon"] ::-webkit-scrollbar { width: 14px; height: 14px; }
+html[data-ui-theme="cartoon"] ::-webkit-scrollbar-track { background: #b9e8ff; }
+html[data-ui-theme="cartoon"] ::-webkit-scrollbar-thumb { background: var(--ct-pink); border: 3px solid var(--ct-ink); border-radius: 999px; }
+
+/* ---------- Шапка: белая, с волнистым краем ---------- */
+html[data-ui-theme="cartoon"] .ui-nav {
+    background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none;
+    border-bottom: 3px solid var(--ct-ink); box-shadow: none;
+}
+html[data-ui-theme="cartoon"] .ui-nav::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 14px; pointer-events: none;
+    background: radial-gradient(circle at 12px -2px, #fff 0 11px, var(--ct-ink) 11.5px 14px, transparent 14.5px) 0 0 / 24px 14px repeat-x;
+}
+html[data-ui-theme="cartoon"] .ui-brand__name { font-family: var(--ct-title); font-size: 1.35rem; color: var(--ct-ink); letter-spacing: .02em; }
+html[data-ui-theme="cartoon"] .ui-brand__sub { color: var(--ui-muted); font-weight: 700; }
+html[data-ui-theme="cartoon"] .ui-brand__logo { border-radius: 50% !important; box-shadow: 0 0 0 3px var(--ct-ink), 3px 3px 0 3px var(--ct-ink); }
+html[data-ui-theme="cartoon"] .ui-navlink { color: var(--ct-ink); font-weight: 800; border: 2.5px solid transparent; border-radius: 999px !important; }
+html[data-ui-theme="cartoon"] .ui-navlink:hover { background: #fff1b8; border-color: var(--ct-ink); animation: ct-wiggle .35s ease-in-out; }
+html[data-ui-theme="cartoon"] .ui-navlink--active,
+html[data-ui-theme="cartoon"] .ui-navlink--active:hover {
+    background: var(--ct-pink) !important; color: #fff !important; border-color: var(--ct-ink);
+    box-shadow: 3px 3px 0 var(--ct-ink) !important;
+}
+html[data-ui-theme="cartoon"] .ui-navlink__count { background: var(--ct-mint); color: var(--ct-ink); border: 2px solid var(--ct-ink); }
+html[data-ui-theme="cartoon"] .ui-avatar { background: var(--ct-mint); color: var(--ct-ink); border: 2.5px solid var(--ct-ink); box-shadow: 2px 2px 0 var(--ct-ink); }
+html[data-ui-theme="cartoon"] .ui-iconbtn { color: var(--ct-ink); border-radius: 999px !important; border: 2.5px solid transparent; }
+html[data-ui-theme="cartoon"] .ui-iconbtn:hover { background: #fff1b8; border-color: var(--ct-ink); }
+@keyframes ct-wiggle { 25% { transform: rotate(-3deg); } 75% { transform: rotate(3deg); } }
+
+/* ---------- Заголовок страницы — наклейка ---------- */
+html[data-ui-theme="cartoon"] .ui-page-header { padding-top: 2.4rem; }
+html[data-ui-theme="cartoon"] .ui-page-header h1,
+html[data-ui-theme="cartoon"] .ui-page-header h2 {
+    display: inline-block; font-family: var(--ct-title) !important; font-weight: 400 !important;
+    font-size: 1.9rem !important; line-height: 1.2; letter-spacing: .01em;
+    padding: .1em .55em .15em; background: var(--ui-accent); color: var(--ct-ink) !important;
+    border: 3px solid var(--ct-ink); border-radius: 14px; box-shadow: 5px 5px 0 var(--ct-ink);
+    transform: rotate(-1.5deg); transition: transform .2s; margin-bottom: .45rem;
+}
+html[data-ui-theme="cartoon"] .ui-page-header h1:hover,
+html[data-ui-theme="cartoon"] .ui-page-header h2:hover { transform: rotate(1deg) scale(1.03); }
+html[data-ui-theme="cartoon"] h3 { font-family: var(--ct-title); font-weight: 400 !important; font-size: 1.15em; }
+html[data-ui-theme="cartoon"] .auth__headline { font-family: var(--ct-title) !important; font-weight: 400 !important; }
+
+/* ---------- Карточки — панели комикса ---------- */
+html[data-ui-theme="cartoon"] .ui-card {
+    background: #fff; border: 3px solid var(--ct-ink); border-radius: 20px;
+    box-shadow: 6px 6px 0 var(--ct-ink) !important;
+}
+html[data-ui-theme="cartoon"] .ui-card--hover { transition: transform .15s, box-shadow .15s; }
+html[data-ui-theme="cartoon"] .ui-card--hover:hover { transform: translate(-2px, -2px) rotate(-.4deg); box-shadow: 9px 9px 0 var(--ct-ink) !important; }
+html[data-ui-theme="cartoon"] :is(.shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl) { box-shadow: 4px 4px 0 var(--ct-ink) !important; }
+html[data-ui-theme="cartoon"] .bg-white.rounded-lg,
+html[data-ui-theme="cartoon"] .bg-white.rounded-xl,
+html[data-ui-theme="cartoon"] .bg-white.rounded-2xl { border: 3px solid var(--ct-ink); }
+
+/* ---------- Кнопки: толстый контур, «вдавливаются» ---------- */
+html[data-ui-theme="cartoon"] .ui-btn {
+    text-transform: none; letter-spacing: 0; font-size: .9rem; font-weight: 800;
+    border: 2.5px solid var(--ct-ink) !important; border-radius: 999px !important;
+    box-shadow: 3px 3px 0 var(--ct-ink) !important; transition: transform .08s, box-shadow .08s, background-color .15s;
+}
+html[data-ui-theme="cartoon"] .ui-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ct-ink) !important; }
+html[data-ui-theme="cartoon"] .ui-btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ct-ink) !important; }
+html[data-ui-theme="cartoon"] .ui-btn--primary { background: var(--ui-accent); color: var(--ct-ink); }
+html[data-ui-theme="cartoon"] .ui-btn--ghost { background: #fff; color: var(--ct-ink); }
+html[data-ui-theme="cartoon"] .ui-btn--ghost:hover { background: var(--ct-mint); color: var(--ct-ink); }
+/* жёстко заданные синие кнопки — тоже мультяшные */
+html[data-ui-theme="cartoon"] :is(button, a).bg-blue-600,
+html[data-ui-theme="cartoon"] :is(button, a).bg-indigo-600 {
+    border: 2.5px solid var(--ct-ink) !important; box-shadow: 3px 3px 0 var(--ct-ink) !important; font-weight: 800;
+}
+
+/* ---------- Плитки-иконки — цветные кружки ---------- */
+html[data-ui-theme="cartoon"] .ui-icon-tile { border-radius: 50% !important; border: 3px solid var(--ct-ink); box-shadow: 3px 3px 0 var(--ct-ink) !important; }
+
+/* ---------- Бейджи ---------- */
+html[data-ui-theme="cartoon"] .ui-badge { border: 2px solid var(--ct-ink); font-weight: 800; border-radius: 999px !important; }
+
+/* ---------- Меню — облачко-реплика ---------- */
+html[data-ui-theme="cartoon"] .ui-menu { border: 3px solid var(--ct-ink); border-radius: 20px !important; box-shadow: 6px 6px 0 var(--ct-ink) !important; }
+html[data-ui-theme="cartoon"] .ui-menu__label { font-family: var(--ct-title); font-size: .95rem; text-transform: none; letter-spacing: 0; color: var(--ct-pink); font-weight: 400; }
+html[data-ui-theme="cartoon"] .ui-menu__item { border-radius: 12px !important; font-weight: 700; }
+html[data-ui-theme="cartoon"] .ui-menu__item:hover { background: #fff1b8; color: var(--ct-ink); }
+html[data-ui-theme="cartoon"] .ui-menu__item--active { background: var(--ct-mint); color: var(--ct-ink); }
+html[data-ui-theme="cartoon"] .ui-menu__dot { width: 9px; height: 9px; border: 2px solid var(--ct-ink); background: #fff; }
+html[data-ui-theme="cartoon"] .ui-menu__item--active .ui-menu__dot { background: var(--ct-pink); }
+html[data-ui-theme="cartoon"] .ui-menu__sep { height: 3px; background: repeating-linear-gradient(90deg, var(--ct-ink) 0 6px, transparent 6px 11px); }
+html[data-ui-theme="cartoon"] .ui-segment { border: 2.5px solid var(--ct-ink); border-radius: 999px !important; background: #fff; }
+html[data-ui-theme="cartoon"] .ui-segment__item { border-radius: 999px !important; font-weight: 800; color: var(--ct-ink); }
+html[data-ui-theme="cartoon"] .ui-segment__item--active,
+html[data-ui-theme="cartoon"] .ui-segment__item--active:hover { background: var(--ct-pink) !important; color: #fff !important; box-shadow: none; }
+
+/* ---------- Таблицы ---------- */
+html[data-ui-theme="cartoon"] .ui-table thead th {
+    background: var(--ui-accent); color: var(--ct-ink); font-weight: 900; text-transform: none; letter-spacing: 0;
+    border-bottom: 3px solid var(--ct-ink);
+}
+html[data-ui-theme="cartoon"] .ui-table tbody tr:nth-child(even) { background: #fffbea; }
+html[data-ui-theme="cartoon"] .ui-table tbody tr:hover { background: #e3f6ff; }
+html[data-ui-theme="cartoon"] .ui-table tbody td { border-bottom: 2px dashed rgba(26, 26, 26, 0.18); }
+
+/* ---------- Поля ввода ---------- */
+html[data-ui-theme="cartoon"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="submit"]):not([type="button"]), select, textarea) {
+    border: 2.5px solid var(--ct-ink) !important; border-radius: 12px !important; background-color: #fff;
+}
+html[data-ui-theme="cartoon"] :is(input, select, textarea):focus { border-color: var(--ct-ink) !important; box-shadow: 3px 3px 0 var(--ct-pink) !important; }
+html[data-ui-theme="cartoon"] :is(input[type="checkbox"], input[type="radio"]) { accent-color: var(--ct-pink); width: 1.1em; height: 1.1em; }
+
+/* ---------- Чат, «Отменить», окна ---------- */
+html[data-ui-theme="cartoon"] .ui-chat__fab { background: var(--ct-pink) !important; color: #fff !important; border: 3px solid var(--ct-ink); box-shadow: 4px 4px 0 var(--ct-ink) !important; }
+html[data-ui-theme="cartoon"] .ui-chat__fab:hover { animation: ct-wiggle .4s ease-in-out; }
+html[data-ui-theme="cartoon"] .ui-undo { border: 3px solid var(--ct-ink); box-shadow: 5px 5px 0 var(--ct-ink); border-radius: 999px !important; }
+html[data-ui-theme="cartoon"] :is(.ui-consent__card, .ui-idle__card, .ui-modal, .ui-chat__panel) { border: 3px solid var(--ct-ink) !important; box-shadow: 7px 7px 0 var(--ct-ink) !important; }
+
+/* ---------- Вход ---------- */
+html[data-ui-theme="cartoon"] .auth__brand { color: var(--ct-ink); border-right: 4px solid var(--ct-ink); }
+html[data-ui-theme="cartoon"] .auth__brand .text-white,
+html[data-ui-theme="cartoon"] .auth__headline,
+html[data-ui-theme="cartoon"] .auth__feature { color: var(--ct-ink) !important; }
+html[data-ui-theme="cartoon"] .auth__lead { color: #3a3a4a; }
+html[data-ui-theme="cartoon"] .auth__card { border: 3px solid var(--ct-ink); box-shadow: 8px 8px 0 var(--ct-ink); border-radius: 22px; }
+html[data-ui-theme="cartoon"] .auth button[type="submit"] { border: 2.5px solid var(--ct-ink) !important; box-shadow: 3px 3px 0 var(--ct-ink); border-radius: 999px !important; }
+
+/* Подписи под заголовком лежат прямо на небе — белая подложка для читаемости */
+html[data-ui-theme="cartoon"] .ui-page-header :is(p, span):not(h1 *):not(h2 *) { text-shadow: 0 0 4px #fff, 0 0 8px #fff; }
+
+/* ---------- «БАЦ!» по щелчку (cartoon-skin.js) ---------- */
+.ct-pop { display: none; }
+html[data-ui-theme="cartoon"] .ct-pop {
+    display: block; position: fixed; z-index: 2147483000; pointer-events: none;
+    font-family: var(--ct-title); font-size: 22px; color: var(--ct-ink); white-space: nowrap;
+    padding: 6px 14px; background: var(--ui-accent); border: 3px solid var(--ct-ink);
+    clip-path: polygon(50% 0, 62% 18%, 84% 6%, 80% 30%, 100% 36%, 82% 52%, 98% 70%, 76% 70%, 80% 96%, 60% 80%, 48% 100%, 38% 80%, 16% 94%, 20% 70%, 0 66%, 16% 50%, 2% 30%, 22% 30%, 16% 6%, 38% 18%);
+    padding: 22px 30px; translate: -50% -50%;
+    animation: ct-pop .6s cubic-bezier(.2, 1.6, .4, 1) forwards;
+}
+@keyframes ct-pop {
+    0%   { transform: scale(.2) rotate(-12deg); opacity: 1; }
+    40%  { transform: scale(1.05) rotate(4deg); opacity: 1; }
+    100% { transform: scale(1) rotate(-2deg) translateY(-18px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html[data-ui-theme="cartoon"] .ui-navlink:hover,
+    html[data-ui-theme="cartoon"] .ui-chat__fab:hover { animation: none; }
+}
+html[data-ui-theme="cartoon"] .ui-consent__icon { background: var(--ct-pink) !important; color: #fff !important; border: 2.5px solid var(--ct-ink); border-radius: 50% !important; box-shadow: 2px 2px 0 var(--ct-ink); }
+html[data-ui-theme="cartoon"] button.bg-gray-800 { background: var(--ui-accent) !important; color: var(--ct-ink) !important; border: 2.5px solid var(--ct-ink) !important; border-radius: 999px !important; box-shadow: 3px 3px 0 var(--ct-ink) !important; font-weight: 800; }

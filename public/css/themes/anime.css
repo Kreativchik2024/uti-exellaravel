@@ -1,0 +1,254 @@
+/* ============================================================
+   Тема «Аниме» — пастельный вечер: розово-сиреневый закат,
+   полосатое солнце, горы и ветка сакуры (public/img/anime/scene.svg),
+   стеклянные карточки, парящая шапка-капсула, заголовки с белой
+   обводкой, как титры, и ✦ искорками. Падают лепестки сакуры,
+   за курсором тянутся искорки (public/js/anime-skin.js).
+   СВЕТЛАЯ тема (класс .dark не ставится).
+
+   Шрифт (OFL, лежит локально): M PLUS Rounded 1c.
+   Только оформление: разметка и логика не меняются.
+   Общая часть — themes/base.css; здесь палитра и детали.
+   ============================================================ */
+
+@font-face { font-family: 'M PLUS Rounded 1c'; font-style: normal; font-weight: 500; font-display: swap;
+    src: url("../../fonts/themes/m-plus-rounded-1c-500-cyrillic.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'M PLUS Rounded 1c'; font-style: normal; font-weight: 500; font-display: swap;
+    src: url("../../fonts/themes/m-plus-rounded-1c-500-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'M PLUS Rounded 1c'; font-style: normal; font-weight: 700; font-display: swap;
+    src: url("../../fonts/themes/m-plus-rounded-1c-700-cyrillic.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'M PLUS Rounded 1c'; font-style: normal; font-weight: 700; font-display: swap;
+    src: url("../../fonts/themes/m-plus-rounded-1c-700-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'M PLUS Rounded 1c'; font-style: normal; font-weight: 800; font-display: swap;
+    src: url("../../fonts/themes/m-plus-rounded-1c-800-cyrillic.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'M PLUS Rounded 1c'; font-style: normal; font-weight: 800; font-display: swap;
+    src: url("../../fonts/themes/m-plus-rounded-1c-800-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+html[data-ui-theme="anime"] {
+    color-scheme: light;
+
+    --ui-bg:            #ffe6f2;
+    --ui-surface:       rgba(255, 255, 255, 0.74);
+    --ui-surface-2:     rgba(255, 247, 252, 0.8);
+    --ui-surface-hover: rgba(255, 214, 236, 0.75);
+    --ui-border:        rgba(205, 110, 165, 0.22);
+    --ui-border-strong: rgba(205, 110, 165, 0.45);
+    --ui-text:          #3b2850;
+    --ui-text-2:        #574272;
+    --ui-muted:         #87739e;
+    --ui-faint:         #b3a3c6;
+
+    --ui-accent:        #ff6fae;
+    --ui-accent-hover:  #ff86bd;
+    --ui-accent-soft:   rgba(255, 111, 174, 0.14);
+    --ui-accent-text:   #d13f86;
+    --ui-ring:          rgba(255, 111, 174, 0.35);
+
+    --ui-good:          #22a874;
+    --ui-good-soft:     rgba(34, 168, 116, 0.13);
+    --ui-bad:           #e43d64;
+    --ui-bad-soft:      rgba(228, 61, 100, 0.12);
+
+    --ui-radius:        22px;
+    --ui-radius-sm:     14px;
+    --ui-shadow-sm:     0 2px 8px -2px rgba(190, 80, 140, 0.25);
+    --ui-shadow:        0 10px 30px -10px rgba(190, 80, 140, 0.4), 0 2px 6px rgba(190, 80, 140, 0.08);
+    --ui-shadow-lg:     0 24px 56px -16px rgba(150, 60, 130, 0.5);
+
+    --sk-radius:      16px;
+    --sk-on-accent:   #ffffff;
+    --sk-btn:         linear-gradient(120deg, #ff6fae 0%, #c48cff 100%);
+    --sk-btn-hover:   linear-gradient(120deg, #ff86bd 0%, #d3a3ff 100%);
+    --sk-btn-edge:    rgba(255, 255, 255, 0.5);
+    --sk-nav:         rgba(255, 255, 255, 0.62);
+    --sk-line:        rgba(255, 255, 255, 0.8);
+    --sk-card-edge:   rgba(255, 255, 255, 0.9);
+    --sk-tile:        linear-gradient(135deg, #ff8cc6, #b79bff);
+    --sk-tile-edge:   rgba(255, 255, 255, 0.9);
+    --sk-tile-icon:   #ffffff;
+    --sk-gray-200:    rgba(255, 214, 236, 0.85);
+    --sk-gray-300:    rgba(255, 190, 224, 0.9);
+    --sk-panel:       rgba(255, 247, 252, 0.7);
+    --sk-disabled:    rgba(240, 232, 244, 0.9);
+    --sk-popup:       #fff7fb;
+    --sk-shade:       rgba(90, 50, 110, 0.32);
+    --sk-scroll:      #ff8cc6;
+    --sk-auth-brand:  linear-gradient(160deg, rgba(255, 255, 255, 0.35), rgba(255, 220, 240, 0.65));
+    --sk-veil:        transparent;
+    --sk-cursor:         image-set(url("../../img/cursors/anime.png") 1x, url("../../img/cursors/anime@2x.png") 2x) 4 3, auto;
+    --sk-cursor-pointer: image-set(url("../../img/cursors/anime-pointer.png") 1x, url("../../img/cursors/anime-pointer@2x.png") 2x) 16 14, pointer;
+
+    --an-font: "M PLUS Rounded 1c", "Segoe UI", system-ui, sans-serif;
+    --an-pink: #ff6fae;
+    --an-lilac: #b79bff;
+    --an-ink: #3b2850;
+    --an-glass: blur(14px) saturate(1.5);
+}
+
+/* ---------- Сцена ---------- */
+html[data-ui-theme="anime"] body {
+    font-family: var(--an-font) !important;
+    color: var(--ui-text) !important;
+    background-image:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 245, 251, 0.35) 100%),
+        url("../../img/anime/scene.svg");
+    background-size: cover, cover;
+    background-position: center, center bottom;
+    background-attachment: fixed;
+}
+html[data-ui-theme="anime"] :is(input, select, textarea, button) { font-family: inherit; }
+html[data-ui-theme="anime"] ::selection { background: #ffc2dc; color: var(--an-ink); }
+html[data-ui-theme="anime"] ::-webkit-scrollbar { width: 12px; height: 12px; }
+html[data-ui-theme="anime"] ::-webkit-scrollbar-track { background: rgba(255, 230, 242, 0.6); }
+html[data-ui-theme="anime"] ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #ff8cc6, #b79bff); border-radius: 999px; border: 3px solid rgba(255, 230, 242, 0.9); }
+
+/* ---------- Шапка — парящая стеклянная капсула ---------- */
+html[data-ui-theme="anime"] .ui-nav {
+    top: 10px; margin: 10px 14px 0; border-radius: 26px;
+    background: var(--sk-nav); backdrop-filter: var(--an-glass); -webkit-backdrop-filter: var(--an-glass);
+    border: 1.5px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 12px 34px -14px rgba(170, 70, 140, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+html[data-ui-theme="anime"] .ui-brand__name { font-weight: 800; color: var(--ui-accent-text); letter-spacing: .04em; }
+html[data-ui-theme="anime"] .ui-brand__name::after { content: " ✿"; color: var(--an-pink); }
+html[data-ui-theme="anime"] .ui-brand__logo { border-radius: 50% !important; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ffb3d6; }
+html[data-ui-theme="anime"] .ui-navlink { color: var(--ui-text-2); font-weight: 700; border-radius: 999px !important; }
+html[data-ui-theme="anime"] .ui-navlink:hover { background: rgba(255, 255, 255, 0.75); color: var(--ui-accent-text); }
+html[data-ui-theme="anime"] .ui-navlink--active,
+html[data-ui-theme="anime"] .ui-navlink--active:hover {
+    background: var(--sk-btn) !important; color: #fff !important;
+    box-shadow: 0 6px 16px -6px rgba(255, 111, 174, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+}
+html[data-ui-theme="anime"] .ui-navlink--active::after { content: "✦"; font-size: .7em; margin-left: .1rem; animation: an-twinkle 1.8s ease-in-out infinite; }
+html[data-ui-theme="anime"] .ui-navlink__count { background: #fff; color: var(--ui-accent-text); }
+html[data-ui-theme="anime"] .ui-avatar { background: var(--sk-btn); color: #fff; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ffb3d6; }
+html[data-ui-theme="anime"] .ui-iconbtn { border-radius: 999px !important; color: var(--ui-text-2); }
+html[data-ui-theme="anime"] .ui-iconbtn:hover { background: rgba(255, 255, 255, 0.8); color: var(--ui-accent-text); }
+@keyframes an-twinkle { 0%, 100% { opacity: 1; transform: scale(1) rotate(0); } 50% { opacity: .4; transform: scale(.7) rotate(45deg); } }
+
+/* ---------- Заголовки — как титры: белая обводка, розовая заливка ---------- */
+html[data-ui-theme="anime"] .ui-page-header { padding-top: 2.2rem; }
+html[data-ui-theme="anime"] .ui-page-header h1,
+html[data-ui-theme="anime"] .ui-page-header h2,
+html[data-ui-theme="anime"] .auth__headline {
+    font-weight: 800 !important; letter-spacing: .02em; color: #e0478f !important;
+    text-shadow:
+        2px 0 0 #fff, -2px 0 0 #fff, 0 2px 0 #fff, 0 -2px 0 #fff,
+        2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff,
+        0 6px 14px rgba(200, 70, 140, 0.45);
+}
+html[data-ui-theme="anime"] .ui-page-header h1::after,
+html[data-ui-theme="anime"] .ui-page-header h2::after {
+    content: "✦"; display: inline-block; margin-left: .35em; font-size: .7em; color: #fff;
+    text-shadow: 0 0 8px #ff8cc6, 0 0 16px #ff8cc6; animation: an-twinkle 2.2s ease-in-out infinite;
+}
+html[data-ui-theme="anime"] h3 { font-weight: 800; color: var(--ui-text); }
+
+/* ---------- Карточки — матовое стекло ---------- */
+html[data-ui-theme="anime"] .ui-card {
+    background: var(--ui-surface);
+    backdrop-filter: var(--an-glass); -webkit-backdrop-filter: var(--an-glass);
+    border: 1.5px solid rgba(255, 255, 255, 0.85);
+    box-shadow: inset 0 1px 0 #fff, var(--ui-shadow) !important;
+}
+html[data-ui-theme="anime"] .ui-card--hover { transition: transform .25s, box-shadow .25s; }
+html[data-ui-theme="anime"] .ui-card--hover:hover { transform: translateY(-3px); box-shadow: inset 0 1px 0 #fff, 0 18px 40px -14px rgba(200, 70, 140, 0.55) !important; }
+
+/* ---------- Кнопки — розово-сиреневые капсулы с бликом ---------- */
+html[data-ui-theme="anime"] .ui-btn { text-transform: none; letter-spacing: .01em; font-size: .88rem; font-weight: 700; border-radius: 999px !important; }
+html[data-ui-theme="anime"] .ui-btn--primary {
+    background: var(--sk-btn); background-size: 200% 100%; color: #fff;
+    box-shadow: 0 8px 20px -8px rgba(255, 111, 174, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    transition: background-position .5s, transform .15s, box-shadow .2s;
+}
+html[data-ui-theme="anime"] .ui-btn--primary:hover { background: var(--sk-btn-hover); transform: translateY(-1px); box-shadow: 0 12px 24px -8px rgba(255, 111, 174, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.6); }
+html[data-ui-theme="anime"] .ui-btn--ghost { background: rgba(255, 255, 255, 0.75); border: 1.5px solid #ffc2dc; color: var(--ui-accent-text); }
+html[data-ui-theme="anime"] .ui-btn--ghost:hover { background: #fff; border-color: var(--an-pink); }
+html[data-ui-theme="anime"] :is(button, a).bg-blue-600,
+html[data-ui-theme="anime"] :is(button, a).bg-indigo-600 { background: var(--sk-btn) !important; color: #fff !important; border-radius: 999px !important; }
+
+/* ---------- Плитки-иконки, бейджи ---------- */
+html[data-ui-theme="anime"] .ui-icon-tile { border-radius: 50% !important; }
+html[data-ui-theme="anime"] .ui-badge { border-radius: 999px !important; font-weight: 700; }
+
+/* ---------- Меню ---------- */
+html[data-ui-theme="anime"] .ui-menu {
+    background: rgba(255, 247, 252, 0.92) !important; backdrop-filter: var(--an-glass); -webkit-backdrop-filter: var(--an-glass);
+    border: 1.5px solid #fff; border-radius: 20px !important;
+}
+html[data-ui-theme="anime"] .ui-menu__label { color: var(--an-pink); letter-spacing: .1em; }
+html[data-ui-theme="anime"] .ui-menu__label::before { content: "✿ "; }
+html[data-ui-theme="anime"] .ui-menu__item { border-radius: 12px !important; }
+html[data-ui-theme="anime"] .ui-menu__item:hover { background: rgba(255, 214, 236, 0.75); color: var(--ui-accent-text); }
+html[data-ui-theme="anime"] .ui-menu__item--active { background: var(--ui-accent-soft); color: var(--ui-accent-text); }
+html[data-ui-theme="anime"] .ui-menu__dot { background: #ffc2dc; }
+html[data-ui-theme="anime"] .ui-menu__item--active .ui-menu__dot { background: var(--an-pink); box-shadow: 0 0 6px var(--an-pink); }
+html[data-ui-theme="anime"] .ui-segment { border-radius: 999px !important; background: rgba(255, 255, 255, 0.6); }
+html[data-ui-theme="anime"] .ui-segment__item { border-radius: 999px !important; }
+html[data-ui-theme="anime"] .ui-segment__item--active,
+html[data-ui-theme="anime"] .ui-segment__item--active:hover { background: var(--sk-btn) !important; color: #fff !important; }
+
+/* ---------- Таблицы ---------- */
+html[data-ui-theme="anime"] .ui-table thead th { color: #a6538a; background: rgba(255, 230, 242, 0.55); text-transform: none; letter-spacing: .02em; font-weight: 800; }
+html[data-ui-theme="anime"] .ui-table tbody tr:hover { background: rgba(255, 220, 238, 0.55); }
+
+/* ---------- Поля ввода ---------- */
+html[data-ui-theme="anime"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="submit"]):not([type="button"]), select, textarea) {
+    border: 1.5px solid #ffc2dc !important; border-radius: 14px !important; background-color: rgba(255, 255, 255, 0.85);
+}
+html[data-ui-theme="anime"] :is(input, select, textarea):focus { border-color: var(--an-pink) !important; box-shadow: 0 0 0 4px rgba(255, 111, 174, 0.2), 0 0 16px rgba(255, 111, 174, 0.25) !important; }
+html[data-ui-theme="anime"] :is(input[type="checkbox"], input[type="radio"], input[type="range"], progress) { accent-color: var(--an-pink); }
+
+/* ---------- Чат, «Отменить», окна ---------- */
+html[data-ui-theme="anime"] .ui-chat__fab { background: var(--sk-btn) !important; color: #fff !important; box-shadow: 0 0 0 3px #fff, 0 12px 28px -8px rgba(255, 111, 174, 0.9) !important; }
+html[data-ui-theme="anime"] .ui-undo { border-radius: 999px !important; border: 1.5px solid #fff; }
+html[data-ui-theme="anime"] :is(.ui-consent__card, .ui-idle__card, .ui-modal, .ui-chat__panel) { border: 1.5px solid #fff !important; border-radius: 24px !important; }
+
+/* ---------- Вход ---------- */
+html[data-ui-theme="anime"] .auth__brand { color: var(--ui-text-2); border-right: 1.5px solid rgba(255, 255, 255, 0.85); backdrop-filter: blur(6px); }
+html[data-ui-theme="anime"] .auth__brand .text-white,
+html[data-ui-theme="anime"] .auth__feature { color: var(--ui-text) !important; }
+html[data-ui-theme="anime"] .auth__lead { color: var(--ui-text-2); }
+html[data-ui-theme="anime"] .auth__card { background: rgba(255, 255, 255, 0.78); backdrop-filter: var(--an-glass); -webkit-backdrop-filter: var(--an-glass); border: 1.5px solid #fff; border-radius: 26px; }
+html[data-ui-theme="anime"] .auth button[type="submit"] { border-radius: 999px !important; }
+
+/* Подписи под заголовком лежат прямо на закате — светлая подсветка для читаемости */
+html[data-ui-theme="anime"] .ui-page-header :is(p, span):not(h1 *):not(h2 *) { text-shadow: 0 0 4px #fff, 0 0 10px rgba(255, 255, 255, 0.95); }
+
+/* ---------- Лепестки сакуры и искорки (anime-skin.js) ---------- */
+.an-petals, .an-spark { display: none; }
+html[data-ui-theme="anime"] .an-petals { display: block; position: fixed; inset: 0; z-index: 2147482000; pointer-events: none; overflow: hidden; }
+html[data-ui-theme="anime"] .an-petal {
+    position: absolute; top: -40px; width: var(--s, 14px); height: calc(var(--s, 14px) * .8);
+    animation: an-fall var(--d, 12s) linear var(--delay, 0s) infinite;
+}
+html[data-ui-theme="anime"] .an-petal::before {
+    content: ""; position: absolute; inset: 0; border-radius: 100% 0 100% 0;
+    background: linear-gradient(135deg, #ffe0ee, #ff9cc9);
+    box-shadow: inset 0 0 0 1px rgba(255, 130, 180, 0.35);
+    animation: an-sway var(--sw, 3s) ease-in-out infinite alternate;
+}
+@keyframes an-fall {
+    0%   { transform: translate3d(0, -5vh, 0) rotate(0deg); opacity: 0; }
+    8%   { opacity: .95; }
+    100% { transform: translate3d(var(--dx, -120px), 108vh, 0) rotate(var(--r, 540deg)); opacity: .85; }
+}
+@keyframes an-sway { from { transform: translateX(-14px) rotateY(0deg); } to { transform: translateX(14px) rotateY(70deg); } }
+html[data-ui-theme="anime"] .an-spark {
+    display: block; position: fixed; z-index: 2147483000; pointer-events: none;
+    width: 12px; height: 12px; translate: -50% -50%;
+    background: radial-gradient(circle, #fff 0 25%, transparent 30%),
+                conic-gradient(from 0deg, transparent 0 40deg, #fff 45deg, transparent 50deg 130deg, #fff 135deg, transparent 140deg 220deg, #fff 225deg, transparent 230deg 310deg, #fff 315deg, transparent 320deg);
+    filter: drop-shadow(0 0 3px #ff6fae) drop-shadow(0 0 6px #ffb3d6);
+    animation: an-spark .7s ease-out forwards;
+}
+@keyframes an-spark { from { transform: scale(1) rotate(0); opacity: 1; } to { transform: translateY(14px) scale(.2) rotate(90deg); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+    html[data-ui-theme="anime"] .an-petals { display: none; }
+    html[data-ui-theme="anime"] .ui-navlink--active::after,
+    html[data-ui-theme="anime"] .ui-page-header h1::after,
+    html[data-ui-theme="anime"] .ui-page-header h2::after { animation: none; }
+}
+html[data-ui-theme="anime"] .ui-consent__icon { background: var(--sk-btn) !important; color: #fff !important; border-radius: 50% !important; }
+html[data-ui-theme="anime"] button.bg-gray-800 { background: var(--sk-btn) !important; color: #fff !important; border-color: transparent !important; border-radius: 999px !important; box-shadow: 0 8px 20px -8px rgba(255, 111, 174, 0.9) !important; }

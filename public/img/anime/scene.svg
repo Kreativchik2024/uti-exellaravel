@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+  <!-- Тема «Аниме»: пастельный закат, полосатое солнце, горы, облака и ветка сакуры -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b9a8ff"/>
+      <stop offset=".45" stop-color="#ffbfe0"/>
+      <stop offset=".8" stop-color="#ffe0cc"/>
+      <stop offset="1" stop-color="#fff1e6"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff6a8"/>
+      <stop offset="1" stop-color="#ff8fc0"/>
+    </linearGradient>
+    <linearGradient id="m1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a99cf0"/>
+      <stop offset="1" stop-color="#e7c6f2"/>
+    </linearGradient>
+    <linearGradient id="m2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d7a8e8"/>
+      <stop offset="1" stop-color="#ffd9ea"/>
+    </linearGradient>
+    <mask id="stripes">
+      <rect width="1600" height="1000" fill="#fff"/>
+      <g fill="#000">
+        <rect x="0" y="560" width="1600" height="6"/>
+        <rect x="0" y="590" width="1600" height="9"/>
+        <rect x="0" y="622" width="1600" height="12"/>
+        <rect x="0" y="656" width="1600" height="15"/>
+      </g>
+    </mask>
+    <filter id="soft" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+    <g id="flower">
+      <g fill="#ffc2dc" stroke="#ff8fbf" stroke-width="1.5">
+        <ellipse cx="0" cy="-11" rx="7" ry="10"/>
+        <ellipse cx="0" cy="-11" rx="7" ry="10" transform="rotate(72)"/>
+        <ellipse cx="0" cy="-11" rx="7" ry="10" transform="rotate(144)"/>
+        <ellipse cx="0" cy="-11" rx="7" ry="10" transform="rotate(216)"/>
+        <ellipse cx="0" cy="-11" rx="7" ry="10" transform="rotate(288)"/>
+      </g>
+      <circle r="4" fill="#ff6fae"/>
+    </g>
+    <g id="spark"><path d="M0 -14 L3 -3 L14 0 L3 3 L0 14 L-3 3 L-14 0 L-3 -3 Z" fill="#fff"/></g>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#sky)"/>
+
+  <!-- солнце -->
+  <circle cx="1060" cy="560" r="190" fill="url(#sun)" mask="url(#stripes)" opacity=".9"/>
+  <circle cx="1060" cy="560" r="260" fill="#fff6c8" opacity=".18"/>
+
+  <!-- облака -->
+  <g fill="#ffffff" opacity=".75" filter="url(#soft)">
+    <ellipse cx="300" cy="260" rx="190" ry="34"/>
+    <ellipse cx="380" cy="235" rx="110" ry="30"/>
+    <ellipse cx="1300" cy="180" rx="200" ry="30"/>
+    <ellipse cx="760" cy="380" rx="160" ry="22"/>
+  </g>
+
+  <!-- горы -->
+  <path d="M0 760 L170 640 L290 700 L470 560 L560 610 L640 580 L800 700 L980 620 L1140 720 L1300 600 L1460 680 L1600 640 L1600 1000 L0 1000 Z" fill="url(#m1)" opacity=".85"/>
+  <path d="M470 560 L520 590 L500 600 L540 612 L560 610 L520 575 Z" fill="#ffffff" opacity=".7"/>
+  <path d="M0 840 L220 760 L420 820 L640 740 L860 830 L1080 770 L1320 850 L1600 780 L1600 1000 L0 1000 Z" fill="url(#m2)"/>
+  <path d="M0 920 Q400 870 800 910 T1600 900 L1600 1000 L0 1000 Z" fill="#fff0f6"/>
+
+  <!-- ветка сакуры в правом верхнем углу -->
+  <g>
+    <path d="M1600 40 C1500 60 1430 90 1360 150 C1320 185 1270 200 1210 205 M1430 92 C1420 140 1390 170 1350 190 M1520 55 C1500 110 1520 150 1560 180"
+          fill="none" stroke="#7a4a5c" stroke-width="12" stroke-linecap="round"/>
+    <path d="M1360 150 C1330 130 1300 128 1270 140" fill="none" stroke="#7a4a5c" stroke-width="7" stroke-linecap="round"/>
+    <use href="#flower" x="1215" y="205"/>
+    <use href="#flower" x="1255" y="190" transform="rotate(20 1255 190)"/>
+    <use href="#flower" x="1272" y="138"/>
+    <use href="#flower" x="1320" y="170"/>
+    <use href="#flower" x="1352" y="192" transform="rotate(40 1352 192)"/>
+    <use href="#flower" x="1395" y="118"/>
+    <use href="#flower" x="1430" y="150"/>
+    <use href="#flower" x="1468" y="76"/>
+    <use href="#flower" x="1540" y="120"/>
+    <use href="#flower" x="1560" y="182"/>
+    <use href="#flower" x="1580" y="70"/>
+    <use href="#flower" x="1505" y="40"/>
+  </g>
+
+  <!-- искорки -->
+  <g opacity=".85">
+    <use href="#spark" x="180" y="120"/>
+    <use href="#spark" x="620" y="190" transform="scale(1)"/>
+    <use href="#spark" x="900" y="90"/>
+    <use href="#spark" x="1460" y="420"/>
+    <use href="#spark" x="90" y="520"/>
+  </g>
+  <g fill="#ffffff" opacity=".8">
+    <circle cx="420" cy="140" r="3"/><circle cx="760" cy="60" r="2.5"/><circle cx="1180" cy="330" r="3"/>
+    <circle cx="260" cy="420" r="2"/><circle cx="1500" cy="300" r="2.5"/><circle cx="980" cy="250" r="2"/>
+  </g>
+</svg>

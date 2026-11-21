@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="420" viewBox="0 0 420 420">
+  <!-- Тема «Мультик»: бесшовная плитка фона — полутоновые точки и каракули -->
+  <defs>
+    <pattern id="dots" width="14" height="14" patternUnits="userSpaceOnUse">
+      <circle cx="7" cy="7" r="2.1" fill="#ffffff" fill-opacity=".28"/>
+    </pattern>
+  </defs>
+  <rect width="420" height="420" fill="url(#dots)"/>
+  <g stroke="#1a1a1a" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" opacity=".42">
+    <!-- облачко -->
+    <path d="M40 110c-14 0-22-16-10-26 0-16 20-22 30-12 8-14 32-12 36 4 16-2 24 18 10 28 2 10-8 16-16 14-6 10-26 10-32 0-10 4-20-2-18-8z" fill="#ffffff"/>
+    <!-- звёзды -->
+    <path d="M300 40l8 18 20 2-15 13 5 20-18-10-18 10 5-20-15-13 20-2z" fill="#ffd23f"/>
+    <path d="M120 300l5 11 12 1-9 8 3 12-11-6-11 6 3-12-9-8 12-1z" fill="#ffd23f"/>
+    <!-- молния -->
+    <path d="M360 250l-26 40h18l-12 34 32-46h-19l13-28z" fill="#ff4f9a"/>
+    <!-- кружок с бликом -->
+    <circle cx="230" cy="200" r="16" fill="#7cf2c4"/>
+    <!-- каракули -->
+    <path d="M190 360c10-14 20 14 30 0s20 14 30 0 20 14 30 0" fill="none"/>
+    <path d="M30 230c6-10 18-10 22 0s16 10 22 0" fill="none"/>
+    <path d="M250 110c0-10 14-10 14 0s14 10 14 0" fill="none"/>
+    <!-- спираль -->
+    <path d="M380 140c0-6 10-6 10 2s-14 10-16 0 6-18 18-16 16 14 10 24" fill="none"/>
+    <!-- плюсики -->
+    <path d="M160 60v18M151 69h18M60 370v14M53 377h14M320 380v14M313 387h14" fill="none"/>
+  </g>
+  <g fill="#ffffff" opacity=".42"><circle cx="225" cy="195" r="4"/></g>
+</svg>

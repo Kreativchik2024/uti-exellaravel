@@ -1,13 +1,13 @@
 /* ============================================================
    Тема оформления: «auto» (как в системе) / «light» / «dark» /
-   «peaky» («Острые козырьки»), «blueprint» («Конструкторское бюро»), «minions» («Миньоны», светлая), «darkknight» («Тёмный рыцарь»), «pcb» («Печатная плата»), «terminal» («Терминал») —
+   «peaky» («Острые козырьки»), «blueprint» («Конструкторское бюро»), «minions» («Миньоны», светлая), «darkknight» («Тёмный рыцарь»), «pcb» («Печатная плата»), «terminal» («Терминал»), «bunker» («Бункер»), «cartoon» («Мультик», светлая), «anime» («Аниме», светлая) —
    основа тёмная (или светлая: SKINS[имя] = false) + public/css/themes/*.css (атрибут html[data-ui-theme]).
 
    Подключается СИНХРОННО в <head> обоих макетов — тема применяется
    до отрисовки страницы, без мигания белым.
 
    API:
-     window.getThemeMode()        → 'auto' | 'light' | 'dark' | 'peaky' | 'blueprint' | 'minions' | 'darkknight' | 'pcb' | 'terminal'
+     window.getThemeMode()        → 'auto' | 'light' | 'dark' | 'peaky' | 'blueprint' | 'minions' | 'darkknight' | 'pcb' | 'terminal' | 'bunker' | 'cartoon' | 'anime'
      window.setThemeMode(mode)    — выбрать режим (сохраняется в браузере)
      window.toggleDark()          — совместимость: переключить светлая/тёмная
 
@@ -18,9 +18,9 @@
     'use strict';
 
     var KEY = 'theme';
-    var MODES = ['auto', 'light', 'dark', 'peaky', 'blueprint', 'minions', 'darkknight', 'pcb', 'terminal'];
+    var MODES = ['auto', 'light', 'dark', 'peaky', 'blueprint', 'minions', 'darkknight', 'pcb', 'terminal', 'bunker', 'cartoon', 'anime'];
     // Оформленные темы: имя режима → тёмная ли основа
-    var SKINS = { peaky: true, blueprint: true, minions: false, darkknight: true, pcb: true, terminal: true };
+    var SKINS = { peaky: true, blueprint: true, minions: false, darkknight: true, pcb: true, terminal: true, bunker: true, cartoon: false, anime: false };
     var media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
     function readMode() {
