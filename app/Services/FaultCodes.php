@@ -22,6 +22,12 @@ class FaultCodes
     /** Похожесть, начиная с которой описание считается уже существующей неисправностью. */
     public const SAME = 0.75;
 
+    /**
+     * Вкладки, которым выпадает весь справочник: исследование разбирает любой узел борта,
+     * поэтому привязка уровней к вкладкам (она слетает при каждой загрузке таблицы) им не нужна.
+     */
+    public const ALL_CODES_SHEETS = ['research'];
+
     public function __construct(private SectionContext $sections) {}
 
     // ================================================================ коды вкладки
@@ -29,18 +35,23 @@ class FaultCodes
     /** Подгруппы и разделы, коды которых выпадают во вкладке. */
     public function groupsForSheet(string $sheet): Collection
     {
-        return FaultCodeGroup::tree()->filter(fn ($g) => $g->coversSheet($sheet))
+        return FaultCodeGroup::tree()->filter(fn ($g) => $this->groupCovers($g, $sheet))
             ->sortBy(fn ($g) => $g->sortKey())->values();
+    }
+
+    private function groupCovers(FaultCodeGroup $g, string $sheet): bool
+    {
+        return in_array($sheet, self::ALL_CODES_SHEETS, true) || $g->coversSheet($sheet);
     }
 
     /** Действующие коды для вкладки: её категорий и общие. */
     public function codesForSheet(string $sheet): Collection
     {
         $tree = FaultCodeGroup::tree();
-        $groupIds = $tree->filter(fn ($g) => $g->coversSheet($sheet))->keys();
+        $groupIds = $tree->filter(fn ($g) => $this->groupCovers($g, $sheet))->keys();
 
         // Коды без раздела — только в ПГП (борт целиком) или если у вкладки разделов нет вовсе
-        $withLoose = $sheet === 'pgp' || $groupIds->isEmpty();
+        $withLoose = $sheet === 'pgp' || in_array($sheet, self::ALL_CODES_SHEETS, true) || $groupIds->isEmpty();
         $codes = FaultCode::query()
             ->forSection($this->sections->current())
             ->where('is_active', true)

@@ -77,6 +77,9 @@ trait SiteHelpers
                 $name === 'worker1'                => $worker1,
                 $name === 'technologist'           => $this->technologistName(),
                 $name === 'post_number'            => 3,
+                // Исследованиям выпадают коды всех вкладок: «Тест fault_code» там совпал бы с кодами других вкладок
+                // (одинаковое описание в разных разделах — форма просит выбрать код вручную)
+                $name === 'fault_code' && $sheet === 'research' => 'Обрыв экранированной жилы шлейфа',
                 // свой фюзеляж у каждой записи: тот же номер на ПГП — это тот же борт (без дубля, см. PgpBoardLookup)
                 $name === 'fuselage_number'        => 'Тест fuselage_number ' . (++$this->employeeSeq),
                 $name === 'peripheral_number'      => 2,

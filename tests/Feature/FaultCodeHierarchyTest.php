@@ -69,6 +69,17 @@ class FaultCodeHierarchyTest extends TestCase
         $this->assertSame(5, FaultCode::count());
     }
 
+    public function test_research_sees_all_codes_without_binding_to_tab(): void
+    {
+        $this->importTable();
+        // Ни один уровень не привязан к «Исследованиям» — коды всё равно выпадают все
+        $this->assertFalse(FaultCodeGroup::all()->contains(fn ($g) => in_array('research', (array) $g->sheets, true)));
+        $codes = app(FaultCodes::class)->codesForSheet('research')->pluck('code')->all();
+        $this->assertEqualsCanonicalizing(FaultCode::where('is_active', true)->pluck('code')->all(), $codes);
+        // А узкая вкладка — по-прежнему только свои
+        $this->assertNotContains('R.1.1', app(FaultCodes::class)->codesForSheet('mini_pc')->pluck('code')->all());
+    }
+
     public function test_merged_cells_and_reupload_move_codes_to_right_groups(): void
     {
         // Объединённые ячейки: подгруппа и раздел написаны только в первой строке
