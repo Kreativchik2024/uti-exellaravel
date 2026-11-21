@@ -1,0 +1,341 @@
+/* ============================================================
+   Тема «Терминал» — сайт учёта производства как экран заводского
+   терминала АСУ: янтарный люминофор на чёрной ЭЛТ, строки развёртки,
+   моноширинный шрифт, квадратные рамки, инверсная подсветка.
+   На широком экране (≥1280px) верхнее меню становится боковой
+   командной панелью с клавишами F1…Fn и строкой состояния внизу.
+   Красный и зелёный оставлены — брак и готовность различимы.
+
+   Только оформление: разметка и логика не меняются.
+   Живые мелочи (часы, «загрузка» при входе) — public/js/terminal-skin.js.
+   Общая часть — themes/base.css; здесь палитра, раскладка и детали.
+   ============================================================ */
+
+html[data-ui-theme="terminal"] {
+    --ui-bg:            #0a0702;
+    --ui-surface:       rgba(16, 11, 3, 0.94);
+    --ui-surface-2:     rgba(22, 15, 4, 0.95);
+    --ui-surface-hover: rgba(255, 176, 0, 0.11);
+    --ui-border:        rgba(255, 176, 0, 0.26);
+    --ui-border-strong: rgba(255, 176, 0, 0.55);
+    --ui-text:          #ffc54f;
+    --ui-text-2:        #f2ab2e;
+    --ui-muted:         #c08a2a;
+    --ui-faint:         #85621f;
+
+    --ui-accent:        #ffb000;
+    --ui-accent-hover:  #ffc940;
+    --ui-accent-soft:   rgba(255, 176, 0, 0.14);
+    --ui-accent-text:   #ffd98a;
+    --ui-ring:          rgba(255, 176, 0, 0.35);
+
+    --ui-good:          #7dff6a;
+    --ui-good-soft:     rgba(100, 255, 80, 0.12);
+    --ui-bad:           #ff5d3b;
+    --ui-bad-soft:      rgba(255, 80, 50, 0.15);
+
+    --ui-radius:        0px;
+    --ui-radius-sm:     0px;
+    --ui-shadow-sm:     none;
+    --ui-shadow:        none;
+    --ui-shadow-lg:     0 0 0 1px rgba(255, 176, 0, 0.35), 0 18px 40px -12px rgba(0, 0, 0, 0.95);
+
+    --sk-radius:      0px;
+    --sk-on-accent:   #0a0702;
+    --sk-btn:         #ffb000;
+    --sk-btn-hover:   #ffc940;
+    --sk-btn-edge:    transparent;
+    --sk-nav:         #080501;
+    --sk-line:        rgba(255, 176, 0, 0.45);
+    --sk-card-edge:   transparent;
+    --sk-tile:        transparent;
+    --sk-tile-edge:   rgba(255, 176, 0, 0.6);
+    --sk-tile-icon:   #ffc54f;
+    --sk-gray-200:    rgba(255, 176, 0, 0.16);
+    --sk-gray-300:    rgba(255, 176, 0, 0.24);
+    --sk-panel:       rgba(22, 15, 4, 0.8);
+    --sk-disabled:    rgba(40, 28, 8, 0.6);
+    --sk-popup:       #0d0903;
+    --sk-shade:       rgba(0, 0, 0, 0.72);
+    --sk-scroll:      #8a5f10;
+    --sk-auth-brand:  #080501;
+    --sk-veil:        transparent;
+    --sk-cursor:         image-set(url("../../img/cursors/terminal.png") 1x, url("../../img/cursors/terminal@2x.png") 2x) 1 1, auto;
+    --sk-cursor-pointer: image-set(url("../../img/cursors/terminal-pointer.png") 1x, url("../../img/cursors/terminal-pointer@2x.png") 2x) 11 1, pointer;
+
+    --t-mono: "Consolas", "Cascadia Mono", "Lucida Console", "DejaVu Sans Mono", "Courier New", ui-monospace, monospace;
+    --t-glow: 0 0 3px rgba(255, 170, 0, 0.45);
+    --t-side: 248px;
+}
+
+/* ---------- Экран: шрифт, свечение, развёртка ---------- */
+html[data-ui-theme="terminal"] body,
+html[data-ui-theme="terminal"] body * { font-family: var(--t-mono) !important; }
+html[data-ui-theme="terminal"] body {
+    color: var(--ui-text-2) !important;
+    text-shadow: var(--t-glow);
+    background-image: radial-gradient(ellipse 120% 90% at 50% 40%, #1a1103 0%, #0a0702 60%, #030201 100%);
+    background-attachment: fixed;
+    caret-color: var(--ui-accent);
+}
+html[data-ui-theme="terminal"] ::selection { background: #ffb000; color: #0a0702; text-shadow: none; }
+
+/* строки развёртки и затемнённые края кинескопа — поверх всего, клики проходят насквозь */
+html[data-ui-theme="terminal"] body::after {
+    content: ""; position: fixed; inset: 0; z-index: 2147483000; pointer-events: none;
+    background:
+        repeating-linear-gradient(180deg, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.18) 2px 3px),
+        radial-gradient(ellipse 130% 110% at 50% 50%, transparent 62%, rgba(0, 0, 0, 0.55) 100%);
+    animation: t-flicker 7s steps(1) infinite;
+}
+@keyframes t-flicker {
+    0%, 100% { opacity: 1; }
+    48% { opacity: .92; }
+    49% { opacity: 1; }
+    83% { opacity: .96; }
+    84% { opacity: 1; }
+}
+
+/* полосы прокрутки — янтарные, квадратные */
+html[data-ui-theme="terminal"] ::-webkit-scrollbar { width: 10px; height: 10px; }
+html[data-ui-theme="terminal"] ::-webkit-scrollbar-track { background: #0a0702; }
+html[data-ui-theme="terminal"] ::-webkit-scrollbar-thumb { background: #6b4a0c; border: 2px solid #0a0702; }
+html[data-ui-theme="terminal"] ::-webkit-scrollbar-thumb:hover { background: #ffb000; }
+
+/* ---------- Жёстко заданные в шаблонах цвета текста — в люминофор ---------- */
+html[data-ui-theme="terminal"] :is(.text-black, .text-gray-900, .text-gray-800, .text-slate-900, .text-slate-800) { color: var(--ui-text) !important; }
+html[data-ui-theme="terminal"] :is(.text-gray-700, .text-gray-600, .text-slate-700, .text-slate-600) { color: var(--ui-text-2) !important; }
+html[data-ui-theme="terminal"] :is(.text-gray-500, .text-gray-400, .text-slate-500, .text-slate-400) { color: var(--ui-muted) !important; }
+html[data-ui-theme="terminal"] :is(.text-gray-300, .text-slate-300) { color: var(--ui-faint) !important; }
+html[data-ui-theme="terminal"] :is(.hover\:text-gray-900, .hover\:text-gray-800, .hover\:text-gray-700):hover { color: var(--ui-text) !important; }
+
+/* ---------- Всё квадратное, тени — рамками ---------- */
+html[data-ui-theme="terminal"] :is(.rounded, .rounded-sm, .rounded-full, .rounded-t-lg, .rounded-b-lg, .rounded-l-lg, .rounded-r-lg,
+    .ui-badge, .ui-avatar, .ui-navlink__count, .ui-menu, .ui-card, .ui-chat__fab, .ui-chat__panel, .ui-undo, .ui-menu__dot,
+    .ui-consent__card, .ui-consent__icon, .ui-idle__card, .ui-modal, .ui-fc-menu, .ui-fc-detail, .ui-fc-card, [role="dialog"] > div,
+    .ui-consent__card *) { border-radius: 0 !important; }
+html[data-ui-theme="terminal"] .ui-consent__card,
+html[data-ui-theme="terminal"] .ui-idle__card { border: 3px double var(--ui-border-strong) !important; }
+html[data-ui-theme="terminal"] .ui-consent__icon { background: transparent !important; color: var(--ui-accent) !important; box-shadow: inset 0 0 0 1px var(--ui-accent) !important; }
+html[data-ui-theme="terminal"] :is(.shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl) { box-shadow: 0 0 0 1px var(--ui-border) !important; }
+
+/* ---------- Заголовки: приглашение командной строки и мигающий курсор ---------- */
+html[data-ui-theme="terminal"] .ui-page-header h1,
+html[data-ui-theme="terminal"] .ui-page-header h2,
+html[data-ui-theme="terminal"] .auth__headline {
+    text-transform: uppercase; letter-spacing: .08em !important; font-weight: 700 !important;
+    color: var(--ui-text) !important;
+    text-shadow: 0 0 6px rgba(255, 176, 0, 0.6), 0 0 18px rgba(255, 140, 0, 0.25);
+}
+html[data-ui-theme="terminal"] .ui-page-header h1::before,
+html[data-ui-theme="terminal"] .ui-page-header h2::before { content: "> "; color: var(--ui-muted); }
+html[data-ui-theme="terminal"] .ui-page-header h1::after,
+html[data-ui-theme="terminal"] .ui-page-header h2::after {
+    content: ""; display: inline-block; width: .6em; height: 1em; margin-left: .3em; vertical-align: -.12em;
+    background: var(--ui-accent); box-shadow: 0 0 8px rgba(255, 176, 0, 0.7);
+    animation: t-blink 1.05s steps(1) infinite;
+}
+@keyframes t-blink { 50% { opacity: 0; } }
+html[data-ui-theme="terminal"] h3 { text-transform: uppercase; letter-spacing: .05em; }
+
+/* ---------- Карточки — окна терминала с двойной рамкой ---------- */
+html[data-ui-theme="terminal"] .ui-card {
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border-strong);
+    box-shadow: 0 0 0 3px var(--ui-bg), 0 0 0 4px var(--ui-border) !important;
+}
+html[data-ui-theme="terminal"] .ui-card--hover:hover { border-color: var(--ui-accent); box-shadow: 0 0 0 3px var(--ui-bg), 0 0 0 4px var(--ui-border-strong), 0 0 22px -6px rgba(255, 176, 0, 0.45) !important; }
+
+/* ---------- Кнопки: [ КОМАНДА ], основная — инверсией ---------- */
+html[data-ui-theme="terminal"] .ui-btn { letter-spacing: .06em; font-weight: 700; }
+html[data-ui-theme="terminal"] .ui-btn::before { content: "["; opacity: .55; margin-right: -.15rem; }
+html[data-ui-theme="terminal"] .ui-btn::after  { content: "]"; opacity: .55; margin-left: -.15rem; }
+html[data-ui-theme="terminal"] .ui-btn--primary { text-shadow: none; box-shadow: none; }
+html[data-ui-theme="terminal"] .ui-btn--primary:hover { box-shadow: 0 0 14px rgba(255, 176, 0, 0.55); }
+html[data-ui-theme="terminal"] .ui-btn--ghost { background: transparent; border: 1px solid var(--ui-border-strong); color: var(--ui-text); }
+html[data-ui-theme="terminal"] .ui-btn--ghost:hover { background: var(--ui-accent); color: #0a0702; border-color: var(--ui-accent); text-shadow: none; }
+html[data-ui-theme="terminal"] .ui-btn:active { transform: none; filter: brightness(1.3); }
+
+/* ---------- Плитки-иконки, бейджи, аватар ---------- */
+html[data-ui-theme="terminal"] .ui-icon-tile { box-shadow: inset 0 0 0 1px var(--sk-tile-edge); }
+html[data-ui-theme="terminal"] .ui-icon-tile svg { filter: drop-shadow(0 0 3px rgba(255, 176, 0, 0.6)); }
+html[data-ui-theme="terminal"] .ui-badge { border: 1px solid currentColor; text-transform: uppercase; letter-spacing: .04em; }
+html[data-ui-theme="terminal"] .ui-avatar { background: transparent; color: var(--ui-accent); box-shadow: inset 0 0 0 1px var(--ui-accent); }
+html[data-ui-theme="terminal"] .ui-navlink__count { background: var(--ui-text); color: #0a0702; text-shadow: none; }
+
+/* ---------- Меню: двойная рамка, пункт под курсором — инверсией ---------- */
+html[data-ui-theme="terminal"] .ui-menu { border: 3px double var(--ui-border-strong); }
+html[data-ui-theme="terminal"] .ui-menu__label { color: var(--ui-muted); letter-spacing: .14em; }
+html[data-ui-theme="terminal"] .ui-menu__label::before { content: "── "; }
+html[data-ui-theme="terminal"] .ui-menu__item:hover,
+html[data-ui-theme="terminal"] .ui-segment__item:hover { background: var(--ui-accent) !important; color: #0a0702 !important; text-shadow: none; }
+html[data-ui-theme="terminal"] .ui-menu__item:hover * { color: inherit !important; }
+html[data-ui-theme="terminal"] .ui-menu__item--active { background: transparent; color: var(--ui-text); }
+html[data-ui-theme="terminal"] .ui-menu__item--active::after { content: "◄"; margin-left: auto; color: var(--ui-accent); }
+html[data-ui-theme="terminal"] .ui-menu__sep { background: none; border-top: 1px dashed var(--ui-border); }
+html[data-ui-theme="terminal"] .ui-segment { border-color: var(--ui-border-strong); }
+html[data-ui-theme="terminal"] .ui-segment__item--active,
+html[data-ui-theme="terminal"] .ui-segment__item--active:hover { background: var(--ui-accent) !important; color: #0a0702 !important; text-shadow: none; box-shadow: none; }
+
+/* ---------- Таблицы ---------- */
+html[data-ui-theme="terminal"] .ui-table thead th {
+    color: var(--ui-accent-text); text-transform: uppercase; letter-spacing: .08em;
+    border-bottom: 1px solid var(--ui-border-strong);
+}
+html[data-ui-theme="terminal"] .ui-table tbody td { border-bottom: 1px dashed var(--ui-border); }
+html[data-ui-theme="terminal"] .ui-table tbody tr:hover { background: var(--ui-accent-soft); box-shadow: inset 3px 0 0 var(--ui-accent); }
+
+/* ---------- Поля ввода — чёрные окна с янтарной рамкой ---------- */
+html[data-ui-theme="terminal"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="submit"]):not([type="button"]), select, textarea) {
+    background-color: #000 !important; color: var(--ui-text) !important;
+    border-color: var(--ui-border-strong) !important;
+}
+html[data-ui-theme="terminal"] :is(input, select, textarea):disabled:is(input, select, textarea):disabled { background-color: var(--sk-disabled) !important; color: var(--ui-faint) !important; }
+html[data-ui-theme="terminal"] :is(input, textarea)::placeholder { color: var(--ui-faint) !important; opacity: 1; }
+html[data-ui-theme="terminal"] :is(input, select, textarea):focus { box-shadow: 0 0 0 1px var(--ui-accent), 0 0 12px rgba(255, 176, 0, 0.35) !important; }
+html[data-ui-theme="terminal"] :is(input[type="checkbox"], input[type="radio"], input[type="range"], progress) { accent-color: var(--ui-accent); }
+html[data-ui-theme="terminal"] input[type="checkbox"] { border-radius: 0 !important; }
+
+/* картинки в шапке — как на монохромном экране */
+html[data-ui-theme="terminal"] .ui-brand__logo,
+html[data-ui-theme="terminal"] .auth__logo { filter: grayscale(1) sepia(1) saturate(4) hue-rotate(-12deg) brightness(.95); border-radius: 0 !important; }
+
+/* ---------- Шапка (узкий экран — сверху; широкий — сбоку, см. ниже) ---------- */
+html[data-ui-theme="terminal"] .ui-nav {
+    background: var(--sk-nav); backdrop-filter: none; -webkit-backdrop-filter: none;
+    border-bottom: 3px double var(--ui-border-strong); box-shadow: none;
+    counter-reset: t-fkey;
+}
+html[data-ui-theme="terminal"] .ui-brand__name { font-size: 1.15rem; letter-spacing: .3em; color: var(--ui-text); text-shadow: 0 0 8px rgba(255, 176, 0, 0.7); }
+html[data-ui-theme="terminal"] .ui-brand__sub { text-transform: uppercase; letter-spacing: .12em; font-size: .62rem; }
+html[data-ui-theme="terminal"] .ui-navlink { text-transform: uppercase; letter-spacing: .06em; font-size: .8rem; color: var(--ui-text-2); }
+html[data-ui-theme="terminal"] .ui-navlink:hover { background: var(--ui-accent-soft); color: var(--ui-text); }
+html[data-ui-theme="terminal"] .ui-nav .ui-navlink { counter-increment: t-fkey; }
+html[data-ui-theme="terminal"] .ui-nav .ui-navlink::before {
+    content: "F" counter(t-fkey); font-size: .66rem; padding: 0 .25rem; margin-right: .1rem;
+    color: #0a0702; background: var(--ui-muted); text-shadow: none;
+}
+html[data-ui-theme="terminal"] .ui-navlink--active,
+html[data-ui-theme="terminal"] .ui-navlink--active:hover {
+    background: var(--ui-accent) !important; color: #0a0702 !important; text-shadow: none; box-shadow: none !important;
+}
+html[data-ui-theme="terminal"] .ui-navlink--active::before { background: #0a0702 !important; color: var(--ui-accent) !important; }
+html[data-ui-theme="terminal"] .ui-iconbtn { color: var(--ui-text-2); }
+html[data-ui-theme="terminal"] .ui-iconbtn:hover { background: var(--ui-accent); color: #0a0702; }
+
+/* ---------- Средний экран: меню сверху — плотнее, без меток F (иначе не влезает) ---------- */
+@media (max-width: 1279.98px) {
+    html[data-ui-theme="terminal"] .ui-nav .ui-navlink::before { content: none; }
+    html[data-ui-theme="terminal"] .ui-navlink { letter-spacing: 0; padding: 0 .5rem; font-size: .76rem; }
+    html[data-ui-theme="terminal"] .ui-brand__name { letter-spacing: .12em; }
+}
+@media (max-width: 1023.98px) {
+    html[data-ui-theme="terminal"] .ui-navlink { padding: 0 .3rem; font-size: .7rem; gap: .2rem; }
+    html[data-ui-theme="terminal"] .ui-navlink > svg { width: 12px; height: 12px; }
+}
+/* ---------- Телефон: кнопки без скобок и разрядки ---------- */
+@media (max-width: 639.98px) {
+    html[data-ui-theme="terminal"] .ui-btn { letter-spacing: 0; padding: 0 .7rem; }
+    html[data-ui-theme="terminal"] .ui-btn::before,
+    html[data-ui-theme="terminal"] .ui-btn::after { content: none; }
+    html[data-ui-theme="terminal"] .ui-page-header h1,
+    html[data-ui-theme="terminal"] .ui-page-header h2 { letter-spacing: .03em !important; }
+}
+
+/* ---------- Широкий экран: боковая командная панель ---------- */
+@media (min-width: 1280px) {
+    html[data-ui-theme="terminal"] { --ui-nav-h: 0px; }
+    html[data-ui-theme="terminal"] .ui-app:has(> .ui-nav) { padding-left: var(--t-side); }
+    html[data-ui-theme="terminal"] .ui-nav {
+        position: fixed; top: 0; bottom: 0; left: 0; width: var(--t-side);
+        border-bottom: 0; border-right: 3px double var(--ui-border-strong);
+        padding-bottom: 74px;   /* место под строку состояния */
+    }
+    html[data-ui-theme="terminal"] .ui-nav > .max-w-7xl { max-width: none; height: 100%; padding: 18px 14px 0; }
+    html[data-ui-theme="terminal"] .ui-nav > .max-w-7xl > .flex {
+        flex-direction: column; align-items: stretch !important; justify-content: flex-start !important;
+        height: 100% !important; gap: 18px;
+    }
+    /* бренд — крупно, с подписью */
+    html[data-ui-theme="terminal"] .ui-nav .ui-brand { padding-bottom: 14px; border-bottom: 1px dashed var(--ui-border); }
+    html[data-ui-theme="terminal"] .ui-nav .ui-brand > span.hidden { display: block !important; }
+    /* разделы — столбцом */
+    html[data-ui-theme="terminal"] .ui-nav > .max-w-7xl > .flex > .md\:flex {
+        flex-direction: column; align-items: stretch; gap: 3px; flex: 1 1 auto;
+    }
+    html[data-ui-theme="terminal"] .ui-nav .md\:flex > .relative { width: 100%; }
+    html[data-ui-theme="terminal"] .ui-nav .ui-navlink { width: 100%; justify-content: flex-start; height: 34px; }
+    html[data-ui-theme="terminal"] .ui-nav .ui-navlink > svg { margin-left: auto; transform: rotate(-90deg) !important; }
+    /* выпадающие панели — вылетают вправо от панели */
+    html[data-ui-theme="terminal"] .ui-nav .ui-menu {
+        left: calc(100% + 14px) !important; right: auto !important; top: 0 !important; margin-top: 0 !important;
+    }
+    /* нижний блок: профиль во всю ширину, под ним поиск и тема */
+    html[data-ui-theme="terminal"] .ui-nav > .max-w-7xl > .flex > div:last-child {
+        flex-wrap: wrap; justify-content: flex-start; gap: 6px;
+        padding-top: 12px; border-top: 1px dashed var(--ui-border);
+    }
+    /* их меню — от края панели (позиционируются по самой панели), снизу вверх */
+    html[data-ui-theme="terminal"] .ui-nav > .max-w-7xl > .flex > div:last-child > .relative { position: static; }
+    html[data-ui-theme="terminal"] .ui-nav > .max-w-7xl > .flex > div:last-child .ui-menu {
+        top: auto !important; bottom: 14px !important; max-height: calc(100vh - 28px); overflow-y: auto;
+    }
+    html[data-ui-theme="terminal"] .ui-nav > .max-w-7xl > .flex > div:last-child > .md\:block { order: -1; width: 100%; }
+    html[data-ui-theme="terminal"] .ui-nav > .max-w-7xl > .flex > div:last-child > .md\:block > button { width: 100%; border-radius: 0 !important; }
+    html[data-ui-theme="terminal"] .ui-nav > .max-w-7xl > .flex > div:last-child > .md\:block > button > span.hidden { display: block !important; flex: 1; min-width: 0; overflow: hidden; }
+    html[data-ui-theme="terminal"] .ui-nav > .max-w-7xl > .flex > div:last-child > .md\:block > button > svg { transform: rotate(-90deg); }
+
+    /* строка состояния (создаёт terminal-skin.js) */
+    html[data-ui-theme="terminal"] .t-status { display: block; }
+}
+
+/* ---------- Строка состояния и «загрузка» (terminal-skin.js) ---------- */
+.t-status, .t-boot { display: none; }
+html[data-ui-theme="terminal"] .t-status {
+    position: fixed; left: 0; bottom: 0; width: var(--t-side); z-index: 41;
+    padding: 8px 14px 10px; border-top: 1px dashed var(--ui-border); border-right: 3px double var(--ui-border-strong);
+    background: #080501; color: var(--ui-muted); font-size: .68rem; line-height: 1.45; letter-spacing: .04em;
+    pointer-events: none; text-transform: uppercase;
+}
+html[data-ui-theme="terminal"] .t-status b { color: var(--ui-text); font-weight: 700; }
+html[data-ui-theme="terminal"] .t-status .t-ok { color: var(--ui-good); }
+html[data-ui-theme="terminal"] .t-status .t-bad { color: var(--ui-bad); }
+@media (max-width: 1279.98px) { html[data-ui-theme="terminal"] .t-status { display: none; } }
+
+html[data-ui-theme="terminal"] .t-boot {
+    display: block; position: fixed; inset: 0; z-index: 2147482000;
+    background: #050301; color: var(--ui-text); padding: 6vh 7vw;
+    font-size: 15px; line-height: 1.7; white-space: pre-wrap; letter-spacing: .04em;
+    animation: t-poweron .45s ease-out both;
+}
+html[data-ui-theme="terminal"] .t-boot.is-out { animation: t-poweroff .35s ease-in forwards; }
+html[data-ui-theme="terminal"] .t-boot__hint { position: absolute; right: 7vw; bottom: 6vh; color: var(--ui-faint); font-size: 12px; }
+html[data-ui-theme="terminal"] .t-boot .t-ok { color: var(--ui-good); }
+html[data-ui-theme="terminal"] .t-boot .t-bad { color: var(--ui-bad); }
+@keyframes t-poweron {
+    0%   { transform: scale(1, .004); filter: brightness(4); }
+    55%  { transform: scale(1, .004); filter: brightness(4); }
+    100% { transform: scale(1, 1); filter: brightness(1); }
+}
+@keyframes t-poweroff { to { opacity: 0; } }
+
+/* ---------- Страница входа: окно «авторизация» ---------- */
+html[data-ui-theme="terminal"] .auth__brand { border-right: 3px double var(--ui-border-strong); }
+html[data-ui-theme="terminal"] .auth__card { border: 3px double var(--ui-border-strong); box-shadow: 0 0 40px -10px rgba(255, 176, 0, 0.25); }
+html[data-ui-theme="terminal"] .auth__card::before {
+    content: " АВТОРИЗАЦИЯ ПОЛЬЗОВАТЕЛЯ "; display: block;
+    margin: -1.75rem -1.75rem 1.5rem; padding: .35rem 1rem;
+    background: var(--ui-accent); color: #0a0702; text-shadow: none;
+    font-weight: 700; letter-spacing: .14em; font-size: .75rem;
+}
+
+/* ---------- Кнопка чата, «Отменить» ---------- */
+html[data-ui-theme="terminal"] .ui-chat__fab { box-shadow: 0 0 0 2px #0a0702, 0 0 0 3px var(--ui-accent), 0 0 18px rgba(255, 176, 0, 0.45); }
+html[data-ui-theme="terminal"] .ui-undo { background: #0d0903 !important; border: 3px double var(--ui-border-strong); color: var(--ui-text); }
+
+/* ---------- Без анимаций для тех, кто их отключил ---------- */
+@media (prefers-reduced-motion: reduce) {
+    html[data-ui-theme="terminal"] body::after,
+    html[data-ui-theme="terminal"] .ui-page-header h1::after,
+    html[data-ui-theme="terminal"] .ui-page-header h2::after { animation: none; }
+}

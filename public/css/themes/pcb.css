@@ -1,0 +1,196 @@
+/* ============================================================
+   Тема «Печатная плата» — сайт учёта производства, каким он
+   видится изнутри изделия: зелёная паяльная маска, медные
+   дорожки и золочёные площадки (ENIG), белая шелкография,
+   светодиоды-индикаторы. Курсор — щуп, над кнопками — площадка.
+   Фон рисуется без фотографий: public/img/pcb/board.svg.
+   Общая часть — themes/base.css; здесь палитра, фон и детали.
+   ============================================================ */
+
+html[data-ui-theme="pcb"] {
+    --ui-bg:            #04231a;
+    --ui-surface:       rgba(7, 46, 32, 0.9);
+    --ui-surface-2:     rgba(9, 54, 38, 0.92);
+    --ui-surface-hover: rgba(18, 78, 54, 0.94);
+    --ui-border:        rgba(216, 178, 90, 0.16);
+    --ui-border-strong: rgba(216, 178, 90, 0.32);
+    --ui-text:          #eef5ef;
+    --ui-text-2:        #cfe2d4;
+    --ui-muted:         #8fb9a0;
+    --ui-faint:         #62907a;
+
+    --ui-accent:        #d6a440;
+    --ui-accent-hover:  #e8bb5a;
+    --ui-accent-soft:   rgba(214, 164, 64, 0.15);
+    --ui-accent-text:   #f0c869;
+    --ui-ring:          rgba(214, 164, 64, 0.38);
+
+    --ui-good:          #6cf08a;
+    --ui-good-soft:     rgba(80, 230, 120, 0.14);
+    --ui-bad:           #ff6a5a;
+    --ui-bad-soft:      rgba(255, 80, 60, 0.15);
+
+    --ui-radius:        4px;
+    --ui-radius-sm:     3px;
+    --ui-shadow-sm:     0 1px 2px rgba(0, 12, 6, 0.5);
+    --ui-shadow:        0 2px 4px rgba(0, 12, 6, 0.4), 0 12px 28px -10px rgba(0, 10, 5, 0.8);
+    --ui-shadow-lg:     0 20px 48px -12px rgba(0, 8, 4, 0.9);
+
+    --sk-radius:      3px;
+    --sk-on-accent:   #1d1300;
+    --sk-btn:         linear-gradient(180deg, #f2cd72 0%, #d6a440 55%, #b8862a 100%);
+    --sk-btn-hover:   linear-gradient(180deg, #f8da88 0%, #e2b14c 55%, #c4922f 100%);
+    --sk-btn-edge:    rgba(255, 240, 200, 0.55);
+    --sk-nav:         rgba(3, 26, 18, 0.92);
+    --sk-line:        rgba(216, 178, 90, 0.4);
+    --sk-card-edge:   rgba(240, 210, 140, 0.12);
+    --sk-tile:        linear-gradient(160deg, #1b211e, #0a0d0c);
+    --sk-tile-edge:   rgba(216, 178, 90, 0.55);
+    --sk-tile-icon:   #f0c869;
+    --sk-gray-200:    rgba(22, 74, 52, 0.92);
+    --sk-gray-300:    rgba(32, 92, 66, 0.92);
+    --sk-panel:       rgba(9, 54, 38, 0.65);
+    --sk-disabled:    rgba(14, 48, 35, 0.9);
+    --sk-popup:       #08301f;
+    --sk-shade:       rgba(1, 14, 9, 0.65);
+    --sk-scroll:      #5e7d3a;
+    --sk-auth-brand:  linear-gradient(160deg, rgba(3, 26, 18, 0.55), rgba(3, 26, 18, 0.9));
+    --sk-cursor:         image-set(url("../../img/cursors/pcb.png") 1x, url("../../img/cursors/pcb@2x.png") 2x) 3 2, auto;
+    --sk-cursor-pointer: image-set(url("../../img/cursors/pcb-pointer.png") 1x, url("../../img/cursors/pcb-pointer@2x.png") 2x) 16 16, pointer;
+
+    --pcb-mono:   "Consolas", "Cascadia Mono", "Lucida Console", "DejaVu Sans Mono", ui-monospace, monospace;
+    --pcb-silk:   rgba(238, 245, 239, 0.28);
+    --pcb-copper: #d8b25a;
+    --pcb-led:    #7dff9a;
+}
+
+/* ---------- Фон: маска с бликом + рисунок платы (без фото) ---------- */
+html[data-ui-theme="pcb"] body {
+    background-image:
+        radial-gradient(ellipse 80% 60% at 15% -10%, rgba(70, 180, 110, 0.20), transparent 70%),
+        radial-gradient(ellipse 70% 60% at 110% 110%, rgba(0, 0, 0, 0.55), transparent 70%),
+        url("../../img/pcb/board.svg"),
+        repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.012) 0 2px, transparent 2px 5px);
+    background-size: auto, auto, 240px 240px, auto;
+    background-attachment: fixed;
+}
+html[data-ui-theme="pcb"] ::selection { background: rgba(214, 164, 64, 0.45); color: #fff; }
+
+/* ---------- Шапка: по нижней дорожке бежит сигнал ---------- */
+html[data-ui-theme="pcb"] .ui-nav {
+    background:
+        linear-gradient(90deg, transparent, rgba(125, 255, 154, 0.9), transparent) no-repeat,
+        var(--sk-nav);
+    background-size: 180px 1px, auto;
+    background-position: -200px 100%, 0 0;
+    border-bottom-color: rgba(216, 178, 90, 0.45);
+    animation: pcb-signal 6s linear infinite;
+}
+@keyframes pcb-signal {
+    from { background-position: -200px 100%, 0 0; }
+    to   { background-position: calc(100% + 200px) 100%, 0 0; }
+}
+html[data-ui-theme="pcb"] .ui-navlink--active,
+html[data-ui-theme="pcb"] .ui-navlink--active:hover {
+    color: var(--ui-accent-text);
+    box-shadow: inset 0 -2px 0 var(--ui-accent), 0 6px 14px -8px rgba(214, 164, 64, 0.7);
+}
+html[data-ui-theme="pcb"] .ui-brand__name { font-family: var(--pcb-mono); letter-spacing: .14em; }
+html[data-ui-theme="pcb"] .ui-brand__sub  { font-family: var(--pcb-mono); letter-spacing: .06em; text-transform: uppercase; font-size: .62rem; }
+
+/* счётчики и аватар — горящий светодиод */
+html[data-ui-theme="pcb"] .ui-navlink__count {
+    background: var(--pcb-led); color: #03200f;
+    box-shadow: 0 0 0 1px rgba(3, 32, 15, 0.8), 0 0 10px rgba(125, 255, 154, 0.7);
+}
+html[data-ui-theme="pcb"] .ui-avatar {
+    background: var(--sk-btn); color: var(--sk-on-accent);
+    box-shadow: inset 0 1px 0 var(--sk-btn-edge), 0 0 0 2px rgba(3, 26, 18, 0.9), 0 0 0 3px rgba(216, 178, 90, 0.5);
+}
+
+/* ---------- Заголовки — шелкография ---------- */
+html[data-ui-theme="pcb"] .ui-page-header h1,
+html[data-ui-theme="pcb"] .ui-page-header h2,
+html[data-ui-theme="pcb"] .auth__headline {
+    font-family: var(--pcb-mono) !important;
+    text-transform: uppercase; letter-spacing: .1em !important; font-weight: 700 !important;
+}
+/* под заголовком — медная дорожка с переходным отверстием на конце */
+html[data-ui-theme="pcb"] .ui-page-header h1,
+html[data-ui-theme="pcb"] .ui-page-header h2 {
+    display: inline-block; padding: 0 1.1rem .3rem 0;
+    background:
+        radial-gradient(circle, var(--ui-bg) 0 2px, var(--pcb-copper) 2.5px 4.5px, transparent 5px) no-repeat right bottom / 10px 10px,
+        linear-gradient(var(--pcb-copper), var(--pcb-copper)) no-repeat left calc(100% - 4px) / calc(100% - 8px) 2px;
+    text-shadow: 0 0 14px rgba(125, 255, 154, 0.18);
+}
+html[data-ui-theme="pcb"] h3 { letter-spacing: .02em; }
+html[data-ui-theme="pcb"] .ui-btn,
+html[data-ui-theme="pcb"] .ui-menu__label,
+html[data-ui-theme="pcb"] .ui-table thead th,
+html[data-ui-theme="pcb"] .ui-badge { font-family: var(--pcb-mono); }
+html[data-ui-theme="pcb"] .ui-menu__label { letter-spacing: .12em; color: var(--ui-accent-text); }
+
+/* ---------- Карточки: уголки-метки шелкографии и стеклотекстолит внутри ---------- */
+html[data-ui-theme="pcb"] .ui-card {
+    border-color: var(--ui-border-strong);
+    background-image:
+        linear-gradient(var(--pcb-silk), var(--pcb-silk)), linear-gradient(var(--pcb-silk), var(--pcb-silk)),
+        linear-gradient(var(--pcb-silk), var(--pcb-silk)), linear-gradient(var(--pcb-silk), var(--pcb-silk)),
+        linear-gradient(var(--pcb-silk), var(--pcb-silk)), linear-gradient(var(--pcb-silk), var(--pcb-silk)),
+        linear-gradient(var(--pcb-silk), var(--pcb-silk)), linear-gradient(var(--pcb-silk), var(--pcb-silk)),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 40%);
+    background-repeat: no-repeat;
+    background-size:
+        12px 1px, 1px 12px, 12px 1px, 1px 12px,
+        12px 1px, 1px 12px, 12px 1px, 1px 12px, auto;
+    background-position:
+        6px 6px, 6px 6px, calc(100% - 6px) 6px, calc(100% - 6px) 6px,
+        6px calc(100% - 6px), 6px calc(100% - 6px), calc(100% - 6px) calc(100% - 6px), calc(100% - 6px) calc(100% - 6px), 0 0;
+}
+
+/* ---------- Плитки-иконки — микросхема с ключом-точкой ---------- */
+html[data-ui-theme="pcb"] .ui-icon-tile {
+    background:
+        radial-gradient(circle, rgba(238, 245, 239, 0.45) 0 1.6px, transparent 2.2px) no-repeat 5px 5px / 6px 6px,
+        var(--sk-tile);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+        0 0 0 1px var(--sk-tile-edge),
+        0 0 0 3px rgba(3, 26, 18, 0.9),
+        0 6px 14px -6px rgba(0, 0, 0, 0.9);
+}
+
+/* ---------- Кнопки — золочёные площадки ---------- */
+html[data-ui-theme="pcb"] .ui-btn--primary { text-shadow: 0 1px 0 rgba(255, 240, 200, 0.4); }
+html[data-ui-theme="pcb"] .ui-btn--primary:hover { box-shadow: inset 0 1px 0 var(--sk-btn-edge), 0 0 0 1px rgba(240, 200, 105, 0.5), 0 4px 16px -4px rgba(214, 164, 64, 0.6); }
+html[data-ui-theme="pcb"] .ui-btn--ghost { background: transparent; border-color: var(--ui-border-strong); }
+html[data-ui-theme="pcb"] .ui-btn--ghost:hover { border-color: var(--pcb-copper); color: var(--ui-accent-text); }
+html[data-ui-theme="pcb"] .ui-chat__fab { box-shadow: 0 0 0 2px rgba(3, 26, 18, 0.9), 0 0 0 3px rgba(216, 178, 90, 0.55), 0 10px 24px -6px rgba(0, 0, 0, 0.9); }
+
+/* ---------- Пункт меню: выбранный — со светодиодом ---------- */
+html[data-ui-theme="pcb"] .ui-menu { border: 1px solid var(--ui-border-strong); }
+html[data-ui-theme="pcb"] .ui-menu__item--active { box-shadow: inset 2px 0 0 var(--pcb-led); }
+
+/* ---------- Таблицы: дорожки между строками ---------- */
+html[data-ui-theme="pcb"] .ui-table thead th { color: var(--ui-accent-text); letter-spacing: .08em; }
+html[data-ui-theme="pcb"] .ui-table tbody td { border-bottom-style: dashed; }
+html[data-ui-theme="pcb"] .ui-table tbody tr:hover { box-shadow: inset 2px 0 0 var(--ui-accent); }
+
+/* ---------- Поля ввода — как окно в маске ---------- */
+html[data-ui-theme="pcb"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+html[data-ui-theme="pcb"] select,
+html[data-ui-theme="pcb"] textarea { background-color: rgba(2, 22, 14, 0.75) !important; }
+html[data-ui-theme="pcb"] :is(input, select, textarea):disabled:is(input, select, textarea):disabled { background-color: var(--sk-disabled) !important; }
+html[data-ui-theme="pcb"] input[type="checkbox"],
+html[data-ui-theme="pcb"] input[type="radio"] { accent-color: var(--ui-accent); }
+
+/* ---------- Успех / ошибка — светодиоды ---------- */
+html[data-ui-theme="pcb"] .text-green-600,
+html[data-ui-theme="pcb"] .text-emerald-600 { text-shadow: 0 0 8px rgba(125, 255, 154, 0.35); }
+html[data-ui-theme="pcb"] .text-red-600 { text-shadow: 0 0 8px rgba(255, 90, 70, 0.35); }
+
+/* ---------- Без анимаций для тех, кто их отключил ---------- */
+@media (prefers-reduced-motion: reduce) {
+    html[data-ui-theme="pcb"] .ui-nav { animation: none; background-size: 0 0, auto; }
+}

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <!-- Тема «Печатная плата»: бесшовная плитка фона. Нижний слой — тусклый, верхний — медь под маской. -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- нижний слой -->
+    <g stroke="#0f5a3a" stroke-width="3">
+      <path d="M210 0V80L195 95V160L210 175V240"/>
+      <path d="M100 0V20L85 35V60"/>
+      <path d="M100 240V225"/>
+    </g>
+    <!-- верхний слой -->
+    <g stroke="#c9a046" stroke-opacity=".26" stroke-width="3">
+      <path d="M0 30H70L90 50H170L190 30H240"/>
+      <path d="M0 200H100L115 215H160L175 200H240"/>
+      <path d="M0 150H30L45 135H75"/>
+      <path d="M140 90V120L155 135H180"/>
+      <path d="M85 60V75H52"/>
+      <path d="M150 186V200"/>
+    </g>
+    <g stroke="#c9a046" stroke-opacity=".18" stroke-width="1.6">
+      <path d="M0 110H20L28 102H60"/>
+      <path d="M0 116H22L30 108H60"/>
+      <path d="M0 122H24L32 114H60"/>
+      <path d="M240 110H220M240 116H222M240 122H224" stroke-opacity=".12"/>
+    </g>
+  </g>
+  <!-- переходные отверстия -->
+  <g fill="#062a1c" stroke="#d8b25a" stroke-opacity=".42" stroke-width="2.4">
+    <circle cx="140" cy="90" r="4.5"/>
+    <circle cx="180" cy="135" r="4.5"/>
+    <circle cx="75" cy="135" r="4.5"/>
+    <circle cx="85" cy="60" r="4.5"/>
+    <circle cx="100" cy="225" r="4.5"/>
+    <circle cx="100" cy="20" r="4.5"/>
+  </g>
+  <!-- площадки: резистор R7 и микросхема U3 -->
+  <g fill="#d8b25a" fill-opacity=".28">
+    <rect x="34" y="68" width="10" height="14" rx="1.5"/>
+    <rect x="58" y="68" width="10" height="14" rx="1.5"/>
+    <rect x="62" y="104" width="8" height="5" rx="1"/>
+    <rect x="62" y="110" width="8" height="5" rx="1"/>
+    <rect x="62" y="116" width="8" height="5" rx="1"/>
+    <rect x="128" y="142" width="5" height="8" rx="1"/><rect x="138" y="142" width="5" height="8" rx="1"/>
+    <rect x="148" y="142" width="5" height="8" rx="1"/><rect x="158" y="142" width="5" height="8" rx="1"/>
+    <rect x="128" y="180" width="5" height="8" rx="1"/><rect x="138" y="180" width="5" height="8" rx="1"/>
+    <rect x="148" y="180" width="5" height="8" rx="1"/><rect x="158" y="180" width="5" height="8" rx="1"/>
+  </g>
+  <!-- шелкография -->
+  <g fill="none" stroke="#e8f1ea" stroke-opacity=".14" stroke-width="1">
+    <rect x="30" y="64" width="42" height="22" rx="2"/>
+    <rect x="124" y="152" width="44" height="26" rx="1"/>
+    <circle cx="130" cy="158" r="1.6" fill="#e8f1ea" fill-opacity=".2"/>
+  </g>
+  <g fill="#e8f1ea" fill-opacity=".16" font-family="Consolas, monospace" font-size="8" letter-spacing=".5">
+    <text x="30" y="96">R7</text>
+    <text x="124" y="172" font-size="7">U3</text>
+    <text x="186" y="125">TP4</text>
+    <text x="8" y="186">GND</text>
+  </g>
+</svg>
