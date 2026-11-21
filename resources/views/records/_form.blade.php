@@ -428,7 +428,8 @@
                             <input type="text" name="{{ $name }}" value="{{ $value }}"
                                    @if($isReq) required @endif @if($isTimeLocked) disabled @endif
                                    placeholder="{{ $f['placeholder'] ?? '' }}"
-                                   @if(!empty($f['prefill'])) data-prefill="{{ $f['prefill'] }}" @endif autocomplete="off"
+                                   @if(!empty($f['prefill'])) data-prefill="{{ $f['prefill'] }}" @endif
+                                   {{-- без autocomplete="off": браузер подсказывает ранее введённые значения поля (как было до масок) --}}
                                    class="{{ $baseInput }} @error($name) !border-red-400 !ring-red-500/15 @enderror">
                         @endif
 
