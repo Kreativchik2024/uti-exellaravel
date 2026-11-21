@@ -51,35 +51,51 @@
                 <button class="ui-btn ui-btn--primary ui-btn--sm mt-2">Создать</button>
             </form>
 
-            @forelse($groups as $g)
-                <div class="ui-fc-group-row {{ $g->parent_id ? 'is-child' : '' }}" style="padding-left: {{ 1 + ($g->depth() - 1) * 1.6 }}rem" x-data="{ edit: false }">
-                    <div class="flex items-center gap-3 flex-wrap">
-                        <span class="ui-fc-code">{{ $g->prefix }}</span>
-                        <span class="text-xs font-mono" style="color: var(--ui-muted)">Р{{ $g->depth() }}</span>
-                        <a href="{{ route('fault-codes.index', ['group' => $g->id]) }}" class="font-semibold" style="color: var(--ui-text)">{{ $g->name }}</a>
-                        @if($g->codes_count)<span class="text-xs" style="color: var(--ui-muted)">{{ $g->codes_count }} код.</span>@endif
-                        <span class="text-xs" style="color: var(--ui-muted)">
-                            @if($g->sheets) вкладки: {{ collect($g->sheets)->map(fn ($s) => $sheets[$s] ?? $s)->implode(', ') }}
-                            @elseif(! $g->parent_id && ! $g->effectiveSheets()) <span style="color:#b45309">не привязан к вкладкам — коды не выпадают</span>
+            @if($groups->isNotEmpty())
+                @php $kids = $groups->groupBy(fn ($g) => $g->parent_id ?? 0); $loose = $treeCodes[0] ?? collect(); @endphp
+                <div class="fc-tree">
+                    <div class="fc-tree__bar">
+                        <span>
+                            @if($focus)
+                                Показана ветка выбранного уровня · <a href="{{ route('fault-codes.index') }}" class="underline">всё дерево</a>
+                            @else
+                                Нажмите на уровень, чтобы раскрыть его ступенькой
                             @endif
                         </span>
-                        <span class="ml-auto flex gap-1">
-                            <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="edit = !edit">Изменить</button>
-                            <form method="POST" action="{{ route('fault-codes.groups.destroy', $g) }}" onsubmit="return confirm('Удалить? Коды станут общими, разделы внутри подгруппы удалятся.')">
-                                @csrf @method('DELETE')
-                                <button class="ui-btn ui-btn--ghost ui-btn--sm" style="color: var(--ui-bad)">✕</button>
-                            </form>
+                        <span class="flex gap-1">
+                            <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="$dispatch('fc-tree', true)">Развернуть всё</button>
+                            <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="$dispatch('fc-tree', false)">Свернуть всё</button>
                         </span>
                     </div>
-                    <form x-show="edit" x-cloak method="POST" action="{{ route('fault-codes.groups.update', $g) }}" class="mt-3">
-                        @csrf @method('PATCH')
-                        @include('fault-codes._group_fields', ['g' => $g])
-                        <button class="ui-btn ui-btn--primary ui-btn--sm mt-2">Сохранить</button>
-                    </form>
+                    @foreach($kids[0] ?? [] as $g)
+                        @continue($focus && $g->id !== $focus['root'])
+                        @include('fault-codes._tree_node', ['g' => $g])
+                    @endforeach
+                    @if($loose->isNotEmpty() && ! $focus)
+                        <div class="fc-node" x-data="{ open: false }" @fc-tree.window="open = $event.detail">
+                            <div class="fc-node__row is-top">
+                                <button type="button" class="fc-node__toggle" @click="open = !open" :aria-expanded="open.toString()" aria-label="Раскрыть общие коды">
+                                    <svg :class="open && 'is-open'" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 5l6 5-6 5z"/></svg>
+                                </button>
+                                <button type="button" class="fc-node__name" @click="open = !open">Общие (без подгруппы)</button>
+                                <span class="fc-node__meta"><span>{{ $loose->count() }} код.</span></span>
+                            </div>
+                            <div class="fc-node__body" x-show="open" x-cloak>
+                                <ul class="fc-codes">
+                                    @foreach($loose as $c)
+                                        <li class="fc-code {{ $c->is_active ? '' : 'is-off' }}">
+                                            <a href="{{ route('fault-codes.index', ['q' => $c->code]) }}#fc-table" class="fc-code__code">{{ $c->code }}</a>
+                                            <span class="fc-code__desc">{{ $c->description ?: '—' }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        </div>
+                    @endif
                 </div>
-            @empty
+            @else
                 <p class="px-4 pb-4 text-sm" style="color: var(--ui-muted)">Подгрупп пока нет. Все коды — общие и выпадают во всех вкладках. Загрузите таблицу кодов — подгруппы и разделы создадутся по ней.</p>
-            @endforelse
+            @endif
         </section>
 
         <div class="grid gap-4 md:grid-cols-2">
@@ -142,7 +158,7 @@
             <button class="ui-btn ui-btn--ghost">Показать</button>
         </form>
 
-        <div class="ui-card overflow-hidden">
+        <div class="ui-card overflow-hidden" id="fc-table">
             <div class="overflow-x-auto">
                 <table class="ui-table">
                     <thead><tr><th style="width: 120px">Код</th><th>Описание</th><th style="width: 200px">Подгруппа · раздел</th><th style="width: 80px">Активен</th><th style="width: 210px"></th></tr></thead>

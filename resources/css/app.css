@@ -1085,4 +1085,37 @@ html.dark .ui-ms-cell.n1 { color: #60a5fa; } html.dark .ui-ms-cell.n2 { color: #
 .ui-fc-note b { font-family: ui-monospace, monospace; }
 .ui-fc-group-row { padding: .7rem 1rem; border-top: 1px solid var(--ui-border); }
 .ui-fc-group-row.is-child { padding-left: 2.4rem; background: var(--ui-surface-2); }
+/* Справочник кодов: дерево-лесенка — каждый уровень раскрывается ступенькой с направляющей линией */
+.fc-tree { border-top: 1px solid var(--ui-border); padding: .35rem .5rem .6rem; }
+.fc-tree__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; padding: .3rem .5rem .5rem; font-size: .75rem; color: var(--ui-muted); }
+.fc-node__row { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .6rem; padding: .35rem .5rem; border-radius: 10px; }
+.fc-node__row:hover { background: var(--ui-surface-2); }
+.fc-node__row.is-top { font-weight: 700; }
+.fc-node__toggle { flex: 0 0 auto; display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 7px; color: var(--ui-muted); }
+.fc-node__toggle:hover:not(:disabled) { background: var(--ui-surface-hover); color: var(--ui-text); }
+.fc-node__toggle:disabled { opacity: .3; cursor: default; }
+.fc-node__toggle svg { width: .95rem; height: .95rem; transition: transform .15s ease; }
+.fc-node__toggle svg.is-open { transform: rotate(90deg); }
+.fc-node__name { display: inline-flex; align-items: center; gap: .55rem; min-width: 0; text-align: left; color: var(--ui-text); font-weight: inherit; }
+.fc-node__name:disabled { cursor: default; }
+.fc-node__meta { display: inline-flex; flex-wrap: wrap; gap: .3rem; font-size: .75rem; font-weight: 400; color: var(--ui-muted); }
+.fc-node__actions { margin-left: auto; display: flex; gap: .25rem; font-weight: 400; }
+.fc-node__edit { margin: .3rem 0 .6rem 2.2rem; }
+.fc-node__body { margin-left: 1.3rem; padding-left: .7rem; border-left: 2px solid var(--ui-border); }
+.fc-codes { margin: .15rem 0 .45rem; padding: 0; list-style: none; }
+.fc-code { display: flex; align-items: baseline; gap: .7rem; padding: .3rem .5rem .3rem 2.2rem; border-radius: 8px; font-size: .85rem; position: relative; }
+.fc-code::before { content: ""; position: absolute; left: -.7rem; top: 50%; width: 2.4rem; border-top: 1px dashed var(--ui-border); }
+.fc-code:hover { background: var(--ui-surface-2); }
+.fc-code.is-off { opacity: .55; }
+.fc-code__code { flex: 0 0 auto; min-width: 5.5rem; font-family: ui-monospace, monospace; font-weight: 700; color: var(--ui-accent-text, var(--ui-text)); }
+.fc-code__code:hover { text-decoration: underline; }
+.fc-code__desc { min-width: 0; color: var(--ui-text); overflow-wrap: anywhere; }
+.fc-code__hint { display: block; font-size: .75rem; color: var(--ui-muted); }
+.fc-code__off { margin-left: .35rem; font-size: .7rem; color: var(--ui-muted); }
+@media (max-width: 640px) {
+    .fc-node__actions { margin-left: 2.2rem; }
+    .fc-node__body { margin-left: .7rem; padding-left: .45rem; }
+    .fc-code { padding-left: 1.2rem; flex-direction: column; gap: 0; }
+    .fc-code::before { width: 1.4rem; top: .95rem; }
+}
 .ui-fc-hint { display: block; font-size: .72rem; color: var(--ui-muted); white-space: normal; }

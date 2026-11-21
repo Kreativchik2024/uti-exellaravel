@@ -8,6 +8,7 @@ use App\Models\FaultCodeGroup;
 use App\Models\Section;
 use App\Services\FaultCodes;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
@@ -31,9 +32,14 @@ class FaultCodeController extends Controller
             ->when($group === 'none', fn ($w) => $w->whereNull('group_id'))
             ->when(ctype_digit((string) $group), fn ($w) => $w->whereIn('group_id', $tree[(int) $group]?->selfAndDescendantIds($tree) ?? [0]))
             ->when($r->boolean('review'), fn ($w) => $w->where('needs_review', true))
-            ->orderByDesc('needs_review')->orderBy('code')
-            ->paginate(100)->withQueryString();
+            ->get();
         FaultCodeGroup::attachTo($codes, $tree);
+        // Сначала новые на проверке, дальше по дереву уровней, внутри — по номеру (C(3).3.2 раньше C(3).3.10)
+        $codes = $codes->sort(fn ($a, $b) => [$b->needs_review, $a->group?->sortKey() ?? '~'] <=> [$a->needs_review, $b->group?->sortKey() ?? '~']
+            ?: strnatcasecmp($a->code, $b->code))->values();
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $codes = (new LengthAwarePaginator($codes->forPage($page, 100)->values(), $codes->count(), 100, $page, ['path' => $r->url()]))
+            ->withQueryString();
 
         return view('fault-codes.index', [
             'codes'    => $codes,
@@ -41,6 +47,14 @@ class FaultCodeController extends Controller
             'group'    => $group,
             'review'   => $r->boolean('review'),
             'groups'   => $tree->sortBy(fn ($g) => $g->sortKey())->values(),
+            'tree'     => $tree,
+            // Выбран уровень — в дереве только его ветка, раскрытая до него и внутри него
+            'focus'    => ($sel = ctype_digit((string) $group) ? ($tree[(int) $group] ?? null) : null)
+                ? ['root' => $sel->path()[0]->id, 'open' => array_merge(array_map(fn ($g) => $g->id, $sel->path()), $sel->selfAndDescendantIds($tree))]
+                : null,
+            // Дерево-лесенка: все коды по уровням, внутри уровня — по номеру
+            'treeCodes' => FaultCode::query()->get(['id', 'code', 'description', 'hint', 'group_id', 'is_active', 'needs_review'])
+                ->sort(fn ($a, $b) => strnatcasecmp($a->code, $b->code))->groupBy(fn ($c) => $c->group_id ?? 0),
             'sheets'   => collect(config('sheets.map'))->map(fn ($c) => $c['title'])->all(),
             'sections' => Section::ordered()->get(['id', 'name']),
             'total'    => FaultCode::count(),
